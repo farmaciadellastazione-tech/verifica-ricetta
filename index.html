@@ -295,19 +295,16 @@
       </div>
     </div>
 
-    <!-- API Key (nascosta di default: la chiave farmacia e' embedded) -->
-    <div id="api-config" style="display:none;">
+    <!-- API Key (per-dispositivo, salvata in localStorage) -->
+    <div id="api-config">
       <div class="api-section">
-        <label for="api-key">Chiave personale (override)</label>
+        <label for="api-key">Chiave API Google Gemini</label>
         <input type="password" id="api-key" placeholder="AIza..." autocomplete="off" />
         <button class="api-toggle" id="api-toggle" onclick="toggleApiKey()">Mostra</button>
       </div>
       <div class="api-help">
-        Lascia vuoto per usare la chiave farmacia (default). Per usarne una personale: ottienila su <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> e incollala qui — sara' salvata solo su questo dispositivo.
+        Chiave gratuita personale su <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — 1.500 analisi/giorno incluse, senza carta di credito. Salvata solo su questo dispositivo (inseriscila una volta sola).
       </div>
-    </div>
-    <div style="text-align:center;margin-bottom:0.5rem;">
-      <a href="#" id="toggle-api-config" onclick="toggleApiConfig(event)" style="font-size:11px;color:var(--text-ter);text-decoration:none;">⚙ Configurazione chiave</a>
     </div>
 
     <button class="btn-analizza" id="btn-analizza" onclick="analizza()">🔍 Analizza validità ricetta</button>
@@ -331,7 +328,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 9;
+const APP_BUILD = 10;
 const APP_BUILD_DATE = '21/05/2026';
 
 let tipoSelezionato = 'ssn';
@@ -345,10 +342,11 @@ document.getElementById('app-version').textContent = `Build ${APP_BUILD} · ${AP
 document.getElementById('db-status').textContent = `Banca dati FOFI attiva — ${FOFI_DB.length} segnalazioni (circ. ${FOFI_DB[0].n}–${FOFI_DB[FOFI_DB.length-1].n})`;
 
 // ─── Chiave API Gemini ─────────────────────────────────────────────────
-// Chiave Farmacia della Stazione, ristretta lato Google Cloud Console al
-// referer https://farmaciadellastazione-tech.github.io/* + API "Generative
-// Language" soltanto. Pubblica nel sorgente ma inutilizzabile da altri origini.
-const EMBEDDED_GEMINI_KEY = 'AIzaSyB_ztV6P7UJbQE3wnwCLFDp5yaxtcCcBlM';
+// La chiave NON e' embedded: ogni dispositivo inserisce la propria una sola
+// volta (salvata in localStorage). L'embed precedente e' stato rimosso dopo
+// segnalazione "leaked key" da Google secret scanning — anche con restrizione
+// referer la chiave pubblica viene flaggata e va revocata.
+const EMBEDDED_GEMINI_KEY = '';
 const API_KEY_STORAGE = 'gemini-api-key';
 const apiKeyInput = document.getElementById('api-key');
 const savedKey = localStorage.getItem(API_KEY_STORAGE);
@@ -359,11 +357,6 @@ apiKeyInput.addEventListener('input', e => {
   else localStorage.removeItem(API_KEY_STORAGE);
 });
 
-function toggleApiConfig(e) {
-  e && e.preventDefault();
-  const cfg = document.getElementById('api-config');
-  cfg.style.display = (cfg.style.display === 'none') ? 'block' : 'none';
-}
 
 // ─── PWA: install prompt + service worker ─────────────────────────────
 let deferredInstallPrompt = null;
@@ -729,9 +722,8 @@ Includi 7-12 controlli specifici.`;
 }
 
 async function analizza() {
-  // Chiave personale (se inserita) ha priorita' sulla chiave embedded farmacia.
   const apiKey = document.getElementById('api-key').value.trim() || EMBEDDED_GEMINI_KEY;
-  if (!apiKey) { mostraErrore('Errore configurazione: chiave API mancante. Contatta l\'amministratore.'); return; }
+  if (!apiKey) { mostraErrore('Inserisci la chiave API Google Gemini (gratuita su aistudio.google.com/apikey — bastano 30 secondi).'); return; }
   const farmaco = document.getElementById('f-farmaco').value;
   if (!imgBase64 && !farmaco) { mostraErrore('Carica una foto oppure inserisci almeno il farmaco.'); return; }
 
