@@ -241,7 +241,7 @@
           <input type="date" id="f-data" />
         </div>
         <div class="field-row">
-          <div class="field-label">Scadenza / Validità <span style="color:var(--text-ter);font-size:11px;">(calcolata: 30 gg — modificabile per ripetibili)</span></div>
+          <div class="field-label">Scadenza / Validità <span style="color:var(--text-ter);font-size:11px;">(default 30 gg; se RR/ripetibile imposta +6 mesi)</span></div>
           <input type="date" id="f-scadenza" />
           <div id="scadenza-hint" style="font-size:12px;margin-top:2px;min-height:16px;"></div>
         </div>
@@ -328,7 +328,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 15;
+const APP_BUILD = 16;
 const APP_BUILD_DATE = '21/05/2026';
 
 let tipoSelezionato = 'ssn';
@@ -626,7 +626,11 @@ function getRequisiti() {
 5. Firma autografa del medico
 6. Dati identificativi medico (nome, specializzazione, indirizzo, n. Ordine)
 7. Indicazione "non ripetibile" se previsto
-8. Validità: 30 giorni (non ripetibile) / 5 erogazioni 1 anno (ripetibile)`,
+8. Validità (D.Lgs. 219/2006 art. 88):
+   - NRP / non ripetibile: 30 giorni dalla data
+   - RR / ripetibile: 6 mesi (180 giorni) dalla data, max 10 erogazioni
+   - Per farmaci a base di benzodiazepine ripetibili (RNR): 30 giorni, max 3 erogazioni
+9. Ripetibilità: determinabile dalla dicitura "non ripetibile" (NRP) o "ripetibile" (RR) o dal numero di erogazioni indicato. Molti farmaci di uso cronico (es. tiocolchicoside/Muscoril, FANS, antibiotici di lunga terapia, antiipertensivi non SSN) sono prescritti come RR di default.`,
     stupefacenti: `Requisiti ricetta stupefacenti (DPR 309/90, Allegato III-bis):
 1. Ricettario ministeriale a ricalco 3 copie
 2. Numero progressivo ricettario
@@ -700,6 +704,7 @@ ${imgBase64 ? 'Analizza l\'immagine allegata E i dati forniti.' : 'Analizza i da
 
 REGOLE TIPO RICETTA (importanti):
 - Applica SOLO i requisiti elencati in NORMATIVA per il TIPO dichiarato sopra. NON segnalare come mancanti requisiti di altri tipi (es. su una ricetta bianca privata NON sono richiesti NRE, codice regionale, codice esenzione, codice ASL — questi sono solo per SSN).
+- DETERMINA SEMPRE la ripetibilita': cerca diciture "NRP"/"non ripetibile" (validità 30 giorni) oppure "RR"/"ripetibile"/numero erogazioni > 1 (validità 6 mesi). In assenza di dicitura esplicita, considera la classe del farmaco: ripetibili di default sono tiocolchicoside/Muscoril, FANS cronici, antibiotici a ciclo lungo, antiipertensivi non SSN, statine, antidepressivi/ansiolitici non controllati. Stupefacenti DPR 309/90 sono sempre 30 gg. Se la scadenza inserita dal farmacista NON corrisponde alla ripetibilita' rilevata (es. ha inserito +30 gg ma la ricetta e' RR), aggiungi un controllo "Validita' ricetta" con stato "attenzione" indicando la scadenza corretta (data prescrizione + 6 mesi per RR).
 - Se hai un'immagine, verifica che il tipo visivo della ricetta corrisponda al TIPO dichiarato. Indizi visivi:
   * SSN/dematerializzata: foglio rosso prestampato con header SSN/Ministero, campi prestampati (codice fiscale, codice esenzione, codice regione), o stampa digitale promemoria dematerializzato con NRE.
   * Bianca privata: foglio bianco con sola intestazione/timbro medico, nessun campo prestampato SSN.
