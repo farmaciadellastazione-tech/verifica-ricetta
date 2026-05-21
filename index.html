@@ -2,8 +2,17 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Verifica Ricetta Medica — Farmacia della Stazione</title>
+<meta name="description" content="Analisi AI delle ricette mediche + banca dati circolari FOFI 2025-2026" />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#1D9E75" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Verifica Ricetta" />
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -82,7 +91,7 @@
   .loading-bar.active { display: block; }
   .loading-bar-inner { height: 100%; background: var(--teal-400); animation: load 2.5s ease-in-out infinite; }
   @keyframes load { 0%{width:0%} 60%{width:80%} 100%{width:95%} }
-  .error-msg { font-size: 13px; color: var(--red-600); margin-top: 10px; padding: 10px 12px; background: var(--red-50); border-radius: var(--radius); display: none; }
+  .error-msg { font-size: 13px; color: var(--red-600); margin-top: 10px; padding: 10px 12px; background: var(--red-50); border-radius: var(--radius); display: none; white-space: pre-line; line-height: 1.5; }
 
   /* Results */
   .results-card { background: var(--bg); border-radius: var(--radius-lg); border: 0.5px solid var(--border); overflow: hidden; margin-bottom: 1rem; }
@@ -135,6 +144,11 @@
   .db-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--green-600); background: var(--green-50); border: 0.5px solid var(--teal-100); border-radius: 20px; padding: 3px 10px; margin-top: 6px; }
   .db-badge-dot { width: 6px; height: 6px; background: var(--teal-400); border-radius: 50%; }
 
+  /* Install PWA button — visibile solo quando installabile */
+  .install-btn { display: none; margin-top: 8px; font-size: 12px; font-weight: 500; color: #fff; background: var(--teal-400); border: none; border-radius: 20px; padding: 6px 14px; cursor: pointer; transition: opacity 0.15s; }
+  .install-btn:hover { opacity: 0.9; }
+  .install-btn.show { display: inline-block; }
+
   .footer { text-align: center; font-size: 11px; color: var(--text-ter); margin-top: 2rem; }
   @media (max-width: 500px) {
     body { padding: 1rem 0.75rem 2rem; }
@@ -157,6 +171,8 @@
     <h1>Verifica Ricetta Medica</h1>
     <p>Analisi AI + Banca Dati Circolari FOFI (falsificazioni e furti)</p>
     <div class="db-badge"><div class="db-badge-dot"></div><span id="db-status">Caricamento banca dati...</span></div>
+    <br>
+    <button class="install-btn" id="install-btn" onclick="installaPWA()">📲 Installa app sul telefono</button>
   </div>
 
   <div id="form-section">
@@ -305,6 +321,32 @@ let fofiHits = [];
 
 // Init DB status
 document.getElementById('db-status').textContent = `Banca dati FOFI attiva — ${FOFI_DB.length} segnalazioni (circ. ${FOFI_DB[0].n}–${FOFI_DB[FOFI_DB.length-1].n})`;
+
+// ─── PWA: install prompt + service worker ─────────────────────────────
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('install-btn').classList.add('show');
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  document.getElementById('install-btn').classList.remove('show');
+});
+function installaPWA() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.finally(() => {
+    deferredInstallPrompt = null;
+    document.getElementById('install-btn').classList.remove('show');
+  });
+}
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .catch(err => console.warn('[SW] registrazione fallita:', err));
+  });
+}
 
 // Tipo tabs
 document.querySelectorAll('.tipo-tab').forEach(tab => {
@@ -675,7 +717,24 @@ async function analizza() {
     const result = JSON.parse(raw.replace(/```json|```/g,'').trim());
     mostraRisultati(result);
   } catch(err) {
-    mostraErrore('Errore: ' + err.message);
+    console.error('[Verifica Ricetta] errore analizza:', err);
+    let msg = 'Errore: ' + err.message;
+    const m = (err.message || '').toLowerCase();
+    if (m.includes('failed to fetch') || m.includes('load failed') || m.includes('networkerror') || m.includes('network request')) {
+      msg = '⚠ Impossibile contattare api.anthropic.com.\n\n' +
+            'Cause possibili:\n' +
+            '• Su iPhone/iPad: Impostazioni → Safari → disattiva "Impedisci tracciamento cross-site"\n' +
+            '• Connessione Wi-Fi/dati instabile o restrittiva (prova a cambiare rete)\n' +
+            '• Chiave API mancante o malformata (deve iniziare con sk-ant-)\n' +
+            '• Browser aziendale/scuola che blocca API esterne';
+    } else if (m.includes('invalid x-api-key') || err.message.includes('401')) {
+      msg = '⚠ Chiave API non valida.\n\nControlla che la chiave inserita inizi con "sk-ant-" e sia completa.';
+    } else if (err.message.includes('429')) {
+      msg = '⚠ Limite richieste raggiunto. Attendi qualche secondo e riprova.';
+    } else if (err.message.includes('529') || err.message.includes('503')) {
+      msg = '⚠ Servizio Anthropic temporaneamente sovraccarico. Riprova tra qualche istante.';
+    }
+    mostraErrore(msg);
   } finally {
     btn.disabled = false;
     btn.textContent = '🔍 Analizza validità ricetta';
