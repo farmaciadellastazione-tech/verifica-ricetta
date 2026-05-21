@@ -328,7 +328,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 14;
+const APP_BUILD = 15;
 const APP_BUILD_DATE = '21/05/2026';
 
 let tipoSelezionato = 'ssn';
@@ -751,16 +751,17 @@ async function analizza() {
     // -> flash-lite-latest (fallback per high-demand). Tutti vision-capable.
     // Se il primario risponde 503/429 (sovraccarico/rate limit), si scorre al successivo.
     const MODELLI_FALLBACK = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
-    // maxOutputTokens 8000: i modelli 2.5+ "thinking" spendono fino a ~3000
-    // token per il ragionamento interno (thoughtsTokenCount), lasciandone
-    // ~1000 per l'output. 4000 risultava insufficiente -> JSON troncati con
-    // "Unterminated string". 8000 da' margine confortevole.
+    // maxOutputTokens 16000 + thinkingBudget 2000: i modelli 2.5+ "thinking"
+    // possono spendere migliaia di token per ragionamento. Senza limit, anche
+    // 8000 totali si esaurivano. Cap esplicito sul pensiero garantisce
+    // ~14000 token per il JSON di output (piu' che abbondanti).
     const requestBody = JSON.stringify({
       contents: [{ parts }],
       generationConfig: {
         temperature: 0.0,
-        maxOutputTokens: 8000,
-        responseMimeType: 'application/json'
+        maxOutputTokens: 16000,
+        responseMimeType: 'application/json',
+        thinkingConfig: { thinkingBudget: 2000 }
       }
     });
 
