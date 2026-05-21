@@ -328,7 +328,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 10;
+const APP_BUILD = 11;
 const APP_BUILD_DATE = '21/05/2026';
 
 let tipoSelezionato = 'ssn';
@@ -738,22 +738,38 @@ async function analizza() {
   parts.push({ text: buildPrompt() });
 
   try {
-    // gemini-2.5-flash: thinking model, capable di vision, free tier attivo.
-    // maxOutputTokens alto per coprire thoughtsTokenCount (modelli 2.5+ ragionano internamente).
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          temperature: 0.0,
-          maxOutputTokens: 4000,
-          responseMimeType: 'application/json'
-        }
-      })
+    // Modelli in ordine di preferenza: 2.5-flash (qualita') -> flash-latest (alias 3.5)
+    // -> flash-lite-latest (fallback per high-demand). Tutti vision-capable.
+    // Se il primario risponde 503/429 (sovraccarico/rate limit), si scorre al successivo.
+    const MODELLI_FALLBACK = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
+    const requestBody = JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: {
+        temperature: 0.0,
+        maxOutputTokens: 4000,
+        responseMimeType: 'application/json'
+      }
     });
-    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || `HTTP ${res.status}`); }
+
+    let res, modelloUsato, ultimoErrore;
+    for (const modello of MODELLI_FALLBACK) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modello}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody
+      });
+      if (res.ok) { modelloUsato = modello; break; }
+      if (res.status !== 503 && res.status !== 429) break;
+      const e = await res.clone().json().catch(()=>({}));
+      ultimoErrore = e.error?.message || `HTTP ${res.status}`;
+      console.warn(`[Verifica] ${modello} -> ${res.status}, provo fallback. Causa: ${ultimoErrore}`);
+    }
+
+    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || ultimoErrore || `HTTP ${res.status}`); }
+    if (modelloUsato && modelloUsato !== MODELLI_FALLBACK[0]) {
+      console.info(`[Verifica] Servito da modello fallback: ${modelloUsato}`);
+    }
     const data = await res.json();
     const raw = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
     if (!raw) throw new Error('Risposta vuota dall\'API Gemini');
@@ -776,8 +792,8 @@ async function analizza() {
       msg = '⚠ Chiave API senza permessi.\n\nVerifica che l\'API "Generative Language" sia abilitata nel progetto Google Cloud associato alla chiave.';
     } else if (err.message.includes('429') || m.includes('quota') || m.includes('rate')) {
       msg = '⚠ Limite richieste raggiunto (free tier Gemini: 15 al minuto / 1.500 al giorno).\n\nAttendi qualche minuto e riprova.';
-    } else if (err.message.includes('503') || err.message.includes('500')) {
-      msg = '⚠ Servizio Gemini temporaneamente sovraccarico. Riprova tra qualche istante.';
+    } else if (err.message.includes('503') || err.message.includes('500') || m.includes('high demand') || m.includes('overloaded')) {
+      msg = '⚠ Tutti i modelli Gemini disponibili sono saturi in questo momento (alta domanda lato Google).\n\nIl sistema ha gia\' provato 3 modelli alternativi. Riprova tra 30-60 secondi.';
     }
     mostraErrore(msg);
   } finally {
