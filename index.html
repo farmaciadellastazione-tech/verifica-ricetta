@@ -103,12 +103,14 @@
   .results-header.non-valida { background: var(--red-50); }
   .results-header.attenzione { background: var(--amber-50); }
   .results-header.sospetta { background: #FFF0F0; border-left: 4px solid var(--red-400); }
+  .results-header.non-necessaria { background: var(--teal-50); }
   .verdict-icon { font-size: 24px; }
   .verdict-title { font-size: 16px; font-weight: 600; }
   .verdict-title.valida { color: var(--green-600); }
   .verdict-title.non-valida { color: var(--red-600); }
   .verdict-title.attenzione { color: var(--amber-600); }
   .verdict-title.sospetta { color: var(--red-800); }
+  .verdict-title.non-necessaria { color: var(--teal-600); }
   .verdict-sub { font-size: 13px; color: var(--text-sec); margin-top: 2px; }
   .score-bar-wrap { padding: 12px 16px 0; }
   .score-label { font-size: 11px; color: var(--text-ter); margin-bottom: 4px; display: flex; justify-content: space-between; }
@@ -329,7 +331,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 8;
+const APP_BUILD = 9;
 const APP_BUILD_DATE = '21/05/2026';
 
 let tipoSelezionato = 'ssn';
@@ -706,7 +708,7 @@ ${imgBase64 ? 'Analizza l\'immagine allegata E i dati forniti.' : 'Analizza i da
 Rispondi SOLO con JSON valido, senza testo prima o dopo:
 
 {
-  "verdetto": "VALIDA" | "NON_VALIDA" | "ATTENZIONE" | "SOSPETTA_FALSA",
+  "verdetto": "VALIDA" | "NON_VALIDA" | "ATTENZIONE" | "SOSPETTA_FALSA" | "NON_NECESSARIA",
   "sommario": "max 25 parole",
   "punteggio": 0-100,
   "controlli": [
@@ -716,7 +718,14 @@ Rispondi SOLO con JSON valido, senza testo prima o dopo:
   "azioni_urgenti": ["azione urgente se ricetta sospetta falsa, altrimenti array vuoto"]
 }
 
-Usa "SOSPETTA_FALSA" se ci sono corrispondenze FOFI o elementi fortemente sospetti. Includi 7-12 controlli specifici.`;
+REGOLE VERDETTO:
+- "SOSPETTA_FALSA": ci sono corrispondenze FOFI o elementi fortemente sospetti (timbri rifatti, firme imitate, dati alterati).
+- "NON_NECESSARIA": il prodotto NON richiede ricetta medica per legge — ad esempio integratori alimentari (magnesio, multivitaminici, probiotici, omega-3, melatonina, fermenti lattici), cosmetici, dispositivi medici (cerotti, garze, termometri), farmaci OTC/SOP (paracetamolo da banco, ibuprofene 200mg, antiacidi, lassativi blandi). In questo caso punteggio 85+, nessuna azione urgente, sommario tipo "Integratore/OTC: dispensabile senza prescrizione". Anche se il medico lo ha scritto su ricetta, se per legge non e' richiesta, usa questo verdetto. In caso di dubbio sulla classificazione, NON usare NON_NECESSARIA — applica i requisiti del tipo di ricetta dichiarato.
+- "VALIDA": ricetta completa, conforme alla normativa, erogabile.
+- "ATTENZIONE": elementi dubbi ma erogabile dopo verifica.
+- "NON_VALIDA": mancano requisiti essenziali, non erogare prima di correzione.
+
+Includi 7-12 controlli specifici.`;
 }
 
 async function analizza() {
@@ -788,10 +797,12 @@ async function analizza() {
 
 function mostraRisultati(r) {
   const isSospetta = r.verdetto === 'SOSPETTA_FALSA';
-  const cls = { VALIDA:'valida', NON_VALIDA:'non-valida', ATTENZIONE:'attenzione', SOSPETTA_FALSA:'sospetta' }[r.verdetto] || 'attenzione';
-  const emoji = { VALIDA:'✅', NON_VALIDA:'❌', ATTENZIONE:'⚠️', SOSPETTA_FALSA:'🚨' }[r.verdetto] || '⚠️';
-  const label = { VALIDA:'Ricetta valida — erogabile', NON_VALIDA:'Ricetta NON valida — non erogare', ATTENZIONE:'Elementi dubbi — verificare', SOSPETTA_FALSA:'⛔ RICETTA SOSPETTA FALSA — NON EROGARE' }[r.verdetto] || r.verdetto;
-  const scoreColor = r.punteggio >= 75 ? '#3B6D11' : r.punteggio >= 50 ? '#854F0B' : '#A32D2D';
+  const cls = { VALIDA:'valida', NON_VALIDA:'non-valida', ATTENZIONE:'attenzione', SOSPETTA_FALSA:'sospetta', NON_NECESSARIA:'non-necessaria' }[r.verdetto] || 'attenzione';
+  const emoji = { VALIDA:'✅', NON_VALIDA:'❌', ATTENZIONE:'⚠️', SOSPETTA_FALSA:'🚨', NON_NECESSARIA:'🌿' }[r.verdetto] || '⚠️';
+  const label = { VALIDA:'Ricetta valida — erogabile', NON_VALIDA:'Ricetta NON valida — non erogare', ATTENZIONE:'Elementi dubbi — verificare', SOSPETTA_FALSA:'⛔ RICETTA SOSPETTA FALSA — NON EROGARE', NON_NECESSARIA:'Non richiede ricetta — vendibile liberamente' }[r.verdetto] || r.verdetto;
+  // Verdetti positivi (valida + non necessaria) mostrano sempre punteggio in verde
+  const isPositive = r.verdetto === 'VALIDA' || r.verdetto === 'NON_NECESSARIA';
+  const scoreColor = isPositive ? '#3B6D11' : r.punteggio >= 75 ? '#3B6D11' : r.punteggio >= 50 ? '#854F0B' : '#A32D2D';
 
   const checks = (r.controlli||[]).map(c => {
     const stMap = { ok:'ok', errore:'err', attenzione:'warn', info:'info', fofi:'fofi' };
