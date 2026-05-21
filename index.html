@@ -293,14 +293,19 @@
       </div>
     </div>
 
-    <!-- API Key -->
-    <div class="api-section">
-      <label for="api-key">Chiave API Google Gemini</label>
-      <input type="password" id="api-key" placeholder="AIza..." autocomplete="off" />
-      <button class="api-toggle" id="api-toggle" onclick="toggleApiKey()">Mostra</button>
+    <!-- API Key (nascosta di default: la chiave farmacia e' embedded) -->
+    <div id="api-config" style="display:none;">
+      <div class="api-section">
+        <label for="api-key">Chiave personale (override)</label>
+        <input type="password" id="api-key" placeholder="AIza..." autocomplete="off" />
+        <button class="api-toggle" id="api-toggle" onclick="toggleApiKey()">Mostra</button>
+      </div>
+      <div class="api-help">
+        Lascia vuoto per usare la chiave farmacia (default). Per usarne una personale: ottienila su <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> e incollala qui — sara' salvata solo su questo dispositivo.
+      </div>
     </div>
-    <div class="api-help">
-      Chiave gratuita su <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — 1.500 analisi/giorno incluse, senza carta di credito. Salvata automaticamente sul dispositivo.
+    <div style="text-align:center;margin-bottom:0.5rem;">
+      <a href="#" id="toggle-api-config" onclick="toggleApiConfig(event)" style="font-size:11px;color:var(--text-ter);text-decoration:none;">⚙ Configurazione chiave</a>
     </div>
 
     <button class="btn-analizza" id="btn-analizza" onclick="analizza()">🔍 Analizza validità ricetta</button>
@@ -328,7 +333,11 @@ let fofiHits = [];
 // Init DB status
 document.getElementById('db-status').textContent = `Banca dati FOFI attiva — ${FOFI_DB.length} segnalazioni (circ. ${FOFI_DB[0].n}–${FOFI_DB[FOFI_DB.length-1].n})`;
 
-// ─── Persistenza chiave API Gemini su localStorage (per dispositivo) ───
+// ─── Chiave API Gemini ─────────────────────────────────────────────────
+// Chiave Farmacia della Stazione, ristretta lato Google Cloud Console al
+// referer https://farmaciadellastazione-tech.github.io/* + API "Generative
+// Language" soltanto. Pubblica nel sorgente ma inutilizzabile da altri origini.
+const EMBEDDED_GEMINI_KEY = 'AIzaSyB_ztV6P7UJbQE3wnwCLFDp5yaxtcCcBlM';
 const API_KEY_STORAGE = 'gemini-api-key';
 const apiKeyInput = document.getElementById('api-key');
 const savedKey = localStorage.getItem(API_KEY_STORAGE);
@@ -338,6 +347,12 @@ apiKeyInput.addEventListener('input', e => {
   if (v) localStorage.setItem(API_KEY_STORAGE, v);
   else localStorage.removeItem(API_KEY_STORAGE);
 });
+
+function toggleApiConfig(e) {
+  e && e.preventDefault();
+  const cfg = document.getElementById('api-config');
+  cfg.style.display = (cfg.style.display === 'none') ? 'block' : 'none';
+}
 
 // ─── PWA: install prompt + service worker ─────────────────────────────
 let deferredInstallPrompt = null;
@@ -696,8 +711,9 @@ Usa "SOSPETTA_FALSA" se ci sono corrispondenze FOFI o elementi fortemente sospet
 }
 
 async function analizza() {
-  const apiKey = document.getElementById('api-key').value.trim();
-  if (!apiKey) { mostraErrore('Inserisci la chiave API Google Gemini (gratuita su aistudio.google.com/apikey).'); return; }
+  // Chiave personale (se inserita) ha priorita' sulla chiave embedded farmacia.
+  const apiKey = document.getElementById('api-key').value.trim() || EMBEDDED_GEMINI_KEY;
+  if (!apiKey) { mostraErrore('Errore configurazione: chiave API mancante. Contatta l\'amministratore.'); return; }
   const farmaco = document.getElementById('f-farmaco').value;
   if (!imgBase64 && !farmaco) { mostraErrore('Carica una foto oppure inserisci almeno il farmaco.'); return; }
 
