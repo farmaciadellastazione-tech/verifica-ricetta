@@ -328,7 +328,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 11;
+const APP_BUILD = 12;
 const APP_BUILD_DATE = '21/05/2026';
 
 let tipoSelezionato = 'ssn';
@@ -742,11 +742,15 @@ async function analizza() {
     // -> flash-lite-latest (fallback per high-demand). Tutti vision-capable.
     // Se il primario risponde 503/429 (sovraccarico/rate limit), si scorre al successivo.
     const MODELLI_FALLBACK = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
+    // maxOutputTokens 8000: i modelli 2.5+ "thinking" spendono fino a ~3000
+    // token per il ragionamento interno (thoughtsTokenCount), lasciandone
+    // ~1000 per l'output. 4000 risultava insufficiente -> JSON troncati con
+    // "Unterminated string". 8000 da' margine confortevole.
     const requestBody = JSON.stringify({
       contents: [{ parts }],
       generationConfig: {
         temperature: 0.0,
-        maxOutputTokens: 4000,
+        maxOutputTokens: 8000,
         responseMimeType: 'application/json'
       }
     });
@@ -771,9 +775,22 @@ async function analizza() {
       console.info(`[Verifica] Servito da modello fallback: ${modelloUsato}`);
     }
     const data = await res.json();
-    const raw = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+    const candidate = data.candidates?.[0];
+    const raw = (candidate?.content?.parts || []).map(p => p.text || '').join('');
     if (!raw) throw new Error('Risposta vuota dall\'API Gemini');
-    const result = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    if (candidate?.finishReason === 'MAX_TOKENS') {
+      throw new Error('Risposta troncata per limite token (analisi troppo lunga). Riduci osservazioni o riprova.');
+    }
+    if (candidate?.finishReason === 'SAFETY') {
+      throw new Error('Risposta bloccata dai filtri di sicurezza Gemini. Riformula osservazioni o riprova senza immagine.');
+    }
+    let result;
+    try {
+      result = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    } catch (parseErr) {
+      console.error('[Verifica] JSON malformato ricevuto:', raw);
+      throw new Error(`Risposta dell'AI non valida (JSON malformato — finishReason: ${candidate?.finishReason || 'sconosciuto'}). Riprova.`);
+    }
     mostraRisultati(result);
   } catch(err) {
     console.error('[Verifica Ricetta] errore analizza:', err);
