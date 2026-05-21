@@ -30,12 +30,16 @@
   .tipo-tab { padding: 7px 14px; font-size: 13px; border: 0.5px solid var(--border-sec); border-radius: var(--radius); cursor: pointer; background: var(--bg); color: var(--text-sec); transition: all 0.15s; user-select: none; }
   .tipo-tab:hover { background: var(--bg-sec); }
   .tipo-tab.active { background: var(--teal-50); color: var(--teal-600); border-color: var(--teal-100); font-weight: 500; }
-  .upload-zone { border: 1.5px dashed var(--border-sec); border-radius: var(--radius-lg); padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg-sec); position: relative; min-height: 120px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-  .upload-zone:hover { border-color: var(--teal-400); background: var(--teal-50); }
-  .upload-zone.has-img { border-style: solid; border-color: var(--teal-400); padding: 0; overflow: hidden; background: #000; }
-  .upload-zone.has-img img { width: 100%; max-height: 280px; object-fit: contain; display: block; }
-  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .remove-img { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.55); color: #fff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; z-index: 2; }
+  .photo-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .photo-btn { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 12px; min-height: 130px; border: 1.5px dashed var(--border-sec); border-radius: var(--radius-lg); background: var(--bg-sec); cursor: pointer; transition: all 0.2s; text-align: center; }
+  .photo-btn:hover, .photo-btn:active { border-color: var(--teal-400); background: var(--teal-50); }
+  .photo-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .photo-btn-icon { font-size: 30px; margin-bottom: 8px; line-height: 1; }
+  .photo-btn-label { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .photo-btn-sub { font-size: 11px; color: var(--text-ter); }
+  .img-preview-wrap { position: relative; border: 1.5px solid var(--teal-400); border-radius: var(--radius-lg); overflow: hidden; background: #000; }
+  .img-preview-wrap img { width: 100%; max-height: 280px; object-fit: contain; display: block; }
+  .remove-img { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; z-index: 2; }
   .or-divider { display: flex; align-items: center; gap: 10px; margin: 1rem 0; }
   .or-divider span { font-size: 12px; color: var(--text-ter); white-space: nowrap; }
   .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 0.5px; background: var(--border); }
@@ -133,10 +137,16 @@
 
   .footer { text-align: center; font-size: 11px; color: var(--text-ter); margin-top: 2rem; }
   @media (max-width: 500px) {
+    body { padding: 1rem 0.75rem 2rem; }
+    .card { padding: 1rem 0.875rem; }
     .field-grid { grid-template-columns: 1fr; }
     .field-row.full { grid-column: 1; }
     .tipo-tabs { gap: 4px; }
     .tipo-tab { font-size: 12px; padding: 6px 10px; }
+    .photo-btn { padding: 18px 8px; min-height: 110px; }
+    .photo-btn-icon { font-size: 26px; margin-bottom: 6px; }
+    .photo-btn-label { font-size: 13px; }
+    .photo-btn-sub { font-size: 10px; }
   }
 </style>
 </head>
@@ -171,15 +181,23 @@
     <!-- Foto -->
     <div class="card">
       <div class="section-label">Fotografia ricetta (opzionale ma consigliata)</div>
-      <div class="upload-zone" id="upload-zone">
-        <input type="file" id="file-input" accept="image/*" />
-        <div id="upload-placeholder">
-          <div style="font-size:30px;margin-bottom:8px;">📷</div>
-          <div style="font-size:14px;color:var(--text-sec);margin-bottom:3px;">Tocca o trascina per caricare</div>
-          <div style="font-size:12px;color:var(--text-ter);">JPG · PNG · HEIC — max 10 MB</div>
-        </div>
-        <img id="preview-img" style="display:none;" alt="Anteprima ricetta" />
-        <button class="remove-img" id="remove-img" style="display:none;" onclick="rimuoviImg(event)">✕ Rimuovi</button>
+      <div class="photo-buttons" id="photo-buttons">
+        <label class="photo-btn">
+          <input type="file" accept="image/*" capture="environment" class="foto-input" />
+          <div class="photo-btn-icon">📷</div>
+          <div class="photo-btn-label">Scatta foto</div>
+          <div class="photo-btn-sub">Apri fotocamera</div>
+        </label>
+        <label class="photo-btn">
+          <input type="file" accept="image/*" class="foto-input" />
+          <div class="photo-btn-icon">🖼️</div>
+          <div class="photo-btn-label">Da galleria</div>
+          <div class="photo-btn-sub">JPG · PNG · HEIC</div>
+        </label>
+      </div>
+      <div class="img-preview-wrap" id="img-preview-wrap" style="display:none;">
+        <img id="preview-img" alt="Anteprima ricetta" />
+        <button class="remove-img" id="remove-img" onclick="rimuoviImg(event)">✕ Rimuovi</button>
       </div>
     </div>
 
@@ -349,33 +367,31 @@ document.getElementById('f-scadenza').addEventListener('input', e => {
   aggiornaScadenza();
 });
 
-// Image upload
-document.getElementById('file-input').addEventListener('change', e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  if (f.size > 10 * 1024 * 1024) { alert('File troppo grande (max 10 MB)'); return; }
-  imgMime = f.type || 'image/jpeg';
+// Image upload — i due input (camera + galleria) condividono lo stesso handler
+function handleFotoSelezionata(file) {
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { alert('File troppo grande (max 10 MB)'); return; }
+  imgMime = file.type || 'image/jpeg';
   const reader = new FileReader();
   reader.onload = ev => {
     imgBase64 = ev.target.result.split(',')[1];
-    const img = document.getElementById('preview-img');
-    img.src = ev.target.result;
-    img.style.display = 'block';
-    document.getElementById('upload-placeholder').style.display = 'none';
-    document.getElementById('remove-img').style.display = 'block';
-    document.getElementById('upload-zone').classList.add('has-img');
+    document.getElementById('preview-img').src = ev.target.result;
+    document.getElementById('img-preview-wrap').style.display = 'block';
+    document.getElementById('photo-buttons').style.display = 'none';
   };
-  reader.readAsDataURL(f);
+  reader.readAsDataURL(file);
+}
+
+document.querySelectorAll('.foto-input').forEach(inp => {
+  inp.addEventListener('change', e => handleFotoSelezionata(e.target.files[0]));
 });
 
 function rimuoviImg(e) {
   e && e.stopPropagation && e.stopPropagation();
   imgBase64 = null;
-  document.getElementById('upload-zone').classList.remove('has-img');
-  document.getElementById('preview-img').style.display = 'none';
-  document.getElementById('upload-placeholder').style.display = 'flex';
-  document.getElementById('remove-img').style.display = 'none';
-  document.getElementById('file-input').value = '';
+  document.getElementById('img-preview-wrap').style.display = 'none';
+  document.getElementById('photo-buttons').style.display = '';
+  document.querySelectorAll('.foto-input').forEach(inp => { inp.value = ''; });
 }
 
 // ─── FOFI SEARCH ENGINE ───────────────────────────────────────────────
