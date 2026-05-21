@@ -728,7 +728,9 @@ async function analizza() {
   parts.push({ text: buildPrompt() });
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+    // gemini-2.5-flash: thinking model, capable di vision, free tier attivo.
+    // maxOutputTokens alto per coprire thoughtsTokenCount (modelli 2.5+ ragionano internamente).
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -736,7 +738,7 @@ async function analizza() {
         contents: [{ parts }],
         generationConfig: {
           temperature: 0.0,
-          maxOutputTokens: 2000,
+          maxOutputTokens: 4000,
           responseMimeType: 'application/json'
         }
       })
