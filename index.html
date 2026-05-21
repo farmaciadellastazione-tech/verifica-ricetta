@@ -78,7 +78,10 @@
   .fofi-live-ok { color: var(--green-600); font-weight: 500; }
   .fofi-live-warn { color: var(--red-600); font-weight: 600; }
 
-  .api-section { background: var(--bg-sec); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 1rem; display: flex; align-items: center; gap: 10px; }
+  .api-section { background: var(--bg-sec); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+  .api-help { font-size: 11px; color: var(--text-ter); margin: 0 0 1rem 0; padding: 0 12px; line-height: 1.4; }
+  .api-help a { color: var(--teal-600); text-decoration: none; font-weight: 500; }
+  .api-help a:hover { text-decoration: underline; }
   .api-section label { font-size: 12px; color: var(--text-sec); white-space: nowrap; flex-shrink: 0; }
   .api-section input { font-size: 12px; font-family: monospace; border: 0.5px solid var(--border-sec); border-radius: 6px; padding: 6px 10px; flex: 1; background: var(--bg); color: var(--text); outline: none; }
   .api-section input:focus { border-color: var(--teal-400); }
@@ -292,9 +295,12 @@
 
     <!-- API Key -->
     <div class="api-section">
-      <label for="api-key">Chiave API Anthropic</label>
-      <input type="password" id="api-key" placeholder="sk-ant-api03-..." autocomplete="off" />
+      <label for="api-key">Chiave API Google Gemini</label>
+      <input type="password" id="api-key" placeholder="AIza..." autocomplete="off" />
       <button class="api-toggle" id="api-toggle" onclick="toggleApiKey()">Mostra</button>
+    </div>
+    <div class="api-help">
+      Chiave gratuita su <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> — 1.500 analisi/giorno incluse, senza carta di credito. Salvata automaticamente sul dispositivo.
     </div>
 
     <button class="btn-analizza" id="btn-analizza" onclick="analizza()">🔍 Analizza validità ricetta</button>
@@ -321,6 +327,17 @@ let fofiHits = [];
 
 // Init DB status
 document.getElementById('db-status').textContent = `Banca dati FOFI attiva — ${FOFI_DB.length} segnalazioni (circ. ${FOFI_DB[0].n}–${FOFI_DB[FOFI_DB.length-1].n})`;
+
+// ─── Persistenza chiave API Gemini su localStorage (per dispositivo) ───
+const API_KEY_STORAGE = 'gemini-api-key';
+const apiKeyInput = document.getElementById('api-key');
+const savedKey = localStorage.getItem(API_KEY_STORAGE);
+if (savedKey) apiKeyInput.value = savedKey;
+apiKeyInput.addEventListener('input', e => {
+  const v = e.target.value.trim();
+  if (v) localStorage.setItem(API_KEY_STORAGE, v);
+  else localStorage.removeItem(API_KEY_STORAGE);
+});
 
 // ─── PWA: install prompt + service worker ─────────────────────────────
 let deferredInstallPrompt = null;
@@ -680,7 +697,7 @@ Usa "SOSPETTA_FALSA" se ci sono corrispondenze FOFI o elementi fortemente sospet
 
 async function analizza() {
   const apiKey = document.getElementById('api-key').value.trim();
-  if (!apiKey) { mostraErrore('Inserisci la chiave API Anthropic.'); return; }
+  if (!apiKey) { mostraErrore('Inserisci la chiave API Google Gemini (gratuita su aistudio.google.com/apikey).'); return; }
   const farmaco = document.getElementById('f-farmaco').value;
   if (!imgBase64 && !farmaco) { mostraErrore('Carica una foto oppure inserisci almeno il farmaco.'); return; }
 
@@ -690,30 +707,28 @@ async function analizza() {
   btn.textContent = '⏳ Analisi in corso...';
   document.getElementById('loading-bar').classList.add('active');
 
-  const messages = [];
-  if (imgBase64) {
-    messages.push({ role:'user', content:[
-      { type:'image', source:{ type:'base64', media_type: imgMime, data: imgBase64 } },
-      { type:'text', text: buildPrompt() }
-    ]});
-  } else {
-    messages.push({ role:'user', content: buildPrompt() });
-  }
+  const parts = [];
+  if (imgBase64) parts.push({ inline_data: { mime_type: imgMime, data: imgBase64 } });
+  parts.push({ text: buildPrompt() });
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1500, messages })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          temperature: 0.0,
+          maxOutputTokens: 2000,
+          responseMimeType: 'application/json'
+        }
+      })
     });
     if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || `HTTP ${res.status}`); }
     const data = await res.json();
-    const raw = (data.content||[]).map(b=>b.text||'').join('');
+    const raw = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+    if (!raw) throw new Error('Risposta vuota dall\'API Gemini');
     const result = JSON.parse(raw.replace(/```json|```/g,'').trim());
     mostraRisultati(result);
   } catch(err) {
@@ -721,18 +736,20 @@ async function analizza() {
     let msg = 'Errore: ' + err.message;
     const m = (err.message || '').toLowerCase();
     if (m.includes('failed to fetch') || m.includes('load failed') || m.includes('networkerror') || m.includes('network request')) {
-      msg = '⚠ Impossibile contattare api.anthropic.com.\n\n' +
+      msg = '⚠ Impossibile contattare l\'API Google Gemini.\n\n' +
             'Cause possibili:\n' +
             '• Su iPhone/iPad: Impostazioni → Safari → disattiva "Impedisci tracciamento cross-site"\n' +
             '• Connessione Wi-Fi/dati instabile o restrittiva (prova a cambiare rete)\n' +
-            '• Chiave API mancante o malformata (deve iniziare con sk-ant-)\n' +
+            '• Chiave API mancante o malformata (deve iniziare con "AIza")\n' +
             '• Browser aziendale/scuola che blocca API esterne';
-    } else if (m.includes('invalid x-api-key') || err.message.includes('401')) {
-      msg = '⚠ Chiave API non valida.\n\nControlla che la chiave inserita inizi con "sk-ant-" e sia completa.';
-    } else if (err.message.includes('429')) {
-      msg = '⚠ Limite richieste raggiunto. Attendi qualche secondo e riprova.';
-    } else if (err.message.includes('529') || err.message.includes('503')) {
-      msg = '⚠ Servizio Anthropic temporaneamente sovraccarico. Riprova tra qualche istante.';
+    } else if (m.includes('api key not valid') || m.includes('invalid api key') || err.message.includes('400')) {
+      msg = '⚠ Chiave API Google non valida.\n\nVai su aistudio.google.com/apikey, copia la chiave (inizia con "AIza") e incollala nel campo.';
+    } else if (err.message.includes('403') || m.includes('permission')) {
+      msg = '⚠ Chiave API senza permessi.\n\nVerifica che l\'API "Generative Language" sia abilitata nel progetto Google Cloud associato alla chiave.';
+    } else if (err.message.includes('429') || m.includes('quota') || m.includes('rate')) {
+      msg = '⚠ Limite richieste raggiunto (free tier Gemini: 15 al minuto / 1.500 al giorno).\n\nAttendi qualche minuto e riprova.';
+    } else if (err.message.includes('503') || err.message.includes('500')) {
+      msg = '⚠ Servizio Gemini temporaneamente sovraccarico. Riprova tra qualche istante.';
     }
     mostraErrore(msg);
   } finally {
