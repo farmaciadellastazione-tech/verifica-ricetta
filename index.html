@@ -328,7 +328,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 16;
+const APP_BUILD = 17;
 const APP_BUILD_DATE = '21/05/2026';
 
 let tipoSelezionato = 'ssn';
@@ -611,13 +611,17 @@ function getRequisiti() {
 1. NRE (15 cifre) o numero ricetta cartacea
 2. Codice fiscale paziente valido (16 caratteri)
 3. Codice regione e ASL
-4. Data di compilazione (validità 30 giorni comuni, 6 mesi ripetibili cronici)
+4. Data di compilazione
 5. Farmaco con nome, dosaggio, forma farmaceutica e n. confezioni
 6. Posologia o indicazione terapeutica
 7. Timbro medico leggibile con codice regionale
 8. Firma autografa del medico
 9. Codice esenzione (se applicabile)
-10. Ricetta integra: non alterata, non cancellata, leggibile`,
+10. Ricetta integra: non alterata, non cancellata, leggibile
+
+VALIDITA' SSN:
+- Non ripetibile (default): 30 giorni dalla data
+- Ripetibile per pazienti cronici: 6 mesi, max 11 erogazioni (con indicazione esplicita del medico)`,
     bianca: `Requisiti ricetta bianca privata (D.Lgs. 219/2006, art. 88):
 1. Data di redazione
 2. Generalità del paziente (nome/cognome o CF)
@@ -626,21 +630,32 @@ function getRequisiti() {
 5. Firma autografa del medico
 6. Dati identificativi medico (nome, specializzazione, indirizzo, n. Ordine)
 7. Indicazione "non ripetibile" se previsto
-8. Validità (D.Lgs. 219/2006 art. 88):
-   - NRP / non ripetibile: 30 giorni dalla data
-   - RR / ripetibile: 6 mesi (180 giorni) dalla data, max 10 erogazioni
-   - Per farmaci a base di benzodiazepine ripetibili (RNR): 30 giorni, max 3 erogazioni
-9. Ripetibilità: determinabile dalla dicitura "non ripetibile" (NRP) o "ripetibile" (RR) o dal numero di erogazioni indicato. Molti farmaci di uso cronico (es. tiocolchicoside/Muscoril, FANS, antibiotici di lunga terapia, antiipertensivi non SSN) sono prescritti come RR di default.`,
-    stupefacenti: `Requisiti ricetta stupefacenti (DPR 309/90, Allegato III-bis):
-1. Ricettario ministeriale a ricalco 3 copie
+8. Ricetta integra, leggibile, non alterata
+
+VALIDITA' RICETTA BIANCA (terminologia uniforme):
+- RR = Ricetta Ripetibile → 6 mesi (180 giorni), max 10 erogazioni. Classe C non controllati.
+- RNR = Ricetta Non Ripetibile standard → 30 giorni, 1 erogazione. Antibiotici a ciclo breve, terapie acute.
+- RNR speciale benzodiazepine (DPR 309/90 Tabella V sez. D) → 30 giorni, max 3 erogazioni, ricetta TRATTENUTA dalla farmacia.
+
+CLASSIFICAZIONE FARMACI COMUNI (per determinazione validita'):
+- RR (6 mesi): Muscoril/tiocolchicoside, Voltaren/diclofenac e altri FANS cronici, Brufen, statine (atorvastatina, simvastatina, rosuvastatina), antiipertensivi non SSN (amlodipina privata, ramipril privato), Zoloft/sertralina, Cymbalta/duloxetina, Trittico/trazodone, antidepressivi non controllati, Lasix/furosemide (uso cronico).
+- RNR speciale benzodiazepine (30 gg, max 3, TRATTENERE): Tavor/lorazepam, Xanax/alprazolam, Lexotan/bromazepam, En/delorazepam, Minias/lormetazepam, Valium/diazepam, Lorans, Rivotril/clonazepam, Halcion/triazolam, Stilnox/zolpidem, Imovane/zopiclone, Sonata/zaleplon. Vale anche per le forme iniettabili (Tavor fiale).
+- RNR standard (30 gg, 1 erogazione): antibiotici monoterapia (Augmentin, Zitromax, Klacid, Ciproxin), antimicotici sistemici, cortisonici sistemici a ciclo breve, anticoncezionali ormonali (con eccezioni RR per uso continuativo).`,
+    stupefacenti: `Requisiti ricetta stupefacenti (DPR 309/90):
+1. Ricettario ministeriale a ricalco 3 copie (RMR)
 2. Numero progressivo ricettario
-3. Data compilazione (validità 30 giorni)
+3. Data compilazione
 4. Nome, cognome, data nascita, indirizzo PAZIENTE
 5. Farmaco: denominazione, dosaggio, n. pezzi in LETTERE e CIFRE
 6. Posologia obbligatoria
 7. Firma autografa e timbro medico con CF
 8. ZERO cancellature ammesse
-9. Max 2 unità per ricetta, una sola sostanza`,
+9. Max 2 confezioni per ricetta, una sola sostanza (salvo terapia dolore Allegato III-bis: fino a 30 gg di terapia)
+
+VALIDITA': 30 giorni dalla data, sempre. Ricetta TRATTENUTA dalla farmacia.
+
+FARMACI COMUNI Tabella I-III stupefacenti (RMR ricalco):
+Oxycontin/oxicodone, Depalgos/oxicodone+paracetamolo, Targin/oxicodone+naloxone, Durogesic/fentanyl, Fentanyl fiale, Jurnista/idromorfone, Contramal/tramadolo (alcune forme), MS Contin/morfina, Oramorph, Sevredol, Palexia/tapentadolo, Subutex/buprenorfina, Suboxone, Metadone, Ritalin/metilfenidato, Concerta, Medikinet, Cannabis terapeutica.`,
     veterinaria: `Requisiti ricetta veterinaria (D.Lgs. 193/2006, Reg. UE 2019/6):
 1. Data e firma veterinario
 2. Dati animale (specie, identificativo)
@@ -704,7 +719,20 @@ ${imgBase64 ? 'Analizza l\'immagine allegata E i dati forniti.' : 'Analizza i da
 
 REGOLE TIPO RICETTA (importanti):
 - Applica SOLO i requisiti elencati in NORMATIVA per il TIPO dichiarato sopra. NON segnalare come mancanti requisiti di altri tipi (es. su una ricetta bianca privata NON sono richiesti NRE, codice regionale, codice esenzione, codice ASL — questi sono solo per SSN).
-- DETERMINA SEMPRE la ripetibilita': cerca diciture "NRP"/"non ripetibile" (validità 30 giorni) oppure "RR"/"ripetibile"/numero erogazioni > 1 (validità 6 mesi). In assenza di dicitura esplicita, considera la classe del farmaco: ripetibili di default sono tiocolchicoside/Muscoril, FANS cronici, antibiotici a ciclo lungo, antiipertensivi non SSN, statine, antidepressivi/ansiolitici non controllati. Stupefacenti DPR 309/90 sono sempre 30 gg. Se la scadenza inserita dal farmacista NON corrisponde alla ripetibilita' rilevata (es. ha inserito +30 gg ma la ricetta e' RR), aggiungi un controllo "Validita' ricetta" con stato "attenzione" indicando la scadenza corretta (data prescrizione + 6 mesi per RR).
+- DETERMINA SEMPRE la classe di ripetibilita' della ricetta, in base a TRE elementi in ordine di priorita':
+  (1) diciture esplicite sulla ricetta: "NRP"/"non ripetibile"/"RNR" (1 erogazione, 30 gg) oppure "RR"/"ripetibile"/"N° erogazioni: X" (6 mesi, X erogazioni);
+  (2) classe del farmaco (vedi CLASSIFICAZIONE FARMACI COMUNI in NORMATIVA);
+  (3) tipo di ricetta dichiarato.
+
+  REGOLE VALIDITA':
+  - RR (Ricetta Ripetibile, bianca) -> 6 mesi (180 gg), max 10 erogazioni. Es: Muscoril, FANS cronici, statine, antidepressivi non controllati.
+  - RNR standard (Ricetta Non Ripetibile, bianca) -> 30 gg, 1 erogazione. Es: antibiotici a ciclo breve.
+  - RNR benzodiazepine (Tab. V sez. D DPR 309/90, bianca) -> 30 gg, max 3 erogazioni, TRATTENUTA in farmacia. Es: Tavor, Xanax, Lexotan, Minias, Valium, Stilnox.
+  - RMR stupefacenti (Tab. I-III DPR 309/90, ricettario ministeriale a ricalco) -> 30 gg, max 2 conf (1 sostanza). Es: Oxycontin, Depalgos, Fentanyl, Targin.
+  - SSN non ripetibile -> 30 gg. SSN ripetibile cronici -> 6 mesi, 11 erogazioni (raro, va indicato dal medico).
+
+- Se la scadenza inserita dal farmacista non corrisponde alla classe rilevata, aggiungi un controllo "Validita' ricetta" stato "attenzione" con la scadenza corretta calcolata (data + 30 gg o data + 180 gg). Se il farmacista non ha inserito scadenza, calcolala tu nel campo note.
+- Per benzodiazepine e stupefacenti aggiungi inoltre un controllo "Trattamento ricetta" stato "info" che ricorda di trattenere la ricetta in farmacia (non restituirla al paziente).
 - Se hai un'immagine, verifica che il tipo visivo della ricetta corrisponda al TIPO dichiarato. Indizi visivi:
   * SSN/dematerializzata: foglio rosso prestampato con header SSN/Ministero, campi prestampati (codice fiscale, codice esenzione, codice regione), o stampa digitale promemoria dematerializzato con NRE.
   * Bianca privata: foglio bianco con sola intestazione/timbro medico, nessun campo prestampato SSN.
