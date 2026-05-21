@@ -328,7 +328,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 12;
+const APP_BUILD = 13;
 const APP_BUILD_DATE = '21/05/2026';
 
 let tipoSelezionato = 'ssn';
@@ -697,6 +697,15 @@ NORMATIVA:
 ${getRequisiti()}
 
 ${imgBase64 ? 'Analizza l\'immagine allegata E i dati forniti.' : 'Analizza i dati forniti (nessuna immagine).'}
+
+REGOLE TIPO RICETTA (importanti):
+- Applica SOLO i requisiti elencati in NORMATIVA per il TIPO dichiarato sopra. NON segnalare come mancanti requisiti di altri tipi (es. su una ricetta bianca privata NON sono richiesti NRE, codice regionale, codice esenzione, codice ASL — questi sono solo per SSN).
+- Se hai un'immagine, verifica che il tipo visivo della ricetta corrisponda al TIPO dichiarato. Indizi visivi:
+  * SSN/dematerializzata: foglio rosso prestampato con header SSN/Ministero, campi prestampati (codice fiscale, codice esenzione, codice regione), o stampa digitale promemoria dematerializzato con NRE.
+  * Bianca privata: foglio bianco con sola intestazione/timbro medico, nessun campo prestampato SSN.
+  * Stupefacenti: ricettario ministeriale beige/giallo a ricalco con 3 copie e numero progressivo prestampato.
+  * Veterinaria: intestazione veterinaria con dati animale/proprietario.
+- Se il tipo VISIVO differisce dal tipo DICHIARATO: aggiungi un controllo con campo "Discordanza tipo ricetta" stato "attenzione" che evidenzia la discordanza, ma continua ad applicare i requisiti del tipo DICHIARATO (il farmacista sa cosa sta verificando). Sommario menziona la discordanza.
 
 Rispondi SOLO con JSON valido, senza testo prima o dopo:
 
