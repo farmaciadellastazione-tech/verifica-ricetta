@@ -204,8 +204,8 @@
     <div class="card">
       <div class="section-label">Tipo ricetta</div>
       <div class="tipo-tabs">
-        <div class="tipo-tab active" data-tipo="ssn">SSN / Dematerializzata</div>
-        <div class="tipo-tab" data-tipo="bianca">Bianca privata</div>
+        <div class="tipo-tab" data-tipo="ssn">SSN / Dematerializzata</div>
+        <div class="tipo-tab active" data-tipo="bianca">Bianca privata</div>
         <div class="tipo-tab" data-tipo="stupefacenti">Stupefacenti</div>
         <div class="tipo-tab" data-tipo="veterinaria">Veterinaria</div>
       </div>
@@ -292,7 +292,7 @@
           <div class="field-label">Codice fiscale paziente</div>
           <input type="text" id="f-cf" placeholder="RSSMRA80A01A123K" maxlength="16" style="text-transform:uppercase;font-family:monospace;" />
         </div>
-        <div class="field-row" id="nre-row">
+        <div class="field-row" id="nre-row" style="display:none;">
           <div class="field-label">NRE (SSN, 15 cifre)</div>
           <input type="text" id="f-nre" placeholder="123456789012345" maxlength="15" style="font-family:monospace;" />
         </div>
@@ -344,10 +344,10 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 23;
+const APP_BUILD = 24;
 const APP_BUILD_DATE = '22/05/2026';
 
-let tipoSelezionato = 'ssn';
+let tipoSelezionato = 'bianca';
 let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)
 let imgBase64 = null;
 let imgMime = 'image/jpeg';
