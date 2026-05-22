@@ -30,13 +30,13 @@
   body { font-family: var(--font); background: #F4F2EC; color: var(--text); min-height: 100vh; padding: 1.5rem 1rem 3rem; }
   .container { max-width: 680px; margin: 0 auto; }
   .page-header { text-align: center; margin-bottom: 2rem; }
-  .page-header .logo { font-size: 13px; color: var(--text-ter); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
-  .page-header h1 { font-size: 24px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
-  .page-header p { font-size: 14px; color: var(--text-sec); }
+  .page-header .logo { font-size: 14px; color: var(--text-ter); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+  .page-header h1 { font-size: 26px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .page-header p { font-size: 16px; color: var(--text-sec); }
   .card { background: var(--bg); border-radius: var(--radius-lg); border: 0.5px solid var(--border); padding: 1.25rem; margin-bottom: 1rem; }
-  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-ter); margin-bottom: 10px; }
+  .section-label { font-size: 13px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-ter); margin-bottom: 10px; }
   .tipo-tabs, .stato-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
-  .tipo-tab { padding: 7px 14px; font-size: 13px; border: 0.5px solid var(--border-sec); border-radius: var(--radius); cursor: pointer; background: var(--bg); color: var(--text-sec); transition: all 0.15s; user-select: none; }
+  .tipo-tab { padding: 9px 16px; font-size: 15px; border: 0.5px solid var(--border-sec); border-radius: var(--radius); cursor: pointer; background: var(--bg); color: var(--text-sec); transition: all 0.15s; user-select: none; }
   .tipo-tab:hover { background: var(--bg-sec); }
   .tipo-tab.active { background: var(--teal-50); color: var(--teal-600); border-color: var(--teal-100); font-weight: 500; }
   .photo-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -46,58 +46,58 @@
      in JS viene ignorato. display:none NON funziona. Usiamo posizione fuori
      schermo + opacity 0. */
   .foto-input { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-  .photo-btn-icon { font-size: 30px; margin-bottom: 8px; line-height: 1; }
-  .photo-btn-label { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
-  .photo-btn-sub { font-size: 11px; color: var(--text-ter); }
+  .photo-btn-icon { font-size: 32px; margin-bottom: 8px; line-height: 1; }
+  .photo-btn-label { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .photo-btn-sub { font-size: 13px; color: var(--text-ter); }
   .img-preview-wrap { position: relative; border: 1.5px solid var(--teal-400); border-radius: var(--radius-lg); overflow: hidden; background: #000; }
   .img-preview-wrap img { width: 100%; max-height: 280px; object-fit: contain; display: block; }
-  .remove-img { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; z-index: 2; }
+  .remove-img { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 14px; cursor: pointer; z-index: 2; }
   .or-divider { display: flex; align-items: center; gap: 10px; margin: 1rem 0; }
-  .or-divider span { font-size: 12px; color: var(--text-ter); white-space: nowrap; }
+  .or-divider span { font-size: 14px; color: var(--text-ter); white-space: nowrap; }
   .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 0.5px; background: var(--border); }
   .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .field-row { display: flex; flex-direction: column; gap: 4px; }
   .field-row.full { grid-column: 1 / -1; }
-  .field-label { font-size: 12px; color: var(--text-sec); }
-  .field-row input, .field-row select, .field-row textarea { font-family: var(--font); font-size: 13px; color: var(--text); border: 0.5px solid var(--border-sec); border-radius: var(--radius); padding: 8px 10px; background: var(--bg); outline: none; width: 100%; transition: border-color 0.15s; }
+  .field-label { font-size: 14px; color: var(--text-sec); }
+  .field-row input, .field-row select, .field-row textarea { font-family: var(--font); font-size: 16px; color: var(--text); border: 0.5px solid var(--border-sec); border-radius: var(--radius); padding: 10px 12px; background: var(--bg); outline: none; width: 100%; transition: border-color 0.15s; }
   .field-row input:focus, .field-row select:focus, .field-row textarea:focus { border-color: var(--teal-400); }
   .field-row textarea { resize: vertical; min-height: 60px; }
 
   /* FOFI Alert Banner */
   .fofi-alert { border-radius: var(--radius-lg); border: 2px solid var(--red-400); background: var(--red-50); padding: 1rem 1.25rem; margin-bottom: 1rem; display: none; }
   .fofi-alert.show { display: block; }
-  .fofi-alert-title { font-size: 15px; font-weight: 700; color: var(--red-800); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-  .fofi-alert-body { font-size: 13px; color: var(--red-600); line-height: 1.55; }
+  .fofi-alert-title { font-size: 17px; font-weight: 700; color: var(--red-800); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .fofi-alert-body { font-size: 15px; color: var(--red-600); line-height: 1.55; }
   .fofi-match { background: var(--bg); border: 0.5px solid var(--red-100); border-radius: var(--radius); padding: 8px 12px; margin-top: 8px; }
-  .fofi-match-n { font-size: 11px; color: var(--red-600); font-weight: 600; margin-bottom: 3px; }
-  .fofi-match-tx { font-size: 12px; color: var(--text-sec); line-height: 1.4; }
-  .fofi-match-tipo { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; margin-right: 4px; }
+  .fofi-match-n { font-size: 13px; color: var(--red-600); font-weight: 600; margin-bottom: 3px; }
+  .fofi-match-tx { font-size: 14px; color: var(--text-sec); line-height: 1.4; }
+  .fofi-match-tipo { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 4px; margin-right: 4px; }
   .fofi-match-tipo.F { background: var(--red-100); color: var(--red-800); }
   .fofi-match-tipo.T { background: var(--amber-100); color: var(--amber-800); }
   .fofi-match-tipo.B { background: var(--gray-100); color: var(--gray-600); }
 
   /* Live check indicator */
-  .fofi-live-check { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--text-ter); }
+  .fofi-live-check { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 14px; color: var(--text-ter); }
   .fofi-live-ok { color: var(--green-600); font-weight: 500; }
   .fofi-live-warn { color: var(--red-600); font-weight: 600; }
 
   .api-section { background: var(--bg-sec); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
-  .api-help { font-size: 11px; color: var(--text-ter); margin: 0 0 1rem 0; padding: 0 12px; line-height: 1.4; }
+  .api-help { font-size: 13px; color: var(--text-ter); margin: 0 0 1rem 0; padding: 0 12px; line-height: 1.4; }
   .api-help a { color: var(--teal-600); text-decoration: none; font-weight: 500; }
   .api-help a:hover { text-decoration: underline; }
-  .api-section label { font-size: 12px; color: var(--text-sec); white-space: nowrap; flex-shrink: 0; }
-  .api-section input { font-size: 12px; font-family: monospace; border: 0.5px solid var(--border-sec); border-radius: 6px; padding: 6px 10px; flex: 1; background: var(--bg); color: var(--text); outline: none; }
+  .api-section label { font-size: 14px; color: var(--text-sec); white-space: nowrap; flex-shrink: 0; }
+  .api-section input { font-size: 14px; font-family: monospace; border: 0.5px solid var(--border-sec); border-radius: 6px; padding: 7px 10px; flex: 1; background: var(--bg); color: var(--text); outline: none; }
   .api-section input:focus { border-color: var(--teal-400); }
-  .api-toggle { font-size: 12px; color: var(--text-sec); cursor: pointer; background: var(--bg); border: 0.5px solid var(--border-sec); border-radius: 4px; padding: 5px 8px; flex-shrink: 0; }
+  .api-toggle { font-size: 14px; color: var(--text-sec); cursor: pointer; background: var(--bg); border: 0.5px solid var(--border-sec); border-radius: 4px; padding: 6px 10px; flex-shrink: 0; }
 
-  .btn-analizza { width: 100%; padding: 13px; font-size: 15px; font-weight: 600; background: var(--teal-400); color: #fff; border: none; border-radius: var(--radius-lg); cursor: pointer; transition: opacity 0.15s; letter-spacing: 0.01em; }
+  .btn-analizza { width: 100%; padding: 14px; font-size: 17px; font-weight: 600; background: var(--teal-400); color: #fff; border: none; border-radius: var(--radius-lg); cursor: pointer; transition: opacity 0.15s; letter-spacing: 0.01em; }
   .btn-analizza:hover { opacity: 0.88; }
   .btn-analizza:disabled { opacity: 0.4; cursor: not-allowed; }
   .loading-bar { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 10px; display: none; }
   .loading-bar.active { display: block; }
   .loading-bar-inner { height: 100%; background: var(--teal-400); animation: load 2.5s ease-in-out infinite; }
   @keyframes load { 0%{width:0%} 60%{width:80%} 100%{width:95%} }
-  .error-msg { font-size: 13px; color: var(--red-600); margin-top: 10px; padding: 10px 12px; background: var(--red-50); border-radius: var(--radius); display: none; white-space: pre-line; line-height: 1.5; }
+  .error-msg { font-size: 15px; color: var(--red-600); margin-top: 10px; padding: 10px 12px; background: var(--red-50); border-radius: var(--radius); display: none; white-space: pre-line; line-height: 1.5; }
 
   /* Results */
   .results-card { background: var(--bg); border-radius: var(--radius-lg); border: 0.5px solid var(--border); overflow: hidden; margin-bottom: 1rem; }
@@ -107,68 +107,68 @@
   .results-header.attenzione { background: var(--amber-50); }
   .results-header.sospetta { background: #FFF0F0; border-left: 4px solid var(--red-400); }
   .results-header.non-necessaria { background: var(--teal-50); }
-  .verdict-icon { font-size: 24px; }
-  .verdict-title { font-size: 16px; font-weight: 600; }
+  .verdict-icon { font-size: 26px; }
+  .verdict-title { font-size: 18px; font-weight: 600; }
   .verdict-title.valida { color: var(--green-600); }
   .verdict-title.non-valida { color: var(--red-600); }
   .verdict-title.attenzione { color: var(--amber-600); }
   .verdict-title.sospetta { color: var(--red-800); }
   .verdict-title.non-necessaria { color: var(--teal-600); }
-  .verdict-sub { font-size: 13px; color: var(--text-sec); margin-top: 2px; }
+  .verdict-sub { font-size: 15px; color: var(--text-sec); margin-top: 2px; }
   .score-bar-wrap { padding: 12px 16px 0; }
-  .score-label { font-size: 11px; color: var(--text-ter); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .score-label { font-size: 13px; color: var(--text-ter); margin-bottom: 4px; display: flex; justify-content: space-between; }
   .score-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
   .score-bar-fill { height: 100%; border-radius: 3px; }
   .checks-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
-  .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 9px 11px; border-radius: var(--radius); font-size: 13px; }
+  .check-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: var(--radius); font-size: 15px; }
   .check-item.ok { background: var(--green-50); }
   .check-item.err { background: var(--red-50); }
   .check-item.warn { background: var(--amber-50); }
   .check-item.info { background: var(--bg-sec); }
   .check-item.fofi { background: #FFF0F0; border: 1px solid var(--red-100); }
-  .check-icon { flex-shrink: 0; margin-top: 1px; font-size: 16px; line-height: 1; }
+  .check-icon { flex-shrink: 0; margin-top: 1px; font-size: 18px; line-height: 1; }
   .check-icon.ok { color: var(--green-600); }
   .check-icon.err { color: var(--red-600); }
   .check-icon.warn { color: var(--amber-600); }
   .check-icon.info { color: var(--gray-400); }
   .check-icon.fofi { color: var(--red-800); }
-  .check-name { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+  .check-name { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
   .check-name.ok { color: var(--green-600); }
   .check-name.err { color: var(--red-600); }
   .check-name.warn { color: var(--amber-600); }
   .check-name.info { color: var(--text-sec); }
   .check-name.fofi { color: var(--red-800); }
-  .check-note { color: var(--text-sec); font-size: 12px; line-height: 1.4; }
+  .check-note { color: var(--text-sec); font-size: 14px; line-height: 1.45; }
   .azioni-box { margin: 0 16px 14px; padding: 12px 14px; background: var(--bg-sec); border-radius: var(--radius); border: 0.5px solid var(--border); }
-  .azioni-title { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-ter); margin-bottom: 8px; }
-  .azioni-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
-  .azioni-list li { font-size: 13px; color: var(--text-sec); display: flex; gap: 8px; align-items: flex-start; }
+  .azioni-title { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-ter); margin-bottom: 8px; }
+  .azioni-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .azioni-list li { font-size: 15px; color: var(--text-sec); display: flex; gap: 8px; align-items: flex-start; line-height: 1.4; }
   .azioni-list li::before { content: '→'; color: var(--teal-400); flex-shrink: 0; font-weight: 600; }
   .azioni-list li.urgent::before { content: '⚠'; color: var(--red-600); }
-  .btn-nuova { width: 100%; padding: 11px; font-size: 14px; background: transparent; color: var(--text-sec); border: 0.5px solid var(--border-sec); border-radius: var(--radius-lg); cursor: pointer; transition: background 0.15s; margin-top: 0.5rem; }
+  .btn-nuova { width: 100%; padding: 12px; font-size: 16px; background: transparent; color: var(--text-sec); border: 0.5px solid var(--border-sec); border-radius: var(--radius-lg); cursor: pointer; transition: background 0.15s; margin-top: 0.5rem; }
   .btn-nuova:hover { background: var(--bg-sec); }
 
   /* FOFI DB status badge */
-  .db-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--green-600); background: var(--green-50); border: 0.5px solid var(--teal-100); border-radius: 20px; padding: 3px 10px; margin-top: 6px; }
+  .db-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--green-600); background: var(--green-50); border: 0.5px solid var(--teal-100); border-radius: 20px; padding: 4px 12px; margin-top: 6px; }
   .db-badge-dot { width: 6px; height: 6px; background: var(--teal-400); border-radius: 50%; }
 
   /* Install PWA button — visibile solo quando installabile */
-  .install-btn { display: none; margin-top: 8px; font-size: 12px; font-weight: 500; color: #fff; background: var(--teal-400); border: none; border-radius: 20px; padding: 6px 14px; cursor: pointer; transition: opacity 0.15s; }
+  .install-btn { display: none; margin-top: 8px; font-size: 14px; font-weight: 500; color: #fff; background: var(--teal-400); border: none; border-radius: 20px; padding: 8px 16px; cursor: pointer; transition: opacity 0.15s; }
   .install-btn:hover { opacity: 0.9; }
   .install-btn.show { display: inline-block; }
 
-  .footer { text-align: center; font-size: 11px; color: var(--text-ter); margin-top: 2rem; }
+  .footer { text-align: center; font-size: 13px; color: var(--text-ter); margin-top: 2rem; }
   @media (max-width: 500px) {
     body { padding: 1rem 0.75rem 2rem; }
     .card { padding: 1rem 0.875rem; }
     .field-grid { grid-template-columns: 1fr; }
     .field-row.full { grid-column: 1; }
     .tipo-tabs { gap: 4px; }
-    .tipo-tab { font-size: 12px; padding: 6px 10px; }
-    .photo-btn { padding: 18px 8px; min-height: 110px; }
-    .photo-btn-icon { font-size: 26px; margin-bottom: 6px; }
-    .photo-btn-label { font-size: 13px; }
-    .photo-btn-sub { font-size: 10px; }
+    .tipo-tab { font-size: 14px; padding: 8px 12px; }
+    .photo-btn { padding: 20px 10px; min-height: 120px; }
+    .photo-btn-icon { font-size: 30px; margin-bottom: 6px; }
+    .photo-btn-label { font-size: 15px; }
+    .photo-btn-sub { font-size: 12px; }
   }
 </style>
 </head>
@@ -195,8 +195,8 @@
     <div class="card">
       <div class="section-label">Stato ricetta</div>
       <div class="stato-tabs">
-        <div class="tipo-tab active" data-stato="da-spedire">📋 Da spedire <span style="opacity:0.7;font-size:11px;">(pre-controllo)</span></div>
-        <div class="tipo-tab" data-stato="gia-spedita">🔍 Già spedita <span style="opacity:0.7;font-size:11px;">(verifica conformità)</span></div>
+        <div class="tipo-tab active" data-stato="da-spedire">📋 Da spedire <span style="opacity:0.7;font-size:13px;">(pre-controllo)</span></div>
+        <div class="tipo-tab" data-stato="gia-spedita">🔍 Già spedita <span style="opacity:0.7;font-size:13px;">(verifica conformità)</span></div>
       </div>
     </div>
 
@@ -243,12 +243,12 @@
       <div class="section-label">Dati verificati a vista</div>
       <div class="field-grid">
         <div class="field-row full">
-          <div class="field-label">Nome medico prescrittore <span style="color:var(--text-ter);font-size:11px;">(ricerca automatica in banca dati FOFI)</span></div>
+          <div class="field-label">Nome medico prescrittore <span style="color:var(--text-ter);font-size:13px;">(ricerca automatica in banca dati FOFI)</span></div>
           <input type="text" id="f-medico" placeholder="es. Rossi Mario" oninput="cercaFOFI()" autocomplete="off" />
           <div class="fofi-live-check" id="fofi-live-medico"></div>
         </div>
         <div class="field-row full">
-          <div class="field-label">Farmaco / Specialità medicinale <span style="color:var(--text-ter);font-size:11px;">(ricerca automatica in banca dati FOFI)</span></div>
+          <div class="field-label">Farmaco / Specialità medicinale <span style="color:var(--text-ter);font-size:13px;">(ricerca automatica in banca dati FOFI)</span></div>
           <input type="text" id="f-farmaco" placeholder="es. Amoxicillina 500 mg — 30 capsule" oninput="cercaFOFI()" autocomplete="off" />
           <div class="fofi-live-check" id="fofi-live-farmaco"></div>
         </div>
@@ -257,9 +257,9 @@
           <input type="date" id="f-data" />
         </div>
         <div class="field-row">
-          <div class="field-label">Scadenza / Validità <span style="color:var(--text-ter);font-size:11px;">(default 30 gg; se RR/ripetibile imposta +6 mesi)</span></div>
+          <div class="field-label">Scadenza / Validità <span style="color:var(--text-ter);font-size:13px;">(default 30 gg; se RR/ripetibile imposta +6 mesi)</span></div>
           <input type="date" id="f-scadenza" />
-          <div id="scadenza-hint" style="font-size:12px;margin-top:2px;min-height:16px;"></div>
+          <div id="scadenza-hint" style="font-size:14px;margin-top:2px;min-height:18px;"></div>
         </div>
         <div class="field-row">
           <div class="field-label">Posologia</div>
@@ -334,7 +334,7 @@
     Farmacia della Stazione · Via Fiume 75, 19122 La Spezia · P.I. 01317570115<br>
     Banca dati FOFI circolari 15373–15909 · 144 segnalazioni · Aggiornamento 21/05/2026<br>
     Strumento ad uso interno — i risultati non sostituiscono la valutazione professionale del farmacista<br>
-    <span id="app-version" style="opacity:0.7;font-size:10px;letter-spacing:0.05em;">Build —</span>
+    <span id="app-version" style="opacity:0.7;font-size:12px;letter-spacing:0.05em;">Build —</span>
   </div>
 </div>
 
@@ -344,7 +344,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 22;
+const APP_BUILD = 23;
 const APP_BUILD_DATE = '22/05/2026';
 
 let tipoSelezionato = 'ssn';
@@ -980,7 +980,7 @@ function mostraRisultati(r) {
     <ul class="azioni-list">${tutteAzioni}</ul>
   </div>` : '';
 
-  const fofiBanner = fofiHits.length > 0 ? `<div style="margin:0 16px 14px;padding:10px 14px;background:#FFF0F0;border:1px solid #F7C1C1;border-radius:8px;font-size:12px;color:#791F1F;">
+  const fofiBanner = fofiHits.length > 0 ? `<div style="margin:0 16px 14px;padding:10px 14px;background:#FFF0F0;border:1px solid #F7C1C1;border-radius:8px;font-size:14px;color:#791F1F;">
     <strong>🚨 ${fofiHits.length} corrispondenza${fofiHits.length>1?'e':''} nella banca dati FOFI 2025-2026</strong> — Circ. n. ${fofiHits.map(h=>h.rec.n).join(', ')}
   </div>` : '';
 
