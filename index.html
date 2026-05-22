@@ -40,9 +40,8 @@
   .tipo-tab:hover { background: var(--bg-sec); }
   .tipo-tab.active { background: var(--teal-50); color: var(--teal-600); border-color: var(--teal-100); font-weight: 500; }
   .photo-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .photo-btn { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 12px; min-height: 130px; border: 1.5px dashed var(--border-sec); border-radius: var(--radius-lg); background: var(--bg-sec); cursor: pointer; transition: all 0.2s; text-align: center; }
+  .photo-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 12px; min-height: 130px; border: 1.5px dashed var(--border-sec); border-radius: var(--radius-lg); background: var(--bg-sec); cursor: pointer; transition: all 0.2s; text-align: center; font-family: inherit; color: inherit; width: 100%; }
   .photo-btn:hover, .photo-btn:active { border-color: var(--teal-400); background: var(--teal-50); }
-  .photo-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .photo-btn-icon { font-size: 30px; margin-bottom: 8px; line-height: 1; }
   .photo-btn-label { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
   .photo-btn-sub { font-size: 11px; color: var(--text-ter); }
@@ -212,18 +211,22 @@
     <div class="card">
       <div class="section-label">Fotografia ricetta (opzionale ma consigliata)</div>
       <div class="photo-buttons" id="photo-buttons">
-        <label class="photo-btn">
-          <input type="file" accept="image/*" capture="environment" class="foto-input" />
+        <!-- iPhone PWA fix: input fuori dal bottone + click() esplicito.
+             Il pattern <label><input hidden/></label> non funziona su iOS
+             in modalita' standalone (PWA installata): il tap sul label non
+             propaga all'input nascosto. Bottone + click() risolve. -->
+        <button type="button" class="photo-btn" onclick="document.getElementById('foto-camera').click()">
           <div class="photo-btn-icon">📷</div>
           <div class="photo-btn-label">Scatta foto</div>
           <div class="photo-btn-sub">Apri fotocamera</div>
-        </label>
-        <label class="photo-btn">
-          <input type="file" accept="image/*" class="foto-input" />
+        </button>
+        <button type="button" class="photo-btn" onclick="document.getElementById('foto-galleria').click()">
           <div class="photo-btn-icon">🖼️</div>
           <div class="photo-btn-label">Da galleria</div>
           <div class="photo-btn-sub">JPG · PNG · HEIC</div>
-        </label>
+        </button>
+        <input type="file" id="foto-camera" accept="image/*" capture="environment" class="foto-input" style="display:none" />
+        <input type="file" id="foto-galleria" accept="image/*" class="foto-input" style="display:none" />
       </div>
       <div class="img-preview-wrap" id="img-preview-wrap" style="display:none;">
         <img id="preview-img" alt="Anteprima ricetta" />
@@ -337,7 +340,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 18;
+const APP_BUILD = 19;
 const APP_BUILD_DATE = '22/05/2026';
 
 let tipoSelezionato = 'ssn';
