@@ -42,6 +42,10 @@
   .photo-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .photo-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 12px; min-height: 130px; border: 1.5px dashed var(--border-sec); border-radius: var(--radius-lg); background: var(--bg-sec); cursor: pointer; transition: all 0.2s; text-align: center; font-family: inherit; color: inherit; width: 100%; }
   .photo-btn:hover, .photo-btn:active { border-color: var(--teal-400); background: var(--teal-50); }
+  /* iOS PWA: input nascosti devono restare nel layout, altrimenti input.click()
+     in JS viene ignorato. display:none NON funziona. Usiamo posizione fuori
+     schermo + opacity 0. */
+  .foto-input { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
   .photo-btn-icon { font-size: 30px; margin-bottom: 8px; line-height: 1; }
   .photo-btn-label { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
   .photo-btn-sub { font-size: 11px; color: var(--text-ter); }
@@ -225,8 +229,8 @@
           <div class="photo-btn-label">Da galleria</div>
           <div class="photo-btn-sub">JPG · PNG · HEIC</div>
         </button>
-        <input type="file" id="foto-camera" accept="image/*" capture="environment" class="foto-input" style="display:none" />
-        <input type="file" id="foto-galleria" accept="image/*" class="foto-input" style="display:none" />
+        <input type="file" id="foto-camera" accept="image/*" capture="environment" class="foto-input" />
+        <input type="file" id="foto-galleria" accept="image/*" class="foto-input" />
       </div>
       <div class="img-preview-wrap" id="img-preview-wrap" style="display:none;">
         <img id="preview-img" alt="Anteprima ricetta" />
@@ -340,7 +344,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 21;
+const APP_BUILD = 22;
 const APP_BUILD_DATE = '22/05/2026';
 
 let tipoSelezionato = 'ssn';
