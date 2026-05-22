@@ -35,7 +35,7 @@
   .page-header p { font-size: 14px; color: var(--text-sec); }
   .card { background: var(--bg); border-radius: var(--radius-lg); border: 0.5px solid var(--border); padding: 1.25rem; margin-bottom: 1rem; }
   .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-ter); margin-bottom: 10px; }
-  .tipo-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tipo-tabs, .stato-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
   .tipo-tab { padding: 7px 14px; font-size: 13px; border: 0.5px solid var(--border-sec); border-radius: var(--radius); cursor: pointer; background: var(--bg); color: var(--text-sec); transition: all 0.15s; user-select: none; }
   .tipo-tab:hover { background: var(--bg-sec); }
   .tipo-tab.active { background: var(--teal-50); color: var(--teal-600); border-color: var(--teal-100); font-weight: 500; }
@@ -188,6 +188,15 @@
       <div class="fofi-alert-body" id="fofi-alert-body"></div>
     </div>
 
+    <!-- Stato ricetta (da spedire vs già spedita) -->
+    <div class="card">
+      <div class="section-label">Stato ricetta</div>
+      <div class="stato-tabs">
+        <div class="tipo-tab active" data-stato="da-spedire">📋 Da spedire <span style="opacity:0.7;font-size:11px;">(pre-controllo)</span></div>
+        <div class="tipo-tab" data-stato="gia-spedita">🔍 Già spedita <span style="opacity:0.7;font-size:11px;">(verifica conformità)</span></div>
+      </div>
+    </div>
+
     <!-- Tipo ricetta -->
     <div class="card">
       <div class="section-label">Tipo ricetta</div>
@@ -307,7 +316,7 @@
       </div>
     </div>
 
-    <button class="btn-analizza" id="btn-analizza" onclick="analizza()">🔍 Analizza validità ricetta</button>
+    <button class="btn-analizza" id="btn-analizza" onclick="analizza()">📋 Genera checklist pre-spedizione</button>
     <div class="loading-bar" id="loading-bar"><div class="loading-bar-inner"></div></div>
     <div class="error-msg" id="error-msg"></div>
   </div>
@@ -328,10 +337,11 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 17;
-const APP_BUILD_DATE = '21/05/2026';
+const APP_BUILD = 18;
+const APP_BUILD_DATE = '22/05/2026';
 
 let tipoSelezionato = 'ssn';
+let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)
 let imgBase64 = null;
 let imgMime = 'image/jpeg';
 let fofiHits = [];
@@ -340,6 +350,10 @@ document.getElementById('app-version').textContent = `Build ${APP_BUILD} · ${AP
 
 // Init DB status
 document.getElementById('db-status').textContent = `Banca dati FOFI attiva — ${FOFI_DB.length} segnalazioni (circ. ${FOFI_DB[0].n}–${FOFI_DB[FOFI_DB.length-1].n})`;
+
+// Init testo bottone (allineato allo stato default 'da-spedire').
+// Lo script gira a fine <body>: il bottone esiste già, niente DOMContentLoaded.
+aggiornaTestoBottone();
 
 // ─── Chiave API Gemini ─────────────────────────────────────────────────
 // La chiave NON e' embedded: ogni dispositivo inserisce la propria una sola
@@ -384,10 +398,10 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Tipo tabs
-document.querySelectorAll('.tipo-tab').forEach(tab => {
+// Tipo tabs — selezione ristretta al wrapper per non collidere con .stato-tabs
+document.querySelectorAll('.tipo-tabs .tipo-tab').forEach(tab => {
   tab.addEventListener('click', () => {
-    document.querySelectorAll('.tipo-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tipo-tabs .tipo-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     tipoSelezionato = tab.dataset.tipo;
     document.getElementById('nre-row').style.display = tipoSelezionato === 'ssn' ? '' : 'none';
@@ -395,6 +409,23 @@ document.querySelectorAll('.tipo-tab').forEach(tab => {
     aggiornaScadenza();
   });
 });
+
+// Stato ricetta tabs (da-spedire vs gia-spedita) — cambia anche il testo del bottone analizza
+document.querySelectorAll('.stato-tabs .tipo-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.stato-tabs .tipo-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    statoRicetta = tab.dataset.stato;
+    aggiornaTestoBottone();
+  });
+});
+
+function aggiornaTestoBottone() {
+  const btn = document.getElementById('btn-analizza');
+  btn.textContent = statoRicetta === 'da-spedire'
+    ? '📋 Genera checklist pre-spedizione'
+    : '🔍 Verifica conformità spedizione';
+}
 
 // ─── SCADENZA: calcolo automatico + indicatore validità ───────────────
 // Default conservativo 30 giorni (SSN non ripetibile, bianca non ripetibile,
@@ -684,6 +715,8 @@ function buildPrompt() {
   const oss = document.getElementById('f-osservazioni').value;
 
   const tipoLabel = { ssn:'Ricetta SSN', bianca:'Ricetta bianca privata', stupefacenti:'Ricetta stupefacenti DPR 309/90', veterinaria:'Ricetta veterinaria' }[tipoSelezionato];
+  const isPre = statoRicetta === 'da-spedire';
+  const modalitaLabel = isPre ? 'PRE-DISPENSAZIONE (ricetta non ancora spedita)' : 'POST-DISPENSAZIONE (ricetta gia\' spedita)';
 
   const fofiBriefing = fofiHits.length > 0
     ? `\n\nALLERTA FOFI: Il sistema ha trovato ${fofiHits.length} segnalazioni nella banca dati circolari FOFI 2025-2026 corrispondenti ai dati inseriti:\n` +
@@ -705,7 +738,55 @@ function buildPrompt() {
     (note ? `- Note: ${note}\n` : '') +
     (oss ? `- Osservazioni: ${oss}\n` : '');
 
-  return `Sei un farmacista esperto italiano. Verifica la validità di questa ricetta.
+  const modalitaIstruzioni = isPre
+    ? `MODALITA': ${modalitaLabel}
+La ricetta NON e' ancora stata spedita. Il farmacista la sta valutando PRIMA di erogare il farmaco. Tu devi:
+(a) verificare validita' formale/normativa della ricetta come oggi;
+(b) produrre una CHECKLIST OPERATIVA delle cose che il farmacista deve fare PRIMA di consegnare il farmaco.
+
+POPOLAMENTO CAMPI:
+- "controlli": requisiti della ricetta (presenza firma, timbro, posologia, NRE, data, CF, ecc.). Stato "ok" se presente, "errore" se manca un requisito ESSENZIALE per legge, "attenzione" se dubbio/parziale, "info" per PROMEMORIA OPERATIVI (es. "Trattamento ricetta: trattenere in farmacia").
+- "azioni_richieste": elenco operativo di cose DA FARE prima di erogare. Esempi (applica solo se pertinenti a tipo + classe):
+  * TUTTE: "Apporre timbro di spedizione con data odierna", "Calcolare e annotare prezzo di vendita".
+  * SSN: "Applicare fustella nello spazio prestampato", "Annullare NRE sul SAR/portale regionale dopo consegna", "Verificare codice esenzione paziente".
+  * RR (bianca ripetibile): "Timbrare con data odierna e restituire al paziente per erogazioni successive (entro 6 mesi)".
+  * RNR standard (bianca non ripetibile): "Timbrare e TRATTENERE la ricetta in farmacia (conservazione 6 mesi)".
+  * RNR benzodiazepine (Tab. V): "TRATTENERE in farmacia + RICHIEDERE DOCUMENTO d'identita' del ritirante e annotarne gli estremi sulla ricetta (conservazione 2 anni)".
+  * Stupefacenti RMR: "RICHIEDERE DOCUMENTO d'identita' del ritirante (obbligatorio) e annotare nome/cognome/n. documento", "REGISTRARE l'uscita nel registro entrata/uscita stupefacenti entro 24h", "TRATTENERE la ricetta (conservazione 2 anni)".
+  * Veterinaria: "Apporre prezzo, timbrare con data, conservare secondo tipologia (REV: 5 anni per animali da reddito)".
+- "azioni_urgenti": solo se SOSPETTA_FALSA o altri rischi gravi.
+
+VERDETTO in modalita' PRE:
+- "VALIDA": ricetta formalmente corretta, erogabile dopo aver completato la checklist in azioni_richieste.
+- "ATTENZIONE": elementi dubbi che richiedono verifica prima di erogare.
+- "NON_VALIDA": mancano requisiti essenziali della prescrizione, NON erogare prima della correzione dal medico.`
+    : `MODALITA': ${modalitaLabel}
+La ricetta E' GIA' STATA SPEDITA dal farmacista. Tu devi verificare RETROATTIVAMENTE che siano state svolte tutte le incombenze previste dalla legge e dalle SOP della farmacia. Una visita ispettiva ASL/NAS contesterebbe queste mancanze.
+
+POPOLAMENTO CAMPI:
+- "controlli": OGNI adempimento post-spedizione previsto va elencato. Stato "ok" se la presenza dell'adempimento e' verificabile (dall'immagine o dalle osservazioni del farmacista); "errore" se MANCA un adempimento OBBLIGATORIO per legge (timbro spedizione, fustella SSN, estremi documento per benzo/stupefacenti, registrazione stupefacenti); "attenzione" se l'adempimento e' previsto da SOP/buona pratica ma non verificabile (es. "Registro stupefacenti: verificare con il farmacista che l'uscita sia stata annotata entro 24h"); "info" SOLO per note di contesto, NON per adempimenti mancanti.
+- "azioni_richieste": azioni CORRETTIVE per le inadempienze rilevate. Esempi:
+  * "Recuperare estremi documento d'identita' del ritirante se la persona e' ancora identificabile",
+  * "Verificare nel registro entrata/uscita stupefacenti che la dispensazione del [data] sia stata annotata; in caso contrario regolarizzare con annotazione tardiva e nota giustificativa",
+  * "Apporre annotazione retroattiva del timbro di spedizione con nota tecnica nel registro non conformita'",
+  * "Verificare annullamento NRE sul SAR".
+- "azioni_urgenti": inadempienze a rischio sanzione NAS/ASL (es. mancato registro stupefacenti, ricetta benzo non trattenuta).
+
+ADEMPIMENTI POST-SPEDIZIONE DA VERIFICARE (applica solo i pertinenti a tipo + classe):
+* TUTTE: presenza timbro di spedizione con data leggibile, presenza prezzo annotato.
+* SSN: fustella applicata, NRE annullato sul SAR.
+* Bianca RR: timbro spedizione con data (ricetta restituita al paziente, OK).
+* Bianca RNR standard: ricetta DEVE essere trattenuta in farmacia. Se restituita al paziente -> ERRORE GRAVE.
+* Bianca RNR benzodiazepine: trattenuta + estremi documento d'identita' annotati sulla ricetta. Mancano gli estremi -> errore.
+* Stupefacenti RMR: trattenuta + estremi documento d'identita' del ritirante annotati + registrazione nel registro entrata/uscita stupefacenti (chiedere conferma nelle osservazioni; se non confermato, "attenzione").
+* Veterinaria: prezzo, timbro spedizione, conservazione secondo tipologia.
+
+VERDETTO in modalita' POST:
+- "VALIDA": spedizione conforme, tutti gli adempimenti verificati.
+- "ATTENZIONE": piccole irregolarita' sanabili (es. timbro presente ma data poco leggibile).
+- "NON_VALIDA": una o piu' INADEMPIENZE GRAVI (mancata registrazione stupefacenti, ricetta benzo restituita al paziente, fustella SSN mancante, estremi documento mancanti per benzo/stupefacenti). Indica sempre nel sommario le inadempienze principali.`;
+
+  return `Sei un farmacista esperto italiano. Verifica questa ricetta.
 
 TIPO: ${tipoLabel}
 DATA ODIERNA: ${oggi}
@@ -717,7 +798,9 @@ ${getRequisiti()}
 
 ${imgBase64 ? 'Analizza l\'immagine allegata E i dati forniti.' : 'Analizza i dati forniti (nessuna immagine).'}
 
-REGOLE TIPO RICETTA (importanti):
+${modalitaIstruzioni}
+
+REGOLE TIPO RICETTA (importanti, valide in entrambe le modalita'):
 - Applica SOLO i requisiti elencati in NORMATIVA per il TIPO dichiarato sopra. NON segnalare come mancanti requisiti di altri tipi (es. su una ricetta bianca privata NON sono richiesti NRE, codice regionale, codice esenzione, codice ASL — questi sono solo per SSN).
 - DETERMINA SEMPRE la classe di ripetibilita' della ricetta, in base a TRE elementi in ordine di priorita':
   (1) diciture esplicite sulla ricetta: "NRP"/"non ripetibile"/"RNR" (1 erogazione, 30 gg) oppure "RR"/"ripetibile"/"N° erogazioni: X" (6 mesi, X erogazioni);
@@ -732,7 +815,6 @@ REGOLE TIPO RICETTA (importanti):
   - SSN non ripetibile -> 30 gg. SSN ripetibile cronici -> 6 mesi, 11 erogazioni (raro, va indicato dal medico).
 
 - Se la scadenza inserita dal farmacista non corrisponde alla classe rilevata, aggiungi un controllo "Validita' ricetta" stato "attenzione" con la scadenza corretta calcolata (data + 30 gg o data + 180 gg). Se il farmacista non ha inserito scadenza, calcolala tu nel campo note.
-- Per benzodiazepine e stupefacenti aggiungi inoltre un controllo "Trattamento ricetta" stato "info" che ricorda di trattenere la ricetta in farmacia (non restituirla al paziente).
 - Se hai un'immagine, verifica che il tipo visivo della ricetta corrisponda al TIPO dichiarato. Indizi visivi:
   * SSN/dematerializzata: foglio rosso prestampato con header SSN/Ministero, campi prestampati (codice fiscale, codice esenzione, codice regione), o stampa digitale promemoria dematerializzato con NRE.
   * Bianca privata: foglio bianco con sola intestazione/timbro medico, nessun campo prestampato SSN.
@@ -747,18 +829,15 @@ Rispondi SOLO con JSON valido, senza testo prima o dopo:
   "sommario": "max 25 parole",
   "punteggio": 0-100,
   "controlli": [
-    { "campo": "nome requisito", "stato": "ok"|"errore"|"attenzione"|"info", "note": "max 20 parole" }
+    { "campo": "nome requisito o adempimento", "stato": "ok"|"errore"|"attenzione"|"info", "note": "max 20 parole" }
   ],
   "azioni_richieste": ["azione 1", "azione 2"],
-  "azioni_urgenti": ["azione urgente se ricetta sospetta falsa, altrimenti array vuoto"]
+  "azioni_urgenti": ["azione urgente se ricetta sospetta falsa o inadempienza grave post-spedizione, altrimenti array vuoto"]
 }
 
-REGOLE VERDETTO:
-- "SOSPETTA_FALSA": ci sono corrispondenze FOFI o elementi fortemente sospetti (timbri rifatti, firme imitate, dati alterati).
+REGOLE VERDETTO TRASVERSALI:
+- "SOSPETTA_FALSA": ci sono corrispondenze FOFI o elementi fortemente sospetti (timbri rifatti, firme imitate, dati alterati). Vale in entrambe le modalita'.
 - "NON_NECESSARIA": il prodotto NON richiede ricetta medica per legge — ad esempio integratori alimentari (magnesio, multivitaminici, probiotici, omega-3, melatonina, fermenti lattici), cosmetici, dispositivi medici (cerotti, garze, termometri), farmaci OTC/SOP (paracetamolo da banco, ibuprofene 200mg, antiacidi, lassativi blandi). In questo caso punteggio 85+, nessuna azione urgente, sommario tipo "Integratore/OTC: dispensabile senza prescrizione". Anche se il medico lo ha scritto su ricetta, se per legge non e' richiesta, usa questo verdetto. In caso di dubbio sulla classificazione, NON usare NON_NECESSARIA — applica i requisiti del tipo di ricetta dichiarato.
-- "VALIDA": ricetta completa, conforme alla normativa, erogabile.
-- "ATTENZIONE": elementi dubbi ma erogabile dopo verifica.
-- "NON_VALIDA": mancano requisiti essenziali, non erogare prima di correzione.
 
 Includi 7-12 controlli specifici.`;
 }
@@ -858,7 +937,7 @@ async function analizza() {
     mostraErrore(msg);
   } finally {
     btn.disabled = false;
-    btn.textContent = '🔍 Analizza validità ricetta';
+    aggiornaTestoBottone();
     document.getElementById('loading-bar').classList.remove('active');
   }
 }
@@ -936,6 +1015,8 @@ function nuovaVerifica() {
   document.getElementById('fofi-live-farmaco').innerHTML='';
   document.getElementById('fofi-alert').classList.remove('show');
   fofiHits=[];
+  // NON resettare statoRicetta ne' tipoSelezionato: in genere il farmacista
+  // controlla piu' ricette consecutive nello stesso stato/tipo (batch).
   rimuoviImg({stopPropagation:()=>{}});
   window.scrollTo({top:0,behavior:'smooth'});
 }
