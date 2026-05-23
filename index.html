@@ -364,7 +364,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 34;
+const APP_BUILD = 35;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -855,7 +855,8 @@ POPOLAMENTO CAMPI:
   * SSN: "Applicare fustella nello spazio prestampato", "Annullare NRE sul SAR/portale regionale dopo consegna", "Verificare codice esenzione paziente".
   * RR (bianca ripetibile): "Timbrare con data odierna e restituire al paziente per erogazioni successive (entro 6 mesi)".
   * RNR standard (bianca non ripetibile): "Timbrare e TRATTENERE la ricetta in farmacia (conservazione 6 mesi)".
-  * RNR benzodiazepine (Tab. V sez. D): "TRATTENERE in farmacia + RICHIEDERE DOCUMENTO d'identita' del ritirante e annotarne gli estremi sulla ricetta (conservazione 2 anni)".
+  * RNR benzodiazepine (Tab. V sez. D, su ricetta BIANCA PRIVATA): "TRATTENERE in farmacia + RICHIEDERE DOCUMENTO d'identita' del ritirante (qualsiasi documento valido con foto+timbro: CI, patente, libretto ordine, porto d'armi, patente nautica) e annotarne nome/cognome/estremi sulla ricetta (conservazione 2 anni). Vale per TUTTE le formulazioni della molecola benzo Tab.V sez.D: orale, gocce, fiale/iniettabili (es. EN fiale/delorazepam, Tavor fiale/lorazepam, Valium fiale/diazepam). La via di somministrazione NON cambia la regola."
+  * Benzodiazepine Tab. V sez. D su ricetta SSN: "TRATTENERE in farmacia secondo prassi SSN. Il documento d'identita' del ritirante NON e' obbligatorio perche' la ricetta SSN gia' contiene i dati del paziente. Annotare timbro spedizione e prezzo come per tutte le SSN."
   * RNR speciale stupefacenti Tab. A allegato III-bis (codeina+paracetamolo Tachidol/Co-Efferalgan, tramadolo+paracetamolo, ecc.): "VERIFICARE che il medico abbia indicato la POSOLOGIA (obbligatoria per Allegato III-bis): se manca, NON erogare e chiedere correzione al medico", "Timbrare e TRATTENERE in farmacia (conservazione 2 anni)", "Verificare che il paziente sia >12 anni (divieto AIFA codeina <12 anni)".
   * Stupefacenti RMR (Tab. I-III, ricettario ministeriale a ricalco): "RICHIEDERE DOCUMENTO d'identita' del ritirante (obbligatorio) e annotare nome/cognome/n. documento", "REGISTRARE l'uscita nel registro entrata/uscita stupefacenti entro 24h", "TRATTENERE la ricetta (conservazione 2 anni)", "VERIFICARE posologia obbligatoria".
   * Veterinaria: "Apporre prezzo, timbrare con data, conservare secondo tipologia (REV: 5 anni per animali da reddito)".
@@ -894,7 +895,7 @@ ADEMPIMENTI POST-SPEDIZIONE DA VERIFICARE (applica solo i pertinenti a tipo + cl
 * SSN: fustella applicata visibile sull'immagine, NRE annullato sul SAR (non verificabile da immagine -> "attenzione" + nota).
 * Bianca RR: timbro spedizione con data sull'immagine (ricetta restituita al paziente, OK — la trattenuta NON e' richiesta per RR).
 * Bianca RNR standard: trattenuta IMPLICITA (il farmacista ce l'ha in mano). Verifica timbro + prezzo dall'immagine.
-* Bianca RNR benzodiazepine: trattenuta IMPLICITA. Verifica dall'immagine: estremi documento d'identita' annotati sulla ricetta (nome/cognome/n. documento del ritirante). Se sull'immagine NON sono visibili -> errore.
+* Bianca privata RNR benzodiazepine (Tab. V sez. D - tutte le formulazioni: orale, gocce, fiale): trattenuta IMPLICITA. Verifica dall'immagine: estremi documento d'identita' del ritirante annotati sulla ricetta (nome/cognome/n. documento). Se sull'immagine NON sono visibili -> errore. NOTA: questo requisito si applica SOLO alla benzo su ricetta BIANCA PRIVATA; su benzo prescritti via SSN, il documento del ritirante NON e' richiesto (la ricetta SSN gia' contiene i dati paziente).
 * Stupefacenti RMR: trattenuta IMPLICITA. Verifica dall'immagine estremi documento del ritirante. Registrazione nel registro entrata/uscita stupefacenti: non verificabile da immagine -> "attenzione" con richiesta di conferma al farmacista.
 * Veterinaria: prezzo + timbro spedizione sull'immagine, conservazione secondo tipologia.
 
