@@ -288,6 +288,22 @@
             <option value="no">Assente</option>
           </select>
         </div>
+        <div class="field-row" id="timbro-sped-row" style="display:none;">
+          <div class="field-label">Timbro di spedizione (controllo visivo)</div>
+          <select id="f-timbro-sped">
+            <option value="">-- seleziona --</option>
+            <option value="presente">Presente sulla ricetta fisica</option>
+            <option value="assente">Assente</option>
+          </select>
+        </div>
+        <div class="field-row" id="prezzo-sped-row" style="display:none;">
+          <div class="field-label">Prezzo annotato (controllo visivo)</div>
+          <select id="f-prezzo-sped">
+            <option value="">-- seleziona --</option>
+            <option value="presente">Annotato sulla ricetta fisica</option>
+            <option value="assente">Non annotato</option>
+          </select>
+        </div>
         <div class="field-row">
           <div class="field-label">Codice fiscale paziente</div>
           <input type="text" id="f-cf" placeholder="RSSMRA80A01A123K" maxlength="16" style="text-transform:uppercase;font-family:monospace;" />
@@ -344,7 +360,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 26;
+const APP_BUILD = 27;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -424,8 +440,16 @@ document.querySelectorAll('.stato-tabs .tipo-tab').forEach(tab => {
     tab.classList.add('active');
     statoRicetta = tab.dataset.stato;
     aggiornaTestoBottone();
+    aggiornaCampiPost();
   });
 });
+
+function aggiornaCampiPost() {
+  const isPost = statoRicetta === 'gia-spedita';
+  document.getElementById('timbro-sped-row').style.display = isPost ? '' : 'none';
+  document.getElementById('prezzo-sped-row').style.display = isPost ? '' : 'none';
+}
+aggiornaCampiPost();
 
 function aggiornaTestoBottone() {
   const btn = document.getElementById('btn-analizza');
@@ -720,6 +744,8 @@ function buildPrompt() {
   const ricettario = document.getElementById('f-ricettario').value;
   const note = document.getElementById('f-note').value;
   const oss = document.getElementById('f-osservazioni').value;
+  const timbroSped = document.getElementById('f-timbro-sped').value;
+  const prezzoSped = document.getElementById('f-prezzo-sped').value;
 
   const tipoLabel = { ssn:'Ricetta SSN', bianca:'Ricetta bianca privata', stupefacenti:'Ricetta stupefacenti DPR 309/90', veterinaria:'Ricetta veterinaria' }[tipoSelezionato];
   const isPre = statoRicetta === 'da-spedire';
@@ -733,8 +759,8 @@ function buildPrompt() {
 
   let dati = '\n\nDATI INSERITI DAL FARMACISTA:\n' +
     (medico ? `- Medico prescrittore: ${medico}\n` : '') +
-    (farmaco ? `- Farmaco: ${farmaco}\n` : '- Farmaco: non indicato\n') +
-    (data ? `- Data prescrizione: ${data}\n` : '- Data prescrizione: non inserita\n') +
+    (farmaco ? `- Farmaco: ${farmaco}\n` : '') +
+    (data ? `- Data prescrizione: ${data}\n` : '') +
     (scad ? `- Scadenza: ${scad}\n` : '') +
     (posologia ? `- Posologia: ${posologia}\n` : '') +
     (firma ? `- Firma medico: ${firma}\n` : '') +
@@ -743,7 +769,9 @@ function buildPrompt() {
     (nre && tipoSelezionato==='ssn' ? `- NRE: ${nre}\n` : '') +
     (ricettario && tipoSelezionato==='stupefacenti' ? `- N° ricettario: ${ricettario}\n` : '') +
     (note ? `- Note: ${note}\n` : '') +
-    (oss ? `- Osservazioni: ${oss}\n` : '');
+    (oss ? `- Osservazioni: ${oss}\n` : '') +
+    (!isPre && timbroSped ? `- Timbro di spedizione (conferma visiva farmacista): ${timbroSped === 'presente' ? 'PRESENTE sulla ricetta fisica' : 'ASSENTE'}\n` : '') +
+    (!isPre && prezzoSped ? `- Prezzo annotato (conferma visiva farmacista): ${prezzoSped === 'presente' ? 'ANNOTATO sulla ricetta fisica' : 'NON annotato'}\n` : '');
 
   const prioritaDati = `
 
@@ -751,8 +779,14 @@ PRIORITA' DEI DATI (regola GENERALE, valida sia in PRE che in POST):
 - I CAMPI ANAGRAFICI E PRESCRITTIVI compilati dal farmacista nel form (Medico, Farmaco, Data prescrizione, Scadenza, Posologia, CF, NRE, N° ricettario) sono AUTORITARI. Il farmacista ha letto la ricetta a mano e ha trascritto il valore corretto.
 - L'OCR sull'immagine puo' confondere caratteri visivamente simili: "/" con "1", "0" con "O", "l" con "1", "5" con "S", "8" con "B". NON segnalare come errore una discrepanza tra il valore del form e quello che TU leggi sull'immagine per questi campi: usa il valore del form, ignora la lettura OCR.
 - Esempio: se il form indica "Data prescrizione: 30/04/2026" e tu leggi sull'immagine "30104/2026" o "30/0412026", la data CORRETTA e' 30/04/2026 (quella del form). Non aggiungere controlli "data illeggibile" o "data non corrisponde".
-- ECCEZIONE - ADEMPIMENTI POST-SPEDIZIONE (timbro di spedizione, prezzo annotato, fustella SSN applicata, estremi documento del ritirante annotati sulla ricetta): qui l'immagine RESTA la fonte di verita', perche' si tratta di elementi APPOSTI in farmacia dopo la spedizione, non di dati prescrittivi del medico. Per questi, segui le regole POST.
-- Se un campo del form e' VUOTO e l'immagine mostra il dato, usa il valore letto dall'immagine (best effort) e segnala nel controllo che il farmacista non l'ha trascritto nel form (stato "info").`;
+- Se un campo del form e' VUOTO, leggi il dato dall'IMMAGINE come best effort. Se l'immagine lo mostra chiaramente, usalo e marca il controllo "ok". NON creare MAI controlli con nomi del tipo "Farmaco inserito dal farmacista", "Dato non inserito nel form", "Medico non indicato dal farmacista" o simili: i campi del form sono solo aiuti supplementari, la loro assenza NON e' un errore se il dato e' visibile sull'immagine.
+- MULTIPLI FARMACI: se l'immagine mostra piu' farmaci prescritti, elencali TUTTI nel controllo "Farmaco/i" (stato "ok" se identificabili). Non segnalare come errore il fatto che il form contenga solo un farmaco o nessuno: il farmacista non e' tenuto a trascrivere ogni farmaco nel form.
+
+ADEMPIMENTI POST-SPEDIZIONE - REGOLA SPECIFICA (solo in modalita' POST):
+- Per timbro di spedizione, prezzo annotato, fustella SSN applicata, estremi documento del ritirante, l'immagine e' la prima fonte di verita' (sono elementi APPOSTI in farmacia, non prescritti dal medico).
+- TUTTAVIA, se in DATI INSERITI DAL FARMACISTA trovi una conferma visiva esplicita ("Timbro di spedizione (conferma visiva farmacista): PRESENTE sulla ricetta fisica" oppure "Prezzo annotato (conferma visiva farmacista): ANNOTATO sulla ricetta fisica"), QUELLA HA PRIORITA' sull'immagine. Il farmacista sta guardando fisicamente la ricetta e te lo conferma: fidati. Marca il controllo "ok" con nota tipo "confermato visivamente dal farmacista".
+- Se invece il farmacista NON ha compilato la conferma visiva e l'immagine non mostra chiaramente l'adempimento (es. foto tagliata, fuori inquadratura, sfocata), usa stato "attenzione" (NON "errore") con nota tipo "non verificabile dall'immagine: il farmacista confermi visivamente nel campo dedicato del form, oppure carichi una foto piu' dettagliata".
+- Se il farmacista dichiara "ASSENTE" o "NON annotato": stato "errore" e considera l'inadempienza nelle azioni richieste.`;
 
   const modalitaIstruzioni = isPre
     ? `MODALITA': ${modalitaLabel}
@@ -781,12 +815,17 @@ La ricetta E' GIA' STATA SPEDITA dal farmacista. Tu devi verificare RETROATTIVAM
 
 ASSUNTI FONDAMENTALI DELLA MODALITA' POST (non violarli):
 1) Il farmacista ha FISICAMENTE la ricetta in mano (sta caricando l'immagine per ricontrollarla). Quindi: per ogni tipo che DEVE essere trattenuto (RNR standard, RNR benzodiazepine, RMR stupefacenti), la trattenuta e' IMPLICITA — NON segnalare MAI "ricetta non trattenuta" come errore, a meno che il farmacista lo dichiari esplicitamente nelle osservazioni.
-2) FONTE DI VERITA' PER GLI ADEMPIMENTI = IMMAGINE (timbro, prezzo, fustella, estremi documento). I campi del form relativi a questi adempimenti sono dati SUPPLEMENTARI di aiuto: un campo del form vuoto NON significa che l'elemento manchi sulla ricetta. Esempio: se il form non ha "timbro" compilato ma sull'immagine si vede il timbro di spedizione -> stato "ok", NON "errore". Solo se l'immagine NON mostra timbro/prezzo -> errore. NOTA: per i DATI ANAGRAFICI/PRESCRITTIVI vale la regola opposta (vedi PRIORITA' DEI DATI sopra): il form ha precedenza sull'OCR.
+2) FONTE DI VERITA' PER GLI ADEMPIMENTI = IMMAGINE in prima battuta (timbro, prezzo, fustella, estremi documento). MA, se il farmacista ha compilato una conferma visiva esplicita nel form ("Timbro di spedizione (conferma visiva farmacista): PRESENTE", "Prezzo annotato (conferma visiva farmacista): ANNOTATO"), QUELLA HA PRIORITA' sull'immagine: marca "ok" anche se sull'immagine non vedi nulla, perche' il farmacista ti sta confermando di averlo verificato fisicamente. Vedi PRIORITA' DEI DATI sopra. NOTA: per i DATI ANAGRAFICI/PRESCRITTIVI vale la regola form > OCR sempre.
 3) Se non c'e' immagine allegata, NON puoi affermare che timbro/prezzo manchino: usa stato "attenzione" con nota "non verificabile senza immagine — il farmacista confermi visivamente".
 4) NON usare MAI le espressioni "non erogare", "non spedire", "errori nell'inserimento dati", "il farmacista deve correggere prima di erogare": la spedizione e' GIA' avvenuta. Usa linguaggio diagnostico retrospettivo: "manca [X] sulla ricetta spedita", "la ricetta avrebbe dovuto riportare [Y]", "verificare in registro che [Z] sia stato annotato".
 
 POPOLAMENTO CAMPI:
-- "controlli": OGNI adempimento post-spedizione previsto va elencato. Stato "ok" se la presenza dell'adempimento e' verificabile DALL'IMMAGINE o dalle osservazioni del farmacista; "errore" se l'IMMAGINE mostra chiaramente la mancanza di un adempimento OBBLIGATORIO per legge (timbro spedizione assente sull'immagine, fustella SSN non applicata sull'immagine, estremi documento non annotati sull'immagine per benzo/stupefacenti, mancata registrazione stupefacenti dichiarata); "attenzione" se l'adempimento non e' verificabile dall'immagine e nemmeno dichiarato (es. "Registro stupefacenti: verificare con il farmacista che l'uscita sia stata annotata entro 24h"); "info" SOLO per note di contesto, NON per adempimenti mancanti.
+- "controlli": OGNI adempimento post-spedizione previsto va elencato. Determina lo stato in questo ORDINE:
+  1. Se il farmacista ha CONFERMATO VISIVAMENTE l'adempimento nel form (es. "Timbro di spedizione: PRESENTE", "Prezzo annotato: ANNOTATO") -> stato "ok", nota "confermato visivamente dal farmacista". Questa conferma e' priorit aria.
+  2. Se il farmacista ha dichiarato ASSENTE/NON annotato -> stato "errore" + azione richiesta.
+  3. Altrimenti guarda l'IMMAGINE: se l'adempimento e' visibile chiaramente -> "ok"; se l'immagine mostra chiaramente la sua assenza -> "errore".
+  4. Se l'adempimento non e' verificabile dall'immagine (foto sfocata/tagliata/fuori inquadratura) e il farmacista non ha confermato -> "attenzione" con nota "non verificabile dall'immagine: confermare nel campo dedicato del form o caricare foto piu' dettagliata". NON usare "errore" in questo caso.
+  5. "info" SOLO per note di contesto, NON per adempimenti mancanti.
 - "azioni_richieste": azioni CORRETTIVE per le inadempienze EFFETTIVAMENTE rilevate. Esempi:
   * "Recuperare estremi documento d'identita' del ritirante se la persona e' ancora identificabile",
   * "Verificare nel registro entrata/uscita stupefacenti che la dispensazione del [data] sia stata annotata; in caso contrario regolarizzare con annotazione tardiva e nota giustificativa",
@@ -1049,7 +1088,7 @@ function nuovaVerifica() {
   ['f-medico','f-farmaco','f-data','f-scadenza','f-cf','f-nre','f-ricettario','f-note','f-osservazioni'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
-  ['f-posologia','f-firma','f-timbro'].forEach(id => { const el=document.getElementById(id); if(el) el.selectedIndex=0; });
+  ['f-posologia','f-firma','f-timbro','f-timbro-sped','f-prezzo-sped'].forEach(id => { const el=document.getElementById(id); if(el) el.selectedIndex=0; });
   delete document.getElementById('f-scadenza').dataset.userEdited;
   document.getElementById('scadenza-hint').innerHTML='';
   document.getElementById('fofi-live-medico').innerHTML='';
