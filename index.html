@@ -364,7 +364,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 38;
+const APP_BUILD = 39;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -740,6 +740,11 @@ VALIDITA' RICETTA BIANCA (terminologia uniforme):
 - RNR benzo iniettabili territoriali Sez. D (Tabella Medicinali Sez. D, post 15/06/2009) → 30 giorni, 1 erogazione, ricetta TRATTENUTA in farmacia + annotazione documento ritirante (CI/patente/ecc.) + conservazione 2 anni. Es: EN fiale (delorazepam), Valium fiale (diazepam), Noan fiale, Diazemuls.
 - RNR Tab.A allegato III-bis (codeina+paracetamolo, tramadolo+paracetamolo) → vedi sezione apposita sotto.
 
+REGOLA PRIORITARIA SUL DOCUMENTO RITIRANTE (leggi PRIMA di decidere se serve):
+- Il documento del ritirante e' obbligatorio SOLO per: (a) benzo iniettabili Sez. D territoriali (EN fiale, Valium fiale, Noan fiale, Diazemuls) su bianca privata; (b) codeina+paracetamolo Sez. D (Tachidol, Codamol, Co-Efferalgan, Lonarid) su bianca privata; (c) oppioidi/stupefacenti su RMR (Tab. I-III).
+- Il documento NON e' richiesto per: benzo orali/gocce Sez. E (Xanax, Tavor cpr/gtt, Lexotan, EN gocce, EN cpr, Stilnox, Rivotril, Halcion, Minias gtt, Lendormin, Valium cpr, Noan cpr, ecc.), antidepressivi, antipsicotici, pregabalin, gabapentin, lacosamide, antibiotici, FANS, statine, ecc.
+- DISAMBIGUAZIONE FORMA FARMACEUTICA: se nella ricetta o nel form compare il nome commerciale di una benzo SENZA specifica della forma (es. solo "EN", "Tavor", "Valium", "Noan", "Lormetazepam"), ASSUMI forma ORALE (Sez. E, no documento). Le fiale richiedono prescrizione esplicita con indicazioni come "fiale", "fle", "f.le", "iniettabile", "i.m.", "e.v.", "soluzione iniettabile", o un dosaggio in mg/ml tipico delle iniettabili (es. EN 2 mg/ml, EN 5 mg/ml, Valium 10 mg/2 ml). In assenza di tali indicazioni: default ORALE = NO documento.
+
 NOTA TERMINOLOGICA IMPORTANTE (sostanze vs medicinali):
 - "Tabella V/IV/III delle sostanze stupefacenti e psicotrope" classifica le SOSTANZE in base al potenziale d'abuso. Le benzodiazepine sono tutte sostanze di Tabella V psicotropi.
 - "Tabella dei Medicinali sez. A/B/C/D/E" del DPR 309/90 (mod. DL 36/2014) classifica i MEDICINALI in base al regime PRESCRITTIVO. Le benzodiazepine NON sono tutte nella stessa sezione:
@@ -923,7 +928,7 @@ ADEMPIMENTI POST-SPEDIZIONE DA VERIFICARE (applica solo i pertinenti a tipo + cl
 VERDETTO in modalita' POST (linguaggio DIAGNOSTICO, mai prescrittivo):
 - "VALIDA": spedizione conforme, tutti gli adempimenti verificabili sono ok.
 - "ATTENZIONE": piccole irregolarita' sanabili (timbro presente ma data poco leggibile) o adempimenti non verificabili dall'immagine che richiedono conferma del farmacista.
-- "NON_VALIDA": una o piu' INADEMPIENZE GRAVI EFFETTIVAMENTE OSSERVABILI sull'immagine (timbro spedizione assente, fustella SSN mancante, estremi documento mancanti per benzo/stupefacenti annotati sulla ricetta) o dichiarate dal farmacista (mancata registrazione stupefacenti). Sommario: indica le inadempienze con linguaggio retrospettivo ("manca timbro sulla ricetta spedita", "estremi documento non annotati"), MAI "non erogare" o "errori nell'inserimento dati".`;
+- "NON_VALIDA": una o piu' INADEMPIENZE GRAVI EFFETTIVAMENTE OSSERVABILI sull'immagine (timbro spedizione assente, fustella SSN mancante, estremi documento mancanti per benzo iniettabili Sez. D territoriali o per stupefacenti RMR) o dichiarate dal farmacista (mancata registrazione stupefacenti). ATTENZIONE: il documento del ritirante NON e' richiesto per le benzo ORALI Sez. E (Xanax, Tavor cpr/gtt, Lexotan, EN gocce/cpr, Stilnox, ecc.) — non segnalarlo come mancanza per queste forme. Sommario: indica le inadempienze con linguaggio retrospettivo ("manca timbro sulla ricetta spedita", "estremi documento non annotati"), MAI "non erogare" o "errori nell'inserimento dati".`;
 
   return `Sei un farmacista esperto italiano. Verifica questa ricetta.
 
