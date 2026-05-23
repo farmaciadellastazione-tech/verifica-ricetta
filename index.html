@@ -364,7 +364,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 43;
+const APP_BUILD = 44;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -691,16 +691,18 @@ VALIDITA' SSN:
 - Ripetibile per pazienti cronici: 6 mesi, max 11 erogazioni (con indicazione esplicita del medico)
 
 NOTE AIFA E PIANI TERAPEUTICI (specifiche SSN, NON applicabili a ricetta bianca privata):
-Per molti principi attivi la rimborsabilita' SSN e' subordinata a NOTE AIFA o PIANI TERAPEUTICI (PT). Se la ricetta e' SSN, il medico DEVE indicare la nota/PT pertinente nello spazio prestampato. Se manca, la dispensazione SSN non e' rimborsabile dal SSN e va trattata come privata. Note piu' comuni:
-- Nota 1: gastroprotettori (PPI: omeprazolo, esomeprazolo, lansoprazolo, pantoprazolo, rabeprazolo) per trattamenti cronici con FANS/antiaggreganti, oppure ulcera gastrica/duodenale, ecc.
-- Nota 4: pregabalin (Lyrica e generici), gabapentin, duloxetina per dolore neuropatico - serve diagnosi specifica.
+Per molti principi attivi la rimborsabilita' SSN e' subordinata a NOTE AIFA o PIANI TERAPEUTICI (PT). Se la ricetta e' SSN, il medico DEVE indicare la nota/PT pertinente nello spazio prestampato. Se manca, la dispensazione SSN non e' rimborsabile dal SSN e va trattata come privata. Note attualmente vigenti (al 2026):
+- Nota N01 (NUOVA - in vigore dal 20/3/2026, sostituisce le abrogate Note 1 e 48): inibitori di pompa protonica - PPI (omeprazolo, esomeprazolo, lansoprazolo, pantoprazolo, rabeprazolo). Rimborsabile SSN per: GERD documentata (4-8 settimane, mantenimento solo se recidive frequenti, rivalutazione ogni 6-12 mesi), ulcera peptica, eradicazione H. pylori (10-14 gg con antibiotici), Zollinger-Ellison, profilassi primaria in pazienti >=65 anni o con comorbidita' gravi in terapia cronica con FANS/anticoagulanti/doppia antiaggregazione/corticosteroidi, profilassi secondaria in caso di anamnesi positiva per ulcera/sanguinamento. Famotidina e misoprostolo (gia' classe A) ora SENZA limitazioni prescrittive SSN.
 - Nota 13: statine (atorvastatina, simvastatina, rosuvastatina, pravastatina, ezetimibe) - per rischio CV alto/molto alto, ipercolesterolemia familiare, diabete, ecc.
-- Nota 48: PPI in patologie acide croniche specifiche (post-terapia eradicante H. pylori, ecc.).
 - Nota 64: anticoncezionali ormonali per endometriosi grave/menorragia.
 - Nota 75: ALPROSTADIL (CAVERJECT, Viridal, Vitaros) - rimborsabile SSN SOLO per disfunzione erettile in pazienti con: lesione midollare, neuropatia diabetica con ED severa, post-prostatectomia radicale, ED secondaria a SM o trauma pelvico. Prescrizione su PIANO TERAPEUTICO redatto da specialista (urologo, neurologo, endocrinologo). Su ricetta SSN va indicata la nota 75 + il piano terapeutico vigente. Senza nota 75 -> non rimborsabile SSN -> ricetta privata RNR.
 - Nota 79: bisfosfonati e farmaci per osteoporosi (alendronato, risedronato, ibandronato, zoledronato, denosumab/Prolia, teriparatide/Forsteo) - serve T-score DEXA specifico o fratture pregresse.
 - Nota 87: epoetine per anemia in IRC o oncologica.
 - Nota 96: vitamina D (colecalciferolo) per pazienti specifici (osteoporosi, IRC, deficit severo documentato).
+NOTE RECENTEMENTE ABROGATE (non piu' valide, NON segnalarle):
+- Nota 1 e Nota 48 (PPI): abrogate il 20/3/2026, sostituite da Nota N01 (vedi sopra).
+- Nota 4 (pregabalin/gabapentin/duloxetina per dolore neuropatico): abrogata con Determina AIFA 1011/2025 del 25/7/2025. Pregabalin e gabapentin restano comunque RNR; per fibromialgia/algie centrali resta necessario il PT specialistico (centro algologico).
+- Nota 11 e Nota 84: abrogate ad aprile 2026.
 
 REGOLE OPERATIVE PER CONTROLLO NOTE AIFA:
 - Se il farmacista ha indicato la nota in "Note" del form (es. "nota 75"), stato "ok" + verifica coerenza con il farmaco.
@@ -728,7 +730,7 @@ Su ricetta privata (bianca) NON serve PT/specialista — basta qualsiasi medico 
 8. Ricetta integra, leggibile, non alterata
 
 NOTA IMPORTANTE (ricetta bianca privata vs SSN):
-- Su ricetta bianca privata NON si applicano le note AIFA (nota 1, 4, 13, 64, 75, 79, 96, ecc.): sono uno strumento di rimborsabilita' SSN, non un requisito normativo per la dispensazione. Es: un Caverject prescritto su ricetta bianca privata e' valido senza nota 75 e senza piano terapeutico. Il paziente paga il farmaco a prezzo pieno e non passa dal SSN.
+- Su ricetta bianca privata NON si applicano le note AIFA (N01, 13, 64, 75, 79, 87, 96, ecc.): sono uno strumento di rimborsabilita' SSN, non un requisito normativo per la dispensazione. Es: un Caverject prescritto su ricetta bianca privata e' valido senza nota 75 e senza piano terapeutico. Il paziente paga il farmaco a prezzo pieno e non passa dal SSN.
 - Su ricetta bianca privata NON servono: NRE, codice ASL, codice regionale, codice esenzione, fustella. Sono requisiti SSN.
 - Su ricetta bianca privata il prescrittore puo' essere QUALSIASI medico abilitato (MMG, specialista privato, libero professionista), NON serve specialista per farmaci che su SSN richiedono PT (es. Caverject, biologici, DOAC, ecc.).
 - Resta valido invece il regime giuridico del farmaco (RR standard / RR benzo orali Sez. E / RNR / RNR benzo iniettabili Sez. D / RNR Tab.A allegato III-bis / RMR Tab. I-III) e le relative regole di posologia, validita', trattenuta, documento, ecc.
