@@ -344,7 +344,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 25;
+const APP_BUILD = 26;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -745,6 +745,15 @@ function buildPrompt() {
     (note ? `- Note: ${note}\n` : '') +
     (oss ? `- Osservazioni: ${oss}\n` : '');
 
+  const prioritaDati = `
+
+PRIORITA' DEI DATI (regola GENERALE, valida sia in PRE che in POST):
+- I CAMPI ANAGRAFICI E PRESCRITTIVI compilati dal farmacista nel form (Medico, Farmaco, Data prescrizione, Scadenza, Posologia, CF, NRE, N° ricettario) sono AUTORITARI. Il farmacista ha letto la ricetta a mano e ha trascritto il valore corretto.
+- L'OCR sull'immagine puo' confondere caratteri visivamente simili: "/" con "1", "0" con "O", "l" con "1", "5" con "S", "8" con "B". NON segnalare come errore una discrepanza tra il valore del form e quello che TU leggi sull'immagine per questi campi: usa il valore del form, ignora la lettura OCR.
+- Esempio: se il form indica "Data prescrizione: 30/04/2026" e tu leggi sull'immagine "30104/2026" o "30/0412026", la data CORRETTA e' 30/04/2026 (quella del form). Non aggiungere controlli "data illeggibile" o "data non corrisponde".
+- ECCEZIONE - ADEMPIMENTI POST-SPEDIZIONE (timbro di spedizione, prezzo annotato, fustella SSN applicata, estremi documento del ritirante annotati sulla ricetta): qui l'immagine RESTA la fonte di verita', perche' si tratta di elementi APPOSTI in farmacia dopo la spedizione, non di dati prescrittivi del medico. Per questi, segui le regole POST.
+- Se un campo del form e' VUOTO e l'immagine mostra il dato, usa il valore letto dall'immagine (best effort) e segnala nel controllo che il farmacista non l'ha trascritto nel form (stato "info").`;
+
   const modalitaIstruzioni = isPre
     ? `MODALITA': ${modalitaLabel}
 La ricetta NON e' ancora stata spedita. Il farmacista la sta valutando PRIMA di erogare il farmaco. Tu devi:
@@ -772,7 +781,7 @@ La ricetta E' GIA' STATA SPEDITA dal farmacista. Tu devi verificare RETROATTIVAM
 
 ASSUNTI FONDAMENTALI DELLA MODALITA' POST (non violarli):
 1) Il farmacista ha FISICAMENTE la ricetta in mano (sta caricando l'immagine per ricontrollarla). Quindi: per ogni tipo che DEVE essere trattenuto (RNR standard, RNR benzodiazepine, RMR stupefacenti), la trattenuta e' IMPLICITA — NON segnalare MAI "ricetta non trattenuta" come errore, a meno che il farmacista lo dichiari esplicitamente nelle osservazioni.
-2) FONTE DI VERITA' = IMMAGINE. I campi del form sono dati SUPPLEMENTARI di aiuto: un campo del form vuoto NON significa che l'elemento manchi sulla ricetta. Esempio: se il form non ha "timbro" compilato ma sull'immagine si vede il timbro di spedizione -> stato "ok", NON "errore". Solo se l'immagine NON mostra timbro/prezzo -> errore.
+2) FONTE DI VERITA' PER GLI ADEMPIMENTI = IMMAGINE (timbro, prezzo, fustella, estremi documento). I campi del form relativi a questi adempimenti sono dati SUPPLEMENTARI di aiuto: un campo del form vuoto NON significa che l'elemento manchi sulla ricetta. Esempio: se il form non ha "timbro" compilato ma sull'immagine si vede il timbro di spedizione -> stato "ok", NON "errore". Solo se l'immagine NON mostra timbro/prezzo -> errore. NOTA: per i DATI ANAGRAFICI/PRESCRITTIVI vale la regola opposta (vedi PRIORITA' DEI DATI sopra): il form ha precedenza sull'OCR.
 3) Se non c'e' immagine allegata, NON puoi affermare che timbro/prezzo manchino: usa stato "attenzione" con nota "non verificabile senza immagine — il farmacista confermi visivamente".
 4) NON usare MAI le espressioni "non erogare", "non spedire", "errori nell'inserimento dati", "il farmacista deve correggere prima di erogare": la spedizione e' GIA' avvenuta. Usa linguaggio diagnostico retrospettivo: "manca [X] sulla ricetta spedita", "la ricetta avrebbe dovuto riportare [Y]", "verificare in registro che [Z] sia stato annotato".
 
@@ -803,7 +812,7 @@ VERDETTO in modalita' POST (linguaggio DIAGNOSTICO, mai prescrittivo):
 
 TIPO: ${tipoLabel}
 DATA ODIERNA: ${oggi}
-${dati}
+${dati}${prioritaDati}
 ${fofiBriefing}
 
 NORMATIVA:
@@ -1010,12 +1019,27 @@ function mostraRisultati(r) {
     <div class="checks-list">${checks}</div>
     ${fofiBanner}
     ${azioniBox}
+    ${!isPositive ? `<div style="margin:0 16px 14px;padding:10px 14px;background:#FFF8E1;border:1px solid #FFD679;border-radius:8px;font-size:14px;color:#5C3A00;">
+      💡 <strong>Errore di lettura nei dati?</strong> Se l'AI ha confuso un carattere (es. <code>/</code> con <code>1</code>) o non ha letto un campo, clicca <em>Correggi e riverifica</em>, compila il dato a mano nel form e rilancia. I valori del form hanno priorità sull'OCR.
+    </div>` : ''}
   </div>
-  <button class="btn-nuova" onclick="nuovaVerifica()">↩ Nuova verifica</button>`;
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:14px 0;">
+    <button class="btn-nuova" onclick="correggiERiverifica()" style="background:#FFE8B0;color:#5C3A00;">✏ Correggi e riverifica</button>
+    <button class="btn-nuova" onclick="nuovaVerifica()">↩ Nuova verifica</button>
+  </div>`;
 
   sec.style.display = 'block';
   document.getElementById('form-section').style.display = 'none';
   sec.scrollIntoView({ behavior:'smooth' });
+}
+
+// Torna al form mantenendo tutti i dati e l'immagine caricata: serve per correggere
+// un campo letto male dall'OCR e rilanciare l'analisi senza ricaricare la foto.
+function correggiERiverifica() {
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('results-section').innerHTML = '';
+  document.getElementById('form-section').style.display = 'block';
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function nuovaVerifica() {
