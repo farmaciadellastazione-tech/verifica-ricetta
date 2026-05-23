@@ -770,28 +770,34 @@ VERDETTO in modalita' PRE:
     : `MODALITA': ${modalitaLabel}
 La ricetta E' GIA' STATA SPEDITA dal farmacista. Tu devi verificare RETROATTIVAMENTE che siano state svolte tutte le incombenze previste dalla legge e dalle SOP della farmacia. Una visita ispettiva ASL/NAS contesterebbe queste mancanze.
 
+ASSUNTI FONDAMENTALI DELLA MODALITA' POST (non violarli):
+1) Il farmacista ha FISICAMENTE la ricetta in mano (sta caricando l'immagine per ricontrollarla). Quindi: per ogni tipo che DEVE essere trattenuto (RNR standard, RNR benzodiazepine, RMR stupefacenti), la trattenuta e' IMPLICITA — NON segnalare MAI "ricetta non trattenuta" come errore, a meno che il farmacista lo dichiari esplicitamente nelle osservazioni.
+2) FONTE DI VERITA' = IMMAGINE. I campi del form sono dati SUPPLEMENTARI di aiuto: un campo del form vuoto NON significa che l'elemento manchi sulla ricetta. Esempio: se il form non ha "timbro" compilato ma sull'immagine si vede il timbro di spedizione -> stato "ok", NON "errore". Solo se l'immagine NON mostra timbro/prezzo -> errore.
+3) Se non c'e' immagine allegata, NON puoi affermare che timbro/prezzo manchino: usa stato "attenzione" con nota "non verificabile senza immagine — il farmacista confermi visivamente".
+4) NON usare MAI le espressioni "non erogare", "non spedire", "errori nell'inserimento dati", "il farmacista deve correggere prima di erogare": la spedizione e' GIA' avvenuta. Usa linguaggio diagnostico retrospettivo: "manca [X] sulla ricetta spedita", "la ricetta avrebbe dovuto riportare [Y]", "verificare in registro che [Z] sia stato annotato".
+
 POPOLAMENTO CAMPI:
-- "controlli": OGNI adempimento post-spedizione previsto va elencato. Stato "ok" se la presenza dell'adempimento e' verificabile (dall'immagine o dalle osservazioni del farmacista); "errore" se MANCA un adempimento OBBLIGATORIO per legge (timbro spedizione, fustella SSN, estremi documento per benzo/stupefacenti, registrazione stupefacenti); "attenzione" se l'adempimento e' previsto da SOP/buona pratica ma non verificabile (es. "Registro stupefacenti: verificare con il farmacista che l'uscita sia stata annotata entro 24h"); "info" SOLO per note di contesto, NON per adempimenti mancanti.
-- "azioni_richieste": azioni CORRETTIVE per le inadempienze rilevate. Esempi:
+- "controlli": OGNI adempimento post-spedizione previsto va elencato. Stato "ok" se la presenza dell'adempimento e' verificabile DALL'IMMAGINE o dalle osservazioni del farmacista; "errore" se l'IMMAGINE mostra chiaramente la mancanza di un adempimento OBBLIGATORIO per legge (timbro spedizione assente sull'immagine, fustella SSN non applicata sull'immagine, estremi documento non annotati sull'immagine per benzo/stupefacenti, mancata registrazione stupefacenti dichiarata); "attenzione" se l'adempimento non e' verificabile dall'immagine e nemmeno dichiarato (es. "Registro stupefacenti: verificare con il farmacista che l'uscita sia stata annotata entro 24h"); "info" SOLO per note di contesto, NON per adempimenti mancanti.
+- "azioni_richieste": azioni CORRETTIVE per le inadempienze EFFETTIVAMENTE rilevate. Esempi:
   * "Recuperare estremi documento d'identita' del ritirante se la persona e' ancora identificabile",
   * "Verificare nel registro entrata/uscita stupefacenti che la dispensazione del [data] sia stata annotata; in caso contrario regolarizzare con annotazione tardiva e nota giustificativa",
   * "Apporre annotazione retroattiva del timbro di spedizione con nota tecnica nel registro non conformita'",
   * "Verificare annullamento NRE sul SAR".
-- "azioni_urgenti": inadempienze a rischio sanzione NAS/ASL (es. mancato registro stupefacenti, ricetta benzo non trattenuta).
+- "azioni_urgenti": inadempienze a rischio sanzione NAS/ASL (es. mancato registro stupefacenti, ricetta benzo restituita al paziente quando invece andava trattenuta).
 
-ADEMPIMENTI POST-SPEDIZIONE DA VERIFICARE (applica solo i pertinenti a tipo + classe):
-* TUTTE: presenza timbro di spedizione con data leggibile, presenza prezzo annotato.
-* SSN: fustella applicata, NRE annullato sul SAR.
-* Bianca RR: timbro spedizione con data (ricetta restituita al paziente, OK).
-* Bianca RNR standard: ricetta DEVE essere trattenuta in farmacia. Se restituita al paziente -> ERRORE GRAVE.
-* Bianca RNR benzodiazepine: trattenuta + estremi documento d'identita' annotati sulla ricetta. Mancano gli estremi -> errore.
-* Stupefacenti RMR: trattenuta + estremi documento d'identita' del ritirante annotati + registrazione nel registro entrata/uscita stupefacenti (chiedere conferma nelle osservazioni; se non confermato, "attenzione").
-* Veterinaria: prezzo, timbro spedizione, conservazione secondo tipologia.
+ADEMPIMENTI POST-SPEDIZIONE DA VERIFICARE (applica solo i pertinenti a tipo + classe; verifica dall'IMMAGINE):
+* TUTTE: timbro di spedizione con data leggibile sull'immagine, prezzo annotato sull'immagine.
+* SSN: fustella applicata visibile sull'immagine, NRE annullato sul SAR (non verificabile da immagine -> "attenzione" + nota).
+* Bianca RR: timbro spedizione con data sull'immagine (ricetta restituita al paziente, OK — la trattenuta NON e' richiesta per RR).
+* Bianca RNR standard: trattenuta IMPLICITA (il farmacista ce l'ha in mano). Verifica timbro + prezzo dall'immagine.
+* Bianca RNR benzodiazepine: trattenuta IMPLICITA. Verifica dall'immagine: estremi documento d'identita' annotati sulla ricetta (nome/cognome/n. documento del ritirante). Se sull'immagine NON sono visibili -> errore.
+* Stupefacenti RMR: trattenuta IMPLICITA. Verifica dall'immagine estremi documento del ritirante. Registrazione nel registro entrata/uscita stupefacenti: non verificabile da immagine -> "attenzione" con richiesta di conferma al farmacista.
+* Veterinaria: prezzo + timbro spedizione sull'immagine, conservazione secondo tipologia.
 
-VERDETTO in modalita' POST:
-- "VALIDA": spedizione conforme, tutti gli adempimenti verificati.
-- "ATTENZIONE": piccole irregolarita' sanabili (es. timbro presente ma data poco leggibile).
-- "NON_VALIDA": una o piu' INADEMPIENZE GRAVI (mancata registrazione stupefacenti, ricetta benzo restituita al paziente, fustella SSN mancante, estremi documento mancanti per benzo/stupefacenti). Indica sempre nel sommario le inadempienze principali.`;
+VERDETTO in modalita' POST (linguaggio DIAGNOSTICO, mai prescrittivo):
+- "VALIDA": spedizione conforme, tutti gli adempimenti verificabili sono ok.
+- "ATTENZIONE": piccole irregolarita' sanabili (timbro presente ma data poco leggibile) o adempimenti non verificabili dall'immagine che richiedono conferma del farmacista.
+- "NON_VALIDA": una o piu' INADEMPIENZE GRAVI EFFETTIVAMENTE OSSERVABILI sull'immagine (timbro spedizione assente, fustella SSN mancante, estremi documento mancanti per benzo/stupefacenti annotati sulla ricetta) o dichiarate dal farmacista (mancata registrazione stupefacenti). Sommario: indica le inadempienze con linguaggio retrospettivo ("manca timbro sulla ricetta spedita", "estremi documento non annotati"), MAI "non erogare" o "errori nell'inserimento dati".`;
 
   return `Sei un farmacista esperto italiano. Verifica questa ricetta.
 
@@ -953,7 +959,11 @@ function mostraRisultati(r) {
   const isSospetta = r.verdetto === 'SOSPETTA_FALSA';
   const cls = { VALIDA:'valida', NON_VALIDA:'non-valida', ATTENZIONE:'attenzione', SOSPETTA_FALSA:'sospetta', NON_NECESSARIA:'non-necessaria' }[r.verdetto] || 'attenzione';
   const emoji = { VALIDA:'✅', NON_VALIDA:'❌', ATTENZIONE:'⚠️', SOSPETTA_FALSA:'🚨', NON_NECESSARIA:'🌿' }[r.verdetto] || '⚠️';
-  const label = { VALIDA:'Ricetta valida — erogabile', NON_VALIDA:'Ricetta NON valida — non erogare', ATTENZIONE:'Elementi dubbi — verificare', SOSPETTA_FALSA:'⛔ RICETTA SOSPETTA FALSA — NON EROGARE', NON_NECESSARIA:'Non richiede ricetta — vendibile liberamente' }[r.verdetto] || r.verdetto;
+  const isPost = statoRicetta === 'gia-spedita';
+  const labelMap = isPost
+    ? { VALIDA:'Spedizione conforme', NON_VALIDA:'Spedizione NON conforme — adempimenti mancanti', ATTENZIONE:'Spedizione con irregolarità da verificare', SOSPETTA_FALSA:'⛔ RICETTA SOSPETTA FALSA — segnalare', NON_NECESSARIA:'Non richiedeva ricetta — vendibile liberamente' }
+    : { VALIDA:'Ricetta valida — erogabile', NON_VALIDA:'Ricetta NON valida — non erogare', ATTENZIONE:'Elementi dubbi — verificare', SOSPETTA_FALSA:'⛔ RICETTA SOSPETTA FALSA — NON EROGARE', NON_NECESSARIA:'Non richiede ricetta — vendibile liberamente' };
+  const label = labelMap[r.verdetto] || r.verdetto;
   // Verdetti positivi (valida + non necessaria) mostrano sempre punteggio in verde
   const isPositive = r.verdetto === 'VALIDA' || r.verdetto === 'NON_NECESSARIA';
   const scoreColor = isPositive ? '#3B6D11' : r.punteggio >= 75 ? '#3B6D11' : r.punteggio >= 50 ? '#854F0B' : '#A32D2D';
