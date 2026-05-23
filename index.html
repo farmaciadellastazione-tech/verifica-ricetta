@@ -317,12 +317,22 @@
           </select>
         </div>
         <div class="field-row">
-          <div class="field-label">Nome paziente</div>
-          <input type="text" id="f-paziente" placeholder="es. Bianchi Lucia" autocomplete="off" />
+          <div class="field-label">Nome paziente (controllo visivo)</div>
+          <select id="f-paziente">
+            <option value="">-- seleziona --</option>
+            <option value="presente">Presente sulla ricetta</option>
+            <option value="assente">Assente</option>
+            <option value="illeggibile">Illeggibile</option>
+          </select>
         </div>
         <div class="field-row">
-          <div class="field-label">Codice fiscale paziente</div>
-          <input type="text" id="f-cf" placeholder="RSSMRA80A01A123K" maxlength="16" style="text-transform:uppercase;font-family:monospace;" />
+          <div class="field-label">Codice fiscale paziente (controllo visivo)</div>
+          <select id="f-cf">
+            <option value="">-- seleziona --</option>
+            <option value="presente">Presente sulla ricetta</option>
+            <option value="assente">Assente</option>
+            <option value="illeggibile">Illeggibile</option>
+          </select>
         </div>
         <div class="field-row" id="nre-row" style="display:none;">
           <div class="field-label">NRE (SSN, 15 cifre)</div>
@@ -376,7 +386,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 52;
+const APP_BUILD = 53;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -888,7 +898,8 @@ function buildPrompt() {
   const firma = document.getElementById('f-firma').value;
   const timbro = document.getElementById('f-timbro').value;
   const paziente = document.getElementById('f-paziente').value;
-  const cf = document.getElementById('f-cf').value.toUpperCase();
+  const cf = document.getElementById('f-cf').value;
+  const visivaLabel = v => v === 'presente' ? 'PRESENTE sulla ricetta' : v === 'assente' ? 'ASSENTE' : v === 'illeggibile' ? 'ILLEGGIBILE' : '';
   const nre = document.getElementById('f-nre').value;
   const ricettario = document.getElementById('f-ricettario').value;
   const note = document.getElementById('f-note').value;
@@ -915,8 +926,8 @@ function buildPrompt() {
     (posologia ? `- Posologia: ${posologia}\n` : '') +
     (firma ? `- Firma medico: ${firma}\n` : '') +
     (timbro ? `- Timbro: ${timbro}\n` : '') +
-    (paziente ? `- Nome paziente: ${paziente}\n` : '') +
-    (cf ? `- CF paziente: ${cf}\n` : '') +
+    (paziente ? `- Nome paziente (conferma visiva farmacista): ${visivaLabel(paziente)}\n` : '') +
+    (cf ? `- CF paziente (conferma visiva farmacista): ${visivaLabel(cf)}\n` : '') +
     (nre && tipoSelezionato==='ssn' ? `- NRE: ${nre}\n` : '') +
     (ricettario && tipoSelezionato==='stupefacenti' ? `- N° ricettario: ${ricettario}\n` : '') +
     (note ? `- Note: ${note}\n` : '') +
@@ -939,7 +950,8 @@ function buildPrompt() {
   const prioritaDati = `
 
 PRIORITA' DEI DATI (regola GENERALE, valida sia in PRE che in POST):
-- I CAMPI ANAGRAFICI E PRESCRITTIVI compilati dal farmacista nel form (Medico, Farmaco, Data prescrizione, Scadenza, Posologia, Nome paziente, CF, NRE, N° ricettario) sono AUTORITARI. Il farmacista ha letto la ricetta a mano e ha trascritto il valore corretto.
+- I CAMPI ANAGRAFICI E PRESCRITTIVI compilati dal farmacista nel form (Medico, Farmaco, Data prescrizione, Scadenza, Posologia, NRE, N° ricettario) sono AUTORITARI. Il farmacista ha letto la ricetta a mano e ha trascritto il valore corretto.
+- Nome paziente e CF paziente nel form sono select "Presente/Assente/Illeggibile" (conferma visiva farmacista): se "PRESENTE sulla ricetta" -> marca i controlli Paziente/CF come "ok" senza pretendere di leggere il valore dall'immagine. Se "ASSENTE" -> "errore". Se "ILLEGGIBILE" -> "attenzione". Se vuoti (farmacista non ha selezionato), prova a leggere dall'immagine.
 - Le righe etichettate "(conferma visiva farmacista in modalita' correzione)" sono AUTORITARIE allo stesso modo: il farmacista sta riguardando fisicamente la ricetta e ti sta dicendo se quel campo e' PRESENTE / ASSENTE / ILLEGGIBILE. Trattale cosi':
   * "PRESENTE sulla ricetta fisica" -> marca il controllo corrispondente "ok" (es. "Medico prescrittore: ok, presente sulla ricetta - conferma visiva"). NON segnalare errore anche se non riesci a leggerlo dall'immagine.
   * "ASSENTE" -> stato "errore" con nota "campo dichiarato assente dal farmacista".
@@ -1370,11 +1382,11 @@ function correggiERiverifica() {
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-// Etichette leggibili per le conferme visive inviate al prompt
+// Etichette leggibili per le conferme visive inviate al prompt.
+// f-paziente e f-cf NON sono qui perche' nel form sono gia' select native
+// (sempre conferma visiva), non input testuali da convertire.
 const CONFERMA_VISIVA_LABEL = {
   'f-medico': 'Medico prescrittore',
-  'f-paziente': 'Nome paziente',
-  'f-cf': 'CF paziente',
   'f-data': 'Data prescrizione',
   'f-scadenza': 'Scadenza',
   'f-nre': 'NRE',
@@ -1453,10 +1465,10 @@ function nuovaVerifica() {
   document.getElementById('form-section').style.display = 'block';
   mostraTuttiCampi(true); // ripristina eventuale modalita' correzione precedente
   ultimoRisultato = null;
-  ['f-medico','f-farmaco','f-data','f-scadenza','f-paziente','f-cf','f-nre','f-ricettario','f-note','f-osservazioni'].forEach(id => {
+  ['f-medico','f-farmaco','f-data','f-scadenza','f-nre','f-ricettario','f-note','f-osservazioni'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
-  ['f-posologia','f-firma','f-timbro','f-timbro-sped','f-prezzo-sped','f-doc-ritirante'].forEach(id => { const el=document.getElementById(id); if(el) el.selectedIndex=0; });
+  ['f-posologia','f-firma','f-timbro','f-timbro-sped','f-prezzo-sped','f-doc-ritirante','f-paziente','f-cf'].forEach(id => { const el=document.getElementById(id); if(el) el.selectedIndex=0; });
   delete document.getElementById('f-scadenza').dataset.userEdited;
   document.getElementById('scadenza-hint').innerHTML='';
   document.getElementById('fofi-live-medico').innerHTML='';
