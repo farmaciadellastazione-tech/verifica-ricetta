@@ -364,7 +364,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 41;
+const APP_BUILD = 42;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -784,12 +784,19 @@ CLASSIFICAZIONE FARMACI COMUNI (per determinazione validita'):
   * LACOSAMIDE (sostanza Tab. V psicotropi ma medicinale NON in Tab. Medicinali sez. D/E): Vimpat (originator UCB) e generici "Lacosamide <azienda>".
   * Antibiotici monoterapia (Augmentin, Zitromax, Klacid, Ciproxin), antimicotici sistemici, cortisonici sistemici a ciclo breve, anticoncezionali ormonali (con eccezioni RR per uso continuativo).
   REGOLA DI FALLBACK SUL PRINCIPIO ATTIVO (importante): se il farmaco contiene come PRINCIPIO ATTIVO pregabalina, gabapentin o lacosamide — INDIPENDENTEMENTE dal nome commerciale, anche se non lo riconosci — applica le regole RNR standard (1 erogazione, 30 gg, nessun limite di confezioni). Il numero di confezioni dispensabili lo stabilisce il MEDICO nella prescrizione: se la ricetta prescrive 3 confezioni di pregabalin (sotto qualsiasi brand), il farmacista PUO' e DEVE dispensare 3 confezioni in unica erogazione, NON e' un errore. Il regime "max 3 erogazioni" e' SOLO per benzo orali Sez. E, NON per pregabalin/gabapentin/lacosamide (sebbene siano sostanze psicotrope, i loro medicinali sono fuori da Sez. D/E).
-- RNR speciale STUPEFACENTI Tabella A allegato III-bis (terapia del dolore — 30 gg, 1 erogazione, TRATTENERE in farmacia, POSOLOGIA OBBLIGATORIA):
-  * PARACETAMOLO + CODEINA: Tachidol, Co-Efferalgan, Lonarid, Tachicodina, Paracetamolo+Codeina DOC/Mylan/Pensa/Alter/EG/Aurobindo/Sandoz/Teva/Zentiva/Almus e altri generici.
+- RNR speciale STUPEFACENTI Tabella Medicinali Sez. D allegato III-bis (terapia del dolore — 30 gg, 1 erogazione, TRATTENERE in farmacia). Distinguere due sotto-classi per documento ritirante e conservazione:
+  SOTTO-CLASSE A — Codeina e derivati in associazione (sez. D PRE-15/6/2009, gia' nel DPR 309/90 originale per composizioni con codeina >10 mg/UD):
+  * PARACETAMOLO + CODEINA: Tachidol, Co-Efferalgan, Lonarid, Codamol, Tachicodina, Paracetamolo+Codeina DOC/Mylan/Pensa/Alter/EG/Aurobindo/Sandoz/Teva/Zentiva/Almus e altri generici.
+  * CODEINA monoterapia (rara), DIIDROCODEINA, supposte Hederix Plan A, gocce Cardiazol Paracodina, Spasmoplus supposte A.
+  Regole sotto-classe A: trattenuta in farmacia, conservazione 6 mesi, 30 gg di validita', 1 erogazione, NESSUN documento ritirante (pre-15/6/2009 — vedi REGOLA PRIORITARIA SUL DOCUMENTO RITIRANTE), POSOLOGIA NON obbligatoria (RNR bianca privata, art. 88 DPR 309/90).
+  SOTTO-CLASSE B — Tramadolo, oppioidi/medi e altri TRANSITATI in sez. D POST-15/6/2009:
   * TRAMADOLO + PARACETAMOLO: Patrol, Kolibri, Tramadolo+Paracetamolo generici.
-  * CODEINA monoterapia (rara), DIIDROCODEINA, BUPRENORFINA basso dosaggio (cerotti Transtec/Transtec PRO), TAPENTADOLO basso dosaggio quando RNR.
-  Regole: ricetta non ripetibile, trattenuta in farmacia (conservazione 2 anni), 30 giorni di validita', UNA sola erogazione. La POSOLOGIA E' OBBLIGATORIA in ricetta (tempi e modalita' di somministrazione), perche' la durata del trattamento NON deve superare 30 giorni "conformemente alla posologia indicata" (Allegato III-bis, art. 14 DPR 309/90 mod. L. 38/2010). Se manca la posologia: stato "errore" con nota "Posologia obbligatoria per medicinali in Allegato III-bis (terapia del dolore con codeina/oppioidi minori). Il medico deve indicare dose, frequenza e durata della terapia." Divieto AIFA sotto i 12 anni per codeina (in mono o associazione): se eta' paziente noto e <12 anni -> errore.
-  REGOLA DI FALLBACK: se il farmaco contiene CODEINA + paracetamolo, TRAMADOLO + paracetamolo, o un oppioide minore in associazione, applica queste regole anche se il brand non e' nell'elenco.`,
+  * TRAMADOLO monoterapia: Contramal, Altadol, Fortradol, Tradonal, Tramadolo generici.
+  * TAPENTADOLO basso dosaggio quando RNR (alto dosaggio va su RMR): Palexia.
+  * BUPRENORFINA transdermica: Transtec, Triquisic.
+  Regole sotto-classe B: trattenuta in farmacia, conservazione 2 anni, 30 gg di validita', 1 erogazione, DOCUMENTO RITIRANTE obbligatorio (art. 45 c. 6-bis DPR 309/90 mod. L. 38/2010), POSOLOGIA NON obbligatoria (RNR bianca privata).
+  REGOLE COMUNI ad A e B: divieto AIFA sotto i 12 anni per codeina (in mono o associazione): se eta' paziente noto e <12 anni -> errore. Se manca la posologia: NON segnalare errore (su RNR bianca non e' obbligatoria); il farmacista applica come riferimento la dose massima del foglietto illustrativo. La posologia diventa obbligatoria SOLO se la prescrizione e' su RMR a ricalco (oppioidi maggiori Sez. A, DM 10/3/2006).
+  REGOLA DI FALLBACK: se il farmaco contiene CODEINA + paracetamolo applica sotto-classe A; se contiene TRAMADOLO/TAPENTADOLO/BUPRENORFINA su RNR applica sotto-classe B, anche se il brand non e' nell'elenco.`,
     stupefacenti: `Requisiti ricetta stupefacenti (DPR 309/90):
 1. Ricettario ministeriale a ricalco 3 copie (RMR)
 2. Numero progressivo ricettario
@@ -978,7 +985,7 @@ REGOLE TIPO RICETTA (importanti, valide in entrambe le modalita'):
   REGOLE POSOLOGIA (quando indicare "errore" per posologia mancante):
   - RR standard / RR benzo orali Sez. E / RNR standard / RNR benzo iniettabili Sez. D: posologia NON obbligatoria sulla ricetta (raccomandata ma non vincolante). Se manca: NON segnalare errore. Eventualmente "info" se rilevante.
   - RNR speciale stupefacenti Tab. A allegato III-bis ASSOCIAZIONI (codeina+paracetamolo: Tachidol, Codamol, Co-Efferalgan, Lonarid, generici; tramadolo+paracetamolo: Patrol, generici): posologia RACCOMANDATA, NON obbligatoria. Se manca, il farmacista applica la dose massima riportata nel foglietto illustrativo come riferimento. NON segnalare errore per posologia mancante su queste associazioni. Eventualmente "info" se rilevante (es. ricetta SSN per terapia del dolore L. 38/2010 entro 30 gg: in quel solo caso e' raccomandata sull'SSN, ma comunque non bloccante per la dispensazione).
-  - RMR stupefacenti Tab. I-III (ricettario ministeriale a ricalco — oppioidi maggiori: morfina, ossicodone, fentanyl, idromorfone, metadone, Oxycontin, Depalgos, Targin, ecc.): posologia OBBLIGATORIA. Se manca: errore (Allegato III-bis art. 14 DPR 309/90).
+  - RMR stupefacenti Sez. A su ricetta a ricalco DM 10/3/2006 (oppioidi maggiori: morfina, ossicodone, fentanyl, idromorfone, metadone, tapentadolo alto dosaggio — Oxycontin, Depalgos, Targin, Durogesic, MS Contin, Oramorph, Jurnista, Palexia, ecc.): posologia OBBLIGATORIA, elemento essenziale della ricetta a ricalco ("dose prescritta, posologia e modo di somministrazione" - DM 10/3/2006). Se manca: stato "errore" con nota normativa.
   - SSN: posologia raccomandata (per calcolare la quantita' a carico SSN, soprattutto cronici). Non bloccante ma "attenzione" se manca su prescrizione cronica.
 
 - (Solo in modalita' PRE) Se la scadenza inserita dal farmacista non corrisponde alla classe rilevata, aggiungi un controllo "Validita' ricetta" stato "attenzione" con la scadenza corretta calcolata (data + 30 gg o data + 180 gg). Se il farmacista non ha inserito scadenza, calcolala tu nel campo note. In modalita' POST questa regola NON SI APPLICA (vedi assunto 5).
