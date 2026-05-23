@@ -364,7 +364,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 31;
+const APP_BUILD = 32;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -832,6 +832,7 @@ ASSUNTI FONDAMENTALI DELLA MODALITA' POST (non violarli):
 2) FONTE DI VERITA' PER GLI ADEMPIMENTI = IMMAGINE in prima battuta (timbro, prezzo, fustella, estremi documento). MA, se il farmacista ha compilato una conferma visiva esplicita nel form ("Timbro di spedizione (conferma visiva farmacista): PRESENTE", "Prezzo annotato (conferma visiva farmacista): ANNOTATO"), QUELLA HA PRIORITA' sull'immagine: marca "ok" anche se sull'immagine non vedi nulla, perche' il farmacista ti sta confermando di averlo verificato fisicamente. Vedi PRIORITA' DEI DATI sopra. NOTA: per i DATI ANAGRAFICI/PRESCRITTIVI vale la regola form > OCR sempre.
 3) Se non c'e' immagine allegata, NON puoi affermare che timbro/prezzo manchino: usa stato "attenzione" con nota "non verificabile senza immagine — il farmacista confermi visivamente".
 4) NON usare MAI le espressioni "non erogare", "non spedire", "errori nell'inserimento dati", "il farmacista deve correggere prima di erogare": la spedizione e' GIA' avvenuta. Usa linguaggio diagnostico retrospettivo: "manca [X] sulla ricetta spedita", "la ricetta avrebbe dovuto riportare [Y]", "verificare in registro che [Z] sia stato annotato".
+5) VALIDITA' DELLA RICETTA in POST: NON applicare MAI il check di validita' contro la DATA ODIERNA. La spedizione e' avvenuta nel passato, presumibilmente entro i termini di validita' (altrimenti il farmacista non l'avrebbe dispensata). Anche se OGGI la ricetta risulta scaduta rispetto alla data di prescrizione, questo NON e' un errore: la dispensazione e' gia' avvenuta in precedenza. NON aggiungere controlli "ricetta scaduta", "validita' superata", "data oltre termine", "scadenza non rispettata" o simili in POST mode. Se vuoi includere un'informativa sulla scadenza originale della ricetta, usa stato "info" con nota tipo "Ricetta del DD/MM/AAAA, classe [RNR/RR/...], validita' originale 30/180 gg dalla data" — MAI "errore" o "attenzione" per il solo fatto che oggi sia oltre il termine.
 
 POPOLAMENTO CAMPI:
 - "controlli": OGNI adempimento post-spedizione previsto va elencato. Determina lo stato in questo ORDINE:
@@ -889,7 +890,7 @@ REGOLE TIPO RICETTA (importanti, valide in entrambe le modalita'):
   - RMR stupefacenti (Tab. I-III DPR 309/90, ricettario ministeriale a ricalco) -> 30 gg, max 2 conf (1 sostanza). Es: Oxycontin, Depalgos, Fentanyl, Targin.
   - SSN non ripetibile -> 30 gg. SSN ripetibile cronici -> 6 mesi, 11 erogazioni (raro, va indicato dal medico).
 
-- Se la scadenza inserita dal farmacista non corrisponde alla classe rilevata, aggiungi un controllo "Validita' ricetta" stato "attenzione" con la scadenza corretta calcolata (data + 30 gg o data + 180 gg). Se il farmacista non ha inserito scadenza, calcolala tu nel campo note.
+- (Solo in modalita' PRE) Se la scadenza inserita dal farmacista non corrisponde alla classe rilevata, aggiungi un controllo "Validita' ricetta" stato "attenzione" con la scadenza corretta calcolata (data + 30 gg o data + 180 gg). Se il farmacista non ha inserito scadenza, calcolala tu nel campo note. In modalita' POST questa regola NON SI APPLICA (vedi assunto 5).
 - Se hai un'immagine, verifica che il tipo visivo della ricetta corrisponda al TIPO dichiarato. Indizi visivi:
   * SSN/dematerializzata: foglio rosso prestampato con header SSN/Ministero, campi prestampati (codice fiscale, codice esenzione, codice regione), o stampa digitale promemoria dematerializzato con NRE.
   * Bianca privata: foglio bianco con sola intestazione/timbro medico, nessun campo prestampato SSN.
