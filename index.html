@@ -56,6 +56,8 @@
   .img-thumb-remove { position: absolute; top: 6px; right: 6px; background: rgba(220,38,38,0.9); color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 15px; line-height: 1; cursor: pointer; padding: 0; }
   .img-hint { font-size: 13px; color: var(--text-ter); margin-top: 8px; }
   .photo-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .conferma-visiva-select { font-family: var(--font); font-size: 16px; color: var(--text); border: 0.5px solid var(--border-sec); border-radius: var(--radius); padding: 10px 12px; background: #FFF9E8; outline: none; width: 100%; transition: border-color 0.15s; }
+  .conferma-visiva-select:focus { border-color: var(--teal-400); }
   .or-divider { display: flex; align-items: center; gap: 10px; margin: 1rem 0; }
   .or-divider span { font-size: 14px; color: var(--text-ter); white-space: nowrap; }
   .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 0.5px; background: var(--border); }
@@ -366,7 +368,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 48;
+const APP_BUILD = 49;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -913,10 +915,26 @@ function buildPrompt() {
     (!isPre && timbroSped ? `- Timbro di spedizione (conferma visiva farmacista): ${timbroSped === 'presente' ? 'PRESENTE sulla ricetta fisica' : 'ASSENTE'}\n` : '') +
     (!isPre && prezzoSped ? `- Prezzo annotato (conferma visiva farmacista): ${prezzoSped === 'presente' ? 'ANNOTATO sulla ricetta fisica' : 'NON annotato'}\n` : '');
 
+  // Conferme visive impostate in modalita' correzione (select sotto i campi testuali)
+  const confermeVisive = [];
+  document.querySelectorAll('.conferma-visiva-select').forEach(sel => {
+    if (sel.style.display === 'none' || !sel.value) return;
+    const id = sel.dataset.confermaVisivaPer;
+    const label = CONFERMA_VISIVA_LABEL[id] || id;
+    const valore = sel.value === 'presente' ? 'PRESENTE sulla ricetta fisica' : sel.value === 'assente' ? 'ASSENTE' : 'ILLEGGIBILE sull\'immagine';
+    confermeVisive.push(`- ${label} (conferma visiva farmacista in modalita' correzione): ${valore}`);
+  });
+  if (confermeVisive.length) dati += confermeVisive.join('\n') + '\n';
+
   const prioritaDati = `
 
 PRIORITA' DEI DATI (regola GENERALE, valida sia in PRE che in POST):
 - I CAMPI ANAGRAFICI E PRESCRITTIVI compilati dal farmacista nel form (Medico, Farmaco, Data prescrizione, Scadenza, Posologia, Nome paziente, CF, NRE, N° ricettario) sono AUTORITARI. Il farmacista ha letto la ricetta a mano e ha trascritto il valore corretto.
+- Le righe etichettate "(conferma visiva farmacista in modalita' correzione)" sono AUTORITARIE allo stesso modo: il farmacista sta riguardando fisicamente la ricetta e ti sta dicendo se quel campo e' PRESENTE / ASSENTE / ILLEGGIBILE. Trattale cosi':
+  * "PRESENTE sulla ricetta fisica" -> marca il controllo corrispondente "ok" (es. "Medico prescrittore: ok, presente sulla ricetta - conferma visiva"). NON segnalare errore anche se non riesci a leggerlo dall'immagine.
+  * "ASSENTE" -> stato "errore" con nota "campo dichiarato assente dal farmacista".
+  * "ILLEGGIBILE sull'immagine" -> stato "attenzione" con richiesta di trascrizione manuale o foto piu' nitida.
+  * Se per lo stesso campo c'e' SIA un valore testuale digitato SIA una conferma visiva: testo digitato ha priorita' (il farmacista ha gia' trascritto).
 - L'OCR sull'immagine puo' confondere caratteri visivamente simili: "/" con "1", "0" con "O", "l" con "1", "5" con "S", "8" con "B". NON segnalare come errore una discrepanza tra il valore del form e quello che TU leggi sull'immagine per questi campi: usa il valore del form, ignora la lettura OCR.
 - Esempio: se il form indica "Data prescrizione: 30/04/2026" e tu leggi sull'immagine "30104/2026" o "30/0412026", la data CORRETTA e' 30/04/2026 (quella del form). Non aggiungere controlli "data illeggibile" o "data non corrisponde".
 - Se un campo del form e' VUOTO, leggi il dato dall'IMMAGINE come best effort. Se l'immagine lo mostra chiaramente, usalo e marca il controllo "ok". NON creare MAI controlli con nomi del tipo "Farmaco inserito dal farmacista", "Dato non inserito nel form", "Medico non indicato dal farmacista" o simili: i campi del form sono solo aiuti supplementari, la loro assenza NON e' un errore se il dato e' visibile sull'immagine.
@@ -1314,13 +1332,16 @@ function correggiERiverifica() {
         }
       }
     });
+    // Per i campi testuali (escluso il farmaco) sostituisci l'input digitabile
+    // con una select "presente/assente/illeggibile": conferma visiva veloce.
+    attivaConfermaVisivaSe(idsDaMostrare);
     // Inserisci la barra "modalita' correzione" all'inizio del form-section
     let banner = document.getElementById('correzione-banner');
     if (!banner) {
       banner = document.createElement('div');
       banner.id = 'correzione-banner';
       banner.style.cssText = 'margin:0 0 14px;padding:10px 14px;background:#FFF8E1;border:1px solid #FFD679;border-radius:8px;font-size:14px;color:#5C3A00;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;';
-      banner.innerHTML = `<span>🔧 <strong>Modalità correzione</strong> — mostrati solo i campi non conformi (${idsDaMostrare.size}). Correggi e clicca Analizza.</span>
+      banner.innerHTML = `<span>🔧 <strong>Modalità correzione</strong> — mostrati solo i campi non conformi (${idsDaMostrare.size}). Per i testuali basta confermare presente/assente; il farmaco si scrive a mano. Poi clicca Analizza.</span>
         <button type="button" onclick="mostraTuttiCampi()" style="background:#FFE8B0;color:#5C3A00;border:1px solid #FFD679;border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer;">👁 Mostra tutti i campi</button>`;
       document.getElementById('form-section').prepend(banner);
     }
@@ -1329,9 +1350,72 @@ function correggiERiverifica() {
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
+// Etichette leggibili per le conferme visive inviate al prompt
+const CONFERMA_VISIVA_LABEL = {
+  'f-medico': 'Medico prescrittore',
+  'f-paziente': 'Nome paziente',
+  'f-cf': 'CF paziente',
+  'f-data': 'Data prescrizione',
+  'f-scadenza': 'Scadenza',
+  'f-nre': 'NRE',
+  'f-ricettario': 'N° ricettario'
+};
+
+// Per i campi testuali (escluso il farmaco) nasconde l'input originale e
+// mostra una select "presente/assente/illeggibile" - conferma visiva
+// veloce per la modalita' correzione.
+function attivaConfermaVisivaSe(idsDaMostrare) {
+  Object.keys(CONFERMA_VISIVA_LABEL).forEach(id => {
+    if (!idsDaMostrare.has(id)) return;
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.dataset.confermaVisivaAttiva = '1';
+    input.style.display = 'none';
+    // Nascondi anche eventuali check FOFI / hint adiacenti
+    const row = input.closest('.field-row');
+    if (row) {
+      row.querySelectorAll('.fofi-live-check, #scadenza-hint').forEach(el => {
+        el.dataset.confermaNascosto = '1';
+        el.style.display = 'none';
+      });
+    }
+    let select = document.getElementById('conferma-' + id);
+    if (!select) {
+      select = document.createElement('select');
+      select.id = 'conferma-' + id;
+      select.className = 'conferma-visiva-select';
+      select.dataset.confermaVisivaPer = id;
+      select.innerHTML = '<option value="">-- conferma visiva --</option>' +
+        '<option value="presente">✓ Presente sulla ricetta</option>' +
+        '<option value="assente">✗ Assente</option>' +
+        '<option value="illeggibile">⚠ Illeggibile</option>';
+      input.parentNode.insertBefore(select, input.nextSibling);
+    }
+    select.value = '';
+    select.style.display = '';
+  });
+}
+
+// Ripristina input originali e nasconde le select conferma visiva
+function disattivaConfermaVisiva() {
+  document.querySelectorAll('[data-conferma-visiva-attiva="1"]').forEach(el => {
+    el.style.display = '';
+    delete el.dataset.confermaVisivaAttiva;
+  });
+  document.querySelectorAll('[data-conferma-nascosto="1"]').forEach(el => {
+    el.style.display = '';
+    delete el.dataset.confermaNascosto;
+  });
+  document.querySelectorAll('.conferma-visiva-select').forEach(sel => {
+    sel.style.display = 'none';
+    sel.value = '';
+  });
+}
+
 // Ripristina la visibilita' di tutti i campi (rispettando tipo+stato).
 // Se silenzioso=true, non mostra il bottone di ritorno (uso interno per reset).
 function mostraTuttiCampi(silenzioso) {
+  disattivaConfermaVisiva();
   document.querySelectorAll('#form-section [data-correzione-nascosto="1"]').forEach(row => {
     delete row.dataset.correzioneNascosto;
     row.style.display = visibilitaCondizionale(row.id);
