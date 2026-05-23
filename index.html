@@ -308,6 +308,14 @@
             <option value="assente">Non annotato</option>
           </select>
         </div>
+        <div class="field-row full" id="doc-ritirante-row" style="display:none;">
+          <div class="field-label">Estremi documento ritirante (controllo visivo)</div>
+          <select id="f-doc-ritirante">
+            <option value="">-- seleziona --</option>
+            <option value="presente">Annotati sulla ricetta fisica (nome/cognome/n. documento)</option>
+            <option value="assente">Non annotati</option>
+          </select>
+        </div>
         <div class="field-row">
           <div class="field-label">Nome paziente</div>
           <input type="text" id="f-paziente" placeholder="es. Bianchi Lucia" autocomplete="off" />
@@ -368,7 +376,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 49;
+const APP_BUILD = 50;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -887,6 +895,7 @@ function buildPrompt() {
   const oss = document.getElementById('f-osservazioni').value;
   const timbroSped = document.getElementById('f-timbro-sped').value;
   const prezzoSped = document.getElementById('f-prezzo-sped').value;
+  const docRit = document.getElementById('f-doc-ritirante').value;
 
   const tipoLabel = { ssn:'Ricetta SSN', bianca:'Ricetta bianca privata', stupefacenti:'Ricetta stupefacenti DPR 309/90', veterinaria:'Ricetta veterinaria' }[tipoSelezionato];
   const isPre = statoRicetta === 'da-spedire';
@@ -913,7 +922,8 @@ function buildPrompt() {
     (note ? `- Note: ${note}\n` : '') +
     (oss ? `- Osservazioni: ${oss}\n` : '') +
     (!isPre && timbroSped ? `- Timbro di spedizione (conferma visiva farmacista): ${timbroSped === 'presente' ? 'PRESENTE sulla ricetta fisica' : 'ASSENTE'}\n` : '') +
-    (!isPre && prezzoSped ? `- Prezzo annotato (conferma visiva farmacista): ${prezzoSped === 'presente' ? 'ANNOTATO sulla ricetta fisica' : 'NON annotato'}\n` : '');
+    (!isPre && prezzoSped ? `- Prezzo annotato (conferma visiva farmacista): ${prezzoSped === 'presente' ? 'ANNOTATO sulla ricetta fisica' : 'NON annotato'}\n` : '') +
+    (docRit ? `- Estremi documento ritirante (conferma visiva farmacista): ${docRit === 'presente' ? 'ANNOTATI sulla ricetta fisica (nome/cognome/n. documento)' : 'NON annotati'}\n` : '');
 
   // Conferme visive impostate in modalita' correzione (select sotto i campi testuali)
   const confermeVisive = [];
@@ -1266,6 +1276,7 @@ function campiDaControllo(nomeControllo) {
   if (/scaden|validit/.test(n))                               return ['f-scadenza'];
   if (/posolog/.test(n))                                      return ['f-posologia'];
   if (/nre|sar\b/.test(n))                                    return ['f-nre'];
+  if (/document|ritirant|estremi/.test(n))                    return ['f-doc-ritirante'];
   if (/ricettar|stupefac/.test(n))                            return ['f-ricettario'];
   if (/esenz|nota\b/.test(n))                                 return ['f-note'];
   return [];
@@ -1302,6 +1313,16 @@ function correggiERiverifica() {
   // Il farmacista deve poter trascrivere il nome corretto a mano anche se l'AI
   // crede di averlo letto bene.
   idsDaMostrare.add('f-farmaco');
+  // Pre-compila il campo farmaco con il valore rilevato dall'AI: se l'AI ha
+  // letto "Tachidol" il farmacista lo vede gia' nel campo e puo' solo
+  // correggere se necessario, invece di doverlo digitare da zero.
+  const inputFarmaco = document.getElementById('f-farmaco');
+  if (inputFarmaco && !inputFarmaco.value) {
+    const ctrlFarm = controlli.find(c => /farmac/i.test(c.campo || ''));
+    if (ctrlFarm && ctrlFarm.note && ctrlFarm.note.trim()) {
+      inputFarmaco.value = ctrlFarm.note.trim();
+    }
+  }
 
   if (idsDaMostrare.size > 0) {
     // Nascondi tutti i field-row che non contengono input/select con id in idsDaMostrare
@@ -1416,6 +1437,9 @@ function disattivaConfermaVisiva() {
 // Se silenzioso=true, non mostra il bottone di ritorno (uso interno per reset).
 function mostraTuttiCampi(silenzioso) {
   disattivaConfermaVisiva();
+  // Campo "Estremi documento ritirante" visibile solo in modalita' correzione
+  const docRow = document.getElementById('doc-ritirante-row');
+  if (docRow) docRow.style.display = 'none';
   document.querySelectorAll('#form-section [data-correzione-nascosto="1"]').forEach(row => {
     delete row.dataset.correzioneNascosto;
     row.style.display = visibilitaCondizionale(row.id);
@@ -1433,7 +1457,7 @@ function nuovaVerifica() {
   ['f-medico','f-farmaco','f-data','f-scadenza','f-paziente','f-cf','f-nre','f-ricettario','f-note','f-osservazioni'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
-  ['f-posologia','f-firma','f-timbro','f-timbro-sped','f-prezzo-sped'].forEach(id => { const el=document.getElementById(id); if(el) el.selectedIndex=0; });
+  ['f-posologia','f-firma','f-timbro','f-timbro-sped','f-prezzo-sped','f-doc-ritirante'].forEach(id => { const el=document.getElementById(id); if(el) el.selectedIndex=0; });
   delete document.getElementById('f-scadenza').dataset.userEdited;
   document.getElementById('scadenza-hint').innerHTML='';
   document.getElementById('fofi-live-medico').innerHTML='';
