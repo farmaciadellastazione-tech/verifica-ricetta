@@ -364,7 +364,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 30;
+const APP_BUILD = 31;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
@@ -372,6 +372,7 @@ let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedit
 let imgBase64 = null;
 let imgMime = 'image/jpeg';
 let fofiHits = [];
+let ultimoRisultato = null;   // usato da correggiERiverifica per limitare i campi a quelli non conformi
 
 document.getElementById('app-version').textContent = `Build ${APP_BUILD} · ${APP_BUILD_DATE}`;
 
@@ -1017,6 +1018,7 @@ async function analizza() {
 }
 
 function mostraRisultati(r) {
+  ultimoRisultato = r;
   const isSospetta = r.verdetto === 'SOSPETTA_FALSA';
   const cls = { VALIDA:'valida', NON_VALIDA:'non-valida', ATTENZIONE:'attenzione', SOSPETTA_FALSA:'sospetta', NON_NECESSARIA:'non-necessaria' }[r.verdetto] || 'attenzione';
   const emoji = { VALIDA:'✅', NON_VALIDA:'❌', ATTENZIONE:'⚠️', SOSPETTA_FALSA:'🚨', NON_NECESSARIA:'🌿' }[r.verdetto] || '⚠️';
@@ -1085,19 +1087,115 @@ function mostraRisultati(r) {
   sec.scrollIntoView({ behavior:'smooth' });
 }
 
+// Mappa il nome del controllo restituito dall'AI agli id dei campi del form
+// da mostrare in modalita' correzione. Una entry puo' avere piu' id.
+function campiDaControllo(nomeControllo) {
+  const n = (nomeControllo || '').toLowerCase();
+  if (/timbro.*spediz|spediz.*timbro|timbro di sped/.test(n)) return ['timbro-sped-row'];
+  if (/prezzo/.test(n))                                       return ['prezzo-sped-row'];
+  if (/firma/.test(n))                                        return ['f-firma'];
+  if (/timbro/.test(n))                                       return ['f-timbro'];
+  if (/farmac/.test(n))                                       return ['f-farmaco'];
+  if (/paziente|generalit|intestat|nominat/.test(n))          return ['f-paziente','f-cf'];
+  if (/codice fisc|^cf\b/.test(n))                            return ['f-cf'];
+  if (/medic/.test(n))                                        return ['f-medico'];
+  if (/data\b|redazion|prescriz/.test(n))                     return ['f-data'];
+  if (/scaden|validit/.test(n))                               return ['f-scadenza'];
+  if (/posolog/.test(n))                                      return ['f-posologia'];
+  if (/nre|sar\b/.test(n))                                    return ['f-nre'];
+  if (/ricettar|stupefac/.test(n))                            return ['f-ricettario'];
+  if (/esenz|nota\b/.test(n))                                 return ['f-note'];
+  return [];
+}
+
+// Restituisce visibilita' "condizionale" (rispetta tipo+stato) per un dato id.
+function visibilitaCondizionale(id) {
+  if (id === 'nre-row')         return tipoSelezionato === 'ssn' ? '' : 'none';
+  if (id === 'ricettario-row')  return tipoSelezionato === 'stupefacenti' ? '' : 'none';
+  if (id === 'timbro-sped-row' || id === 'prezzo-sped-row') return statoRicetta === 'gia-spedita' ? '' : 'none';
+  return '';
+}
+
 // Torna al form mantenendo tutti i dati e l'immagine caricata: serve per correggere
 // un campo letto male dall'OCR e rilanciare l'analisi senza ricaricare la foto.
+// Se l'ultimo risultato ha controlli non conformi, nasconde i campi conformi e
+// mostra solo quelli da correggere (+ pulsante per espandere il form completo).
 function correggiERiverifica() {
   document.getElementById('results-section').style.display = 'none';
   document.getElementById('results-section').innerHTML = '';
   document.getElementById('form-section').style.display = 'block';
+
+  // Reset previous correction-mode hiding (se l'utente ha gia' usato la funzione prima)
+  mostraTuttiCampi(true);
+
+  const controlli = (ultimoRisultato && ultimoRisultato.controlli) || [];
+  const idsDaMostrare = new Set();
+  for (const c of controlli) {
+    if (c.stato === 'ok' || c.stato === 'fofi') continue; // FOFI non e' correggibile dal form
+    for (const id of campiDaControllo(c.campo)) idsDaMostrare.add(id);
+  }
+
+  if (idsDaMostrare.size > 0) {
+    // Nascondi tutti i field-row che non contengono input/select con id in idsDaMostrare
+    document.querySelectorAll('#form-section .field-row').forEach(row => {
+      // Considera rilevante il row se il suo id e' in idsDaMostrare oppure se contiene un campo il cui id e' in idsDaMostrare
+      let rilevante = idsDaMostrare.has(row.id);
+      if (!rilevante) {
+        row.querySelectorAll('input,select,textarea').forEach(inp => {
+          if (idsDaMostrare.has(inp.id)) rilevante = true;
+        });
+      }
+      if (!rilevante) {
+        row.dataset.correzioneNascosto = '1';
+        row.style.display = 'none';
+      }
+    });
+    // Mostra le righe rilevanti rispettando comunque le visibilita' condizionali
+    idsDaMostrare.forEach(id => {
+      const row = document.getElementById(id);
+      if (row && row.classList.contains('field-row')) {
+        row.style.display = visibilitaCondizionale(id);
+      } else {
+        // id e' di un input/select dentro un row generico: il row e' gia' visibile per default
+        const el = document.getElementById(id);
+        if (el) {
+          const r = el.closest('.field-row');
+          if (r) r.style.display = '';
+        }
+      }
+    });
+    // Inserisci la barra "modalita' correzione" all'inizio del form-section
+    let banner = document.getElementById('correzione-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'correzione-banner';
+      banner.style.cssText = 'margin:0 0 14px;padding:10px 14px;background:#FFF8E1;border:1px solid #FFD679;border-radius:8px;font-size:14px;color:#5C3A00;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;';
+      banner.innerHTML = `<span>🔧 <strong>Modalità correzione</strong> — mostrati solo i campi non conformi (${idsDaMostrare.size}). Correggi e clicca Analizza.</span>
+        <button type="button" onclick="mostraTuttiCampi()" style="background:#FFE8B0;color:#5C3A00;border:1px solid #FFD679;border-radius:6px;padding:6px 10px;font-size:13px;cursor:pointer;">👁 Mostra tutti i campi</button>`;
+      document.getElementById('form-section').prepend(banner);
+    }
+  }
+
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// Ripristina la visibilita' di tutti i campi (rispettando tipo+stato).
+// Se silenzioso=true, non mostra il bottone di ritorno (uso interno per reset).
+function mostraTuttiCampi(silenzioso) {
+  document.querySelectorAll('#form-section [data-correzione-nascosto="1"]').forEach(row => {
+    delete row.dataset.correzioneNascosto;
+    row.style.display = visibilitaCondizionale(row.id);
+  });
+  const banner = document.getElementById('correzione-banner');
+  if (banner) banner.remove();
 }
 
 function nuovaVerifica() {
   document.getElementById('results-section').style.display = 'none';
   document.getElementById('results-section').innerHTML = '';
   document.getElementById('form-section').style.display = 'block';
+  mostraTuttiCampi(true); // ripristina eventuale modalita' correzione precedente
+  ultimoRisultato = null;
   ['f-medico','f-farmaco','f-data','f-scadenza','f-paziente','f-cf','f-nre','f-ricettario','f-note','f-osservazioni'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
