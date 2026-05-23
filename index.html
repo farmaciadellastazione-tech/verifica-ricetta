@@ -49,9 +49,13 @@
   .photo-btn-icon { font-size: 32px; margin-bottom: 8px; line-height: 1; }
   .photo-btn-label { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
   .photo-btn-sub { font-size: 13px; color: var(--text-ter); }
-  .img-preview-wrap { position: relative; border: 1.5px solid var(--teal-400); border-radius: var(--radius-lg); overflow: hidden; background: #000; }
-  .img-preview-wrap img { width: 100%; max-height: 280px; object-fit: contain; display: block; }
-  .remove-img { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 14px; cursor: pointer; z-index: 2; }
+  .img-thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .img-thumb { position: relative; border: 1.5px solid var(--teal-400); border-radius: var(--radius-lg); overflow: hidden; background: #000; aspect-ratio: 4/3; }
+  .img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .img-thumb-label { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.7); color: #fff; font-size: 12px; padding: 3px 9px; border-radius: 5px; font-weight: 600; letter-spacing: 0.2px; }
+  .img-thumb-remove { position: absolute; top: 6px; right: 6px; background: rgba(220,38,38,0.9); color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 15px; line-height: 1; cursor: pointer; padding: 0; }
+  .img-hint { font-size: 13px; color: var(--text-ter); margin-top: 8px; }
+  .photo-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .or-divider { display: flex; align-items: center; gap: 10px; margin: 1rem 0; }
   .or-divider span { font-size: 14px; color: var(--text-ter); white-space: nowrap; }
   .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 0.5px; background: var(--border); }
@@ -232,10 +236,8 @@
         <input type="file" id="foto-camera" accept="image/*" capture="environment" class="foto-input" />
         <input type="file" id="foto-galleria" accept="image/*" class="foto-input" />
       </div>
-      <div class="img-preview-wrap" id="img-preview-wrap" style="display:none;">
-        <img id="preview-img" alt="Anteprima ricetta" />
-        <button class="remove-img" id="remove-img" onclick="rimuoviImg(event)">✕ Rimuovi</button>
-      </div>
+      <div class="img-thumbs" id="img-thumbs"></div>
+      <div class="img-hint" id="img-hint">Per le ricette fronte/retro carica una foto del fronte e una del retro (max 4 foto).</div>
     </div>
 
     <!-- Dati manuali -->
@@ -364,13 +366,13 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 45;
+const APP_BUILD = 46;
 const APP_BUILD_DATE = '23/05/2026';
 
 let tipoSelezionato = 'bianca';
 let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)
-let imgBase64 = null;
-let imgMime = 'image/jpeg';
+let images = []; // [{base64, mime, dataUrl}, ...] - supporta fronte/retro o piu' allegati
+const MAX_IMAGES = 4;
 let fofiHits = [];
 let ultimoRisultato = null;   // usato da correggiERiverifica per limitare i campi a quelli non conformi
 
@@ -512,30 +514,62 @@ document.getElementById('f-scadenza').addEventListener('input', e => {
   aggiornaScadenza();
 });
 
-// Image upload — i due input (camera + galleria) condividono lo stesso handler
+// Image upload — supporto multi-immagine (fronte/retro + eventuali allegati)
 function handleFotoSelezionata(file) {
   if (!file) return;
   if (file.size > 10 * 1024 * 1024) { alert('File troppo grande (max 10 MB)'); return; }
-  imgMime = file.type || 'image/jpeg';
+  if (images.length >= MAX_IMAGES) { alert(`Massimo ${MAX_IMAGES} foto. Rimuovine una per aggiungerne un'altra.`); return; }
   const reader = new FileReader();
   reader.onload = ev => {
-    imgBase64 = ev.target.result.split(',')[1];
-    document.getElementById('preview-img').src = ev.target.result;
-    document.getElementById('img-preview-wrap').style.display = 'block';
-    document.getElementById('photo-buttons').style.display = 'none';
+    images.push({
+      base64: ev.target.result.split(',')[1],
+      mime: file.type || 'image/jpeg',
+      dataUrl: ev.target.result
+    });
+    renderImgThumbs();
   };
   reader.readAsDataURL(file);
 }
 
+function renderImgThumbs() {
+  const wrap = document.getElementById('img-thumbs');
+  wrap.innerHTML = '';
+  images.forEach((img, idx) => {
+    const div = document.createElement('div');
+    div.className = 'img-thumb';
+    const labelTxt = images.length === 1 ? 'Foto 1' : (idx === 0 ? 'Fronte' : (idx === 1 ? 'Retro' : `Foto ${idx + 1}`));
+    div.innerHTML = `<div class="img-thumb-label">${labelTxt}</div><img src="${img.dataUrl}" alt="Anteprima"><button type="button" class="img-thumb-remove" aria-label="Rimuovi" onclick="rimuoviImgAt(${idx})">✕</button>`;
+    wrap.appendChild(div);
+  });
+  // Hint dinamico
+  const hint = document.getElementById('img-hint');
+  if (images.length === 0) hint.textContent = 'Per le ricette fronte/retro carica una foto del fronte e una del retro (max 4 foto).';
+  else if (images.length === 1) hint.textContent = 'Foto 1 caricata. Per fronte/retro aggiungi una seconda foto del retro.';
+  else hint.textContent = `${images.length} foto caricate (max ${MAX_IMAGES}).`;
+  // Disabilita i pulsanti quando si raggiunge il limite
+  const atLimit = images.length >= MAX_IMAGES;
+  document.querySelectorAll('#photo-buttons .photo-btn').forEach(b => { b.disabled = atLimit; });
+}
+
+function rimuoviImgAt(idx) {
+  images.splice(idx, 1);
+  renderImgThumbs();
+  // Reset valore degli input file cosi' che la stessa foto possa essere riselezionata
+  document.querySelectorAll('.foto-input').forEach(inp => { inp.value = ''; });
+}
+
 document.querySelectorAll('.foto-input').forEach(inp => {
-  inp.addEventListener('change', e => handleFotoSelezionata(e.target.files[0]));
+  inp.addEventListener('change', e => {
+    handleFotoSelezionata(e.target.files[0]);
+    e.target.value = ''; // reset per consentire la riselezione dello stesso file
+  });
 });
 
+// Wrapper per compatibilita' con codice che svuotava tutte le foto (es. nuovaVerifica)
 function rimuoviImg(e) {
   e && e.stopPropagation && e.stopPropagation();
-  imgBase64 = null;
-  document.getElementById('img-preview-wrap').style.display = 'none';
-  document.getElementById('photo-buttons').style.display = '';
+  images = [];
+  renderImgThumbs();
   document.querySelectorAll('.foto-input').forEach(inp => { inp.value = ''; });
 }
 
@@ -973,7 +1007,7 @@ ${fofiBriefing}
 NORMATIVA:
 ${getRequisiti()}
 
-${imgBase64 ? 'Analizza l\'immagine allegata E i dati forniti.' : 'Analizza i dati forniti (nessuna immagine).'}
+${images.length === 0 ? 'Analizza i dati forniti (nessuna immagine).' : images.length === 1 ? 'Analizza l\'immagine allegata E i dati forniti.' : `Analizza le ${images.length} immagini allegate (probabilmente fronte+retro della STESSA ricetta, o ricetta + allegati come fustella/documento ritirante). Trattale come un unico insieme: estrai e combina le informazioni da tutte le facciate. NON segnalare un campo come "mancante" se compare in una qualsiasi delle immagini. E i dati forniti.`}
 
 ${modalitaIstruzioni}
 
@@ -1032,7 +1066,7 @@ async function analizza() {
   const apiKey = document.getElementById('api-key').value.trim() || EMBEDDED_GEMINI_KEY;
   if (!apiKey) { mostraErrore('Inserisci la chiave API Google Gemini (gratuita su aistudio.google.com/apikey — bastano 30 secondi).'); return; }
   const farmaco = document.getElementById('f-farmaco').value;
-  if (!imgBase64 && !farmaco) { mostraErrore('Carica una foto oppure inserisci almeno il farmaco.'); return; }
+  if (!images.length && !farmaco) { mostraErrore('Carica almeno una foto oppure inserisci almeno il farmaco.'); return; }
 
   const btn = document.getElementById('btn-analizza');
   document.getElementById('error-msg').style.display = 'none';
@@ -1041,7 +1075,7 @@ async function analizza() {
   document.getElementById('loading-bar').classList.add('active');
 
   const parts = [];
-  if (imgBase64) parts.push({ inline_data: { mime_type: imgMime, data: imgBase64 } });
+  images.forEach(img => parts.push({ inline_data: { mime_type: img.mime, data: img.base64 } }));
   parts.push({ text: buildPrompt() });
 
   try {
