@@ -164,6 +164,41 @@
   .install-btn.show { display: inline-block; }
 
   .footer { text-align: center; font-size: 13px; color: var(--text-ter); margin-top: 2rem; }
+
+  /* Stampa: report consegnabile al medico quando manca qualcosa nella ricetta.
+     Nasconde form/header/bottoni, rimuove i controlli OK, e mostra l'intestazione
+     della farmacia + i dati di contesto della ricetta. */
+  .print-only { display: none; }
+  @media print {
+    @page { margin: 14mm; }
+    body { background: #fff; padding: 0; color: #000; font-size: 11pt; }
+    .container { max-width: none; margin: 0; padding: 0; }
+    .page-header, #api-config, #form-section, .install-btn, .footer,
+    .fofi-alert, .db-badge, .print-hide { display: none !important; }
+    .print-only { display: block !important; }
+    .results-card { border: 1.5px solid #000; border-radius: 0; box-shadow: none; margin: 0; page-break-inside: avoid; }
+    .results-header { background: #fff !important; border-bottom: 1.5px solid #000; padding: 10px 14px; }
+    .results-header.sospetta { border-left: none; }
+    .verdict-icon { display: none; }
+    .verdict-title, .verdict-sub { color: #000 !important; }
+    .score-bar-wrap { display: none; }
+    .checks-list { padding: 10px 14px; gap: 4px; }
+    .check-item { background: #fff !important; border: 1px solid #444; padding: 6px 10px; page-break-inside: avoid; }
+    .check-item.ok { display: none; }  /* il medico deve vedere SOLO cosa manca */
+    .check-name, .check-note, .check-icon { color: #000 !important; }
+    .azioni-box { background: #fff !important; border: 1px solid #000; margin: 10px 14px; padding: 8px 12px; }
+    .azioni-list li, .azioni-list li::before { color: #000 !important; }
+    .print-header { padding: 12px 14px 10px; border-bottom: 1px solid #000; }
+    .print-header h2 { font-size: 15pt; margin-bottom: 2px; }
+    .print-header .farm-sub { font-size: 9pt; color: #333; margin-bottom: 8px; }
+    .print-header .print-title { font-size: 13pt; font-weight: 700; margin-top: 6px; }
+    .print-header .print-date { font-size: 10pt; color: #333; margin-top: 2px; }
+    .print-ricetta-info { padding: 8px 14px; border-bottom: 1px solid #ccc; font-size: 10pt; line-height: 1.5; }
+    .print-ricetta-info .lbl { font-weight: 700; }
+    .print-footer { padding: 12px 14px; border-top: 1px solid #ccc; font-size: 9pt; color: #333; line-height: 1.4; }
+    .print-stamp-box { margin-top: 14px; border: 1px dashed #888; height: 55px; padding: 4px 8px; font-size: 9pt; color: #888; }
+  }
+
   @media (max-width: 500px) {
     body { padding: 1rem 0.75rem 2rem; }
     .card { padding: 1rem 0.875rem; }
@@ -386,8 +421,8 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 55;
-const APP_BUILD_DATE = '23/05/2026';
+const APP_BUILD = 56;
+const APP_BUILD_DATE = '25/05/2026';
 
 let tipoSelezionato = 'bianca';
 let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)
@@ -1241,8 +1276,37 @@ function mostraRisultati(r) {
     <strong>🚨 ${fofiHits.length} corrispondenza${fofiHits.length>1?'e':''} nella banca dati FOFI 2025-2026</strong> — Circ. n. ${fofiHits.map(h=>h.rec.n).join(', ')}
   </div>` : '';
 
+  // Intestazione stampa: dati farmacia + contesto ricetta (medico/farmaco/data/tipo)
+  // visibili solo in stampa via @media print. Per il medico/paziente che riceve
+  // il foglio: deve poter identificare la ricetta e capire cosa manca.
+  const now = new Date();
+  const dataVerificaStr = now.toLocaleDateString('it-IT') + ' ore ' + now.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+  const medicoVal = (document.getElementById('f-medico').value || '').trim();
+  const farmacoVal = (document.getElementById('f-farmaco').value || '').trim();
+  const dataPrescr = document.getElementById('f-data').value;
+  const dataPrescrStr = dataPrescr ? new Date(dataPrescr + 'T00:00:00').toLocaleDateString('it-IT') : '';
+  const tipoLabel = { ssn:'SSN / Dematerializzata', bianca:'Bianca privata', stupefacenti:'Stupefacenti', veterinaria:'Veterinaria' }[tipoSelezionato] || tipoSelezionato;
+  const ctxRows = [];
+  if (medicoVal)     ctxRows.push(`<div><span class="lbl">Medico prescrittore:</span> ${escHtml(medicoVal)}</div>`);
+  if (farmacoVal)    ctxRows.push(`<div><span class="lbl">Farmaco:</span> ${escHtml(farmacoVal)}</div>`);
+  if (dataPrescrStr) ctxRows.push(`<div><span class="lbl">Data prescrizione:</span> ${escHtml(dataPrescrStr)}</div>`);
+  ctxRows.push(`<div><span class="lbl">Tipo ricetta:</span> ${escHtml(tipoLabel)}</div>`);
+  const titoloStampa = isPositive ? 'Verifica ricetta medica — esito' : 'Verifica ricetta medica — elementi da integrare';
+  const printHeader = `<div class="print-only print-header">
+    <h2>Farmacia della Stazione</h2>
+    <div class="farm-sub">Via Fiume 75, 19122 La Spezia · P.I. 01317570115</div>
+    <div class="print-title">${titoloStampa}</div>
+    <div class="print-date">Verifica effettuata il ${dataVerificaStr}</div>
+  </div>
+  <div class="print-only print-ricetta-info">${ctxRows.join('')}</div>`;
+  const printFooter = `<div class="print-only print-footer">
+    Documento generato dall'applicativo di verifica della Farmacia della Stazione. ${isPositive ? '' : 'Si prega di riproporsi al medico prescrittore per la regolarizzazione degli elementi sopra indicati: la ricetta non può essere spedita finché non risultano integrati.'}
+    <div class="print-stamp-box">Timbro / firma farmacista</div>
+  </div>`;
+
   const sec = document.getElementById('results-section');
   sec.innerHTML = `<div class="results-card">
+    ${printHeader}
     <div class="results-header ${cls}">
       <span class="verdict-icon">${emoji}</span>
       <div>
@@ -1257,11 +1321,13 @@ function mostraRisultati(r) {
     <div class="checks-list">${checks}</div>
     ${fofiBanner}
     ${azioniBox}
-    ${!isPositive ? `<div style="margin:0 16px 14px;padding:10px 14px;background:#FFF8E1;border:1px solid #FFD679;border-radius:8px;font-size:14px;color:#5C3A00;">
+    ${!isPositive ? `<div class="print-hide" style="margin:0 16px 14px;padding:10px 14px;background:#FFF8E1;border:1px solid #FFD679;border-radius:8px;font-size:14px;color:#5C3A00;">
       💡 <strong>Errore di lettura nei dati?</strong> Se l'AI ha confuso un carattere (es. <code>/</code> con <code>1</code>) o non ha letto un campo, clicca <em>Correggi e riverifica</em>, compila il dato a mano nel form e rilancia. I valori del form hanno priorità sull'OCR.
     </div>` : ''}
+    ${printFooter}
   </div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:14px 0;">
+  <div class="print-hide" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:14px 0;">
+    <button class="btn-nuova" onclick="stampaReport()" style="background:#E1F5EE;color:#0F6E56;border-color:#9FE1CB;">🖨 Stampa per il medico</button>
     <button class="btn-nuova" onclick="correggiERiverifica()" style="background:#FFE8B0;color:#5C3A00;">✏ Correggi e riverifica</button>
     <button class="btn-nuova" onclick="nuovaVerifica()">↩ Nuova verifica</button>
   </div>`;
@@ -1457,6 +1523,10 @@ function mostraTuttiCampi(silenzioso) {
   });
   const banner = document.getElementById('correzione-banner');
   if (banner) banner.remove();
+}
+
+function stampaReport() {
+  window.print();
 }
 
 function nuovaVerifica() {
