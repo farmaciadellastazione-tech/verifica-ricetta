@@ -1,0 +1,13 @@
+{
+  "name": "verifica-ricetta",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Verifica ricette mediche -- test infrastructure (l'app gira come PWA single-file, nessun build step in prod)",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

@@ -1,2 +1,5 @@
 # Claude Code — impostazioni locali per-macchina
 .claude/
+node_modules/
+.vitest-cache/
+coverage/
