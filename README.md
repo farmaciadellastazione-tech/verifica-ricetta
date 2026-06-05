@@ -70,6 +70,8 @@ colonna **B** = numero circolare, **C** = falsificazione ricette (`F`),
 **D** = furto/smarrimento timbro o ricettario (`T`), **E** = buoni acquisto (`B`).
 Da qui i campi `n`, `t` e `tx` si ricavano in modo **deterministico, senza AI**.
 
+📋 **Checklist operativa passo-passo:** [`AGGIORNAMENTO-FOFI.md`](AGGIORNAMENTO-FOFI.md).
+
 Due strumenti, stesso motore (`fofi-xlsx.js`):
 
 ### A) Script Node (consigliato)
