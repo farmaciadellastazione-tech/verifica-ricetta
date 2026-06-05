@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Aggiorna banca dati FOFI — Verifica Ricetta</title>
+<!-- Pagina di manutenzione (NON linkata dall'app, raggiungibile solo via URL /admin.html).
+     Serve a inserire nuove circolari FOFI senza editare a mano l'array minificato di fofi-db.js.
+     Incolli il testo della circolare -> Gemini estrae {n,t,tx,m,f} -> correggi -> scarichi fofi-db.js. -->
+<style>
+  :root{
+    --green-700:#3B6D11; --green-50:#F1F7EA; --red-400:#C0392B; --red-50:#FFF0F0;
+    --ink:#1d2b14; --muted:#5b6b4b; --line:#d8e0cf; --amber:#854F0B; --amber-50:#FFF7E6;
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;background:#f6f8f2;color:#1d2b14;line-height:1.45}
+  header{background:#2e560d;color:#fff;padding:16px 20px}
+  header h1{margin:0;font-size:18px}
+  header p{margin:4px 0 0;font-size:13px;opacity:.85}
+  main{max-width:860px;margin:0 auto;padding:18px 16px 80px}
+  .card{background:#fff;border:1px solid #d8e0cf;border-radius:10px;padding:16px;margin-bottom:16px}
+  .card h2{margin:0 0 10px;font-size:15px;color:#3B6D11}
+  label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px}
+  input[type=text],input[type=password],input[type=number],textarea{
+    width:100%;border:1px solid #c4cfb6;border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;background:#fff}
+  textarea{resize:vertical;min-height:120px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button{cursor:pointer;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;font-family:inherit}
+  .btn-primary{background:#3B6D11;color:#fff}
+  .btn-primary:disabled{opacity:.5;cursor:default}
+  .btn-sec{background:#e7eede;color:#2e560d;border:1px solid #c4cfb6}
+  .btn-danger{background:#fff;color:#C0392B;border:1px solid #e3b6b0}
+  .hint{font-size:12px;color:#5b6b4b;margin-top:4px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px;margin-right:5px}
+  .pill.F{background:#fde9e7;color:#a02d20}
+  .pill.T{background:#fff1d6;color:#8a5a09}
+  .pill.B{background:#e3ecf7;color:#274a73}
+  .cand{border:1px solid #d8e0cf;border-radius:9px;padding:13px;margin-top:12px;background:#fafcf7}
+  .cand .tline{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:6px 0}
+  .cand .tline label{display:inline-flex;align-items:center;gap:5px;margin:0;font-weight:500}
+  .staged{border-left:4px solid #3B6D11}
+  .warnbox{background:#FFF7E6;border:1px solid #f0d9a8;border-radius:8px;padding:9px 12px;font-size:13px;color:#854F0B;margin-top:8px}
+  .okbox{background:#F1F7EA;border:1px solid #cfe2bb;border-radius:8px;padding:9px 12px;font-size:13px;color:#3B6D11;margin-top:8px}
+  .errbox{background:#FFF0F0;border:1px solid #f0c0bb;border-radius:8px;padding:9px 12px;font-size:13px;color:#a02d20;margin-top:8px;white-space:pre-wrap}
+  code{background:#eef3e6;padding:1px 5px;border-radius:4px;font-size:12px}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  ol.steps{margin:6px 0 0;padding-left:20px;font-size:13px}
+  ol.steps li{margin:4px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>🛠️ Aggiorna banca dati FOFI</h1>
+  <p>Strumento di manutenzione — inserisci nuove circolari (ricette falsificate / timbri rubati) senza toccare il codice.</p>
+</header>
+<main>
+
+  <div class="card">
+    <h2>Come funziona</h2>
+    <ol class="steps">
+      <li>Incolla qui sotto il <strong>testo della circolare FOFI</strong> (anche più segnalazioni insieme).</li>
+      <li>Premi <em>Estrai con Gemini</em>: il sistema riconosce numero, tipo, medici e farmaci.</li>
+      <li>Controlla e <strong>correggi</strong> i campi (specie nome medico e farmaco nel testo: è lì che avviene il match).</li>
+      <li>Aggiungi le voci buone alla coda, poi <strong>Scarica <code>fofi-db.js</code></strong>.</li>
+      <li>Sostituisci il file nel repository e fai commit/push (vedi nota in fondo).</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>1 · Chiave Gemini</h2>
+    <input type="password" id="api-key" placeholder="AIza... (la stessa chiave dell'app)" autocomplete="off">
+    <div class="hint">Riusa la chiave salvata sul dispositivo. Resta solo in <code>localStorage</code>, non viene inviata a nessuno tranne Google.</div>
+    <div id="db-status" class="hint" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Testo della circolare</h2>
+    <textarea id="src" placeholder="Incolla qui il testo della circolare FOFI / del bollettino Federfarma..."></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn-primary" id="btn-estrai">Estrai con Gemini</button>
+      <span id="estrai-status" class="hint"></span>
+    </div>
+    <div id="estrai-err" class="errbox" style="display:none"></div>
+  </div>
+
+  <div class="card" id="cand-card" style="display:none">
+    <h2>3 · Voci estratte — controlla e correggi</h2>
+    <div id="candidates"></div>
+  </div>
+
+  <div class="card" id="staged-card" style="display:none">
+    <h2>4 · Coda da inserire (<span id="staged-count">0</span>)</h2>
+    <div id="staged"></div>
+
+    <label style="margin-top:16px">Righe JSON (da incollare prima di <code>];</code> in <code>fofi-db.js</code>, se preferisci)</label>
+    <textarea id="json-out" class="mono" readonly style="min-height:90px"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn-sec" id="btn-copy">Copia righe JSON</button>
+      <button class="btn-primary" id="btn-download">⬇ Scarica fofi-db.js completo</button>
+      <span id="copy-status" class="hint"></span>
+    </div>
+
+    <div class="warnbox" style="margin-top:14px">
+      <strong>Dopo il download:</strong> sostituisci <code>fofi-db.js</code> nel repository
+      <code>verifica-ricetta</code> sul branch <code>dev</code>, fai commit e push. La PWA si aggiorna
+      al prossimo caricamento. <em>Ricorda di bumpare <code>CACHE_NAME</code> in <code>sw.js</code></em>
+      altrimenti i dispositivi con l'app installata restano alla banca dati vecchia.
+    </div>
+  </div>
+
+</main>
+
+<script src="fofi-db.js"></script>
+<script src="fofi-match.js"></script>
+<script>
+const API_KEY_STORAGE = 'gemini-api-key';
+const MODELLI_FALLBACK = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
+const HEADER =
+  '// Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026\n' +
+  '// Estratto da index.html per manutenibilita\'. Variabile globale FOFI_DB consumata dall\'inline script principale.';
+
+// Stato: voci in coda per il download
+let nuove = [];
+
+// ── Chiave + status DB ───────────────────────────────────────────────────
+const keyInput = document.getElementById('api-key');
+keyInput.value = localStorage.getItem(API_KEY_STORAGE) || '';
+keyInput.addEventListener('input', () => localStorage.setItem(API_KEY_STORAGE, keyInput.value.trim()));
+
+const maxN = FOFI_DB.reduce((m, r) => Math.max(m, r.n || 0), 0);
+document.getElementById('db-status').textContent =
+  `Banca dati attuale: ${FOFI_DB.length} segnalazioni · ultima circolare n. ${maxN}.`;
+
+const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ── Prompt di estrazione ─────────────────────────────────────────────────
+function buildExtractPrompt(testo) {
+  return `Sei un assistente che struttura le circolari FOFI (Federazione Ordini Farmacisti Italiani) su ricette mediche falsificate, timbri/ricettari rubati o smarriti, e buoni acquisto di stupefacenti, per una banca dati anti-frode in farmacia.
+
+Ricevi il testo grezzo di una o più segnalazioni. Restituisci SOLO JSON valido nella forma:
+{"entries":[{"n":<intero o null>,"t":[...],"tx":"...","m":[...],"f":[...]}]}
+
+Crea UNA entry per ogni distinta segnalazione/circolare presente nel testo (un bollettino può contenerne molte).
+
+Campi:
+- n: numero della circolare FOFI (intero). Se nel testo non è indicato, metti null.
+- t: array dei tipi presenti. Codici: "F" = falsificazione/contraffazione di ricetta; "T" = furto o smarrimento di timbro personale e/o ricettario; "B" = buoni acquisto / richieste di stupefacenti (modulistica). Possono coesistere più tipi.
+- tx: il testo della segnalazione ripulito da saluti e intestazioni di servizio, ma con TUTTI i nomi dei medici, i farmaci e i numeri di ricetta/seriali COMPLETI E INTATTI. Questo campo è quello su cui avviene il riconoscimento: non abbreviare né riassumere i nomi.
+- m: nomi dei MEDICI coinvolti, come stringhe (es. "CAPECCHI NICCOLO'"). Escludi i titoli (Dott., Dr., Dr.ssa, Prof.). Non includere i pazienti. Se nessun medico è identificabile: [].
+- f: farmaci/medicinali citati, nome commerciale in MAIUSCOLO senza dosaggio (es. "OXYCONTIN","DEPALGOS","RIVOTRIL"). Se nessun farmaco: [].
+
+Esempi:
+TESTO: "Circolare n. 15843 – FALSIFICAZIONE di una RICETTA con firma del Dott. CAPECCHI NICCOLO' con prescrizione di OXYCONTIN 28 CPR 20 MG."
+JSON: {"entries":[{"n":15843,"t":["F"],"tx":"FALSIFICAZIONE di una RICETTA con firma del Dott. CAPECCHI NICCOLO' con prescrizione di OXYCONTIN 28 CPR 20 MG.","m":["CAPECCHI NICCOLO'"],"f":["OXYCONTIN"]}]}
+TESTO: "Circ. 15815 — smarrimento timbro del Dr. BESANA MICHELE Dirigente Medico S.C. Neuroradiologia del Presidio Ospedaliero di Cremona"
+JSON: {"entries":[{"n":15815,"t":["T"],"tx":"smarrimento timbro del Dr. BESANA MICHELE Dirigente Medico S.C. Neuroradiologia del Presidio Ospedaliero di Cremona","m":["BESANA MICHELE"],"f":[]}]}
+
+Restituisci SOLO il JSON, nessun commento o testo aggiuntivo.
+
+TESTO DA STRUTTURARE:
+"""
+${testo}
+"""`;
+}
+
+// ── Chiamata Gemini (stessa catena di fallback dell'app) ─────────────────
+async function chiamaGemini(prompt) {
+  const apiKey = keyInput.value.trim();
+  if (!apiKey) throw new Error('Inserisci la chiave API Google Gemini.');
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.0, maxOutputTokens: 16000, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 2000 } }
+  });
+  let res, ultimoErrore;
+  for (const modello of MODELLI_FALLBACK) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modello}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    if (res.ok) break;
+    if (res.status !== 503 && res.status !== 429) break;
+    const e = await res.clone().json().catch(()=>({}));
+    ultimoErrore = e.error?.message || `HTTP ${res.status}`;
+    console.warn(`[FOFI-admin] ${modello} -> ${res.status}, provo fallback.`);
+  }
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error?.message || ultimoErrore || `HTTP ${res.status}`); }
+  const data = await res.json();
+  const raw = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  if (!raw) throw new Error('Risposta vuota da Gemini.');
+  let parsed;
+  try { parsed = JSON.parse(raw.replace(/```json|```/g, '').trim()); }
+  catch (e) { console.error('[FOFI-admin] JSON malformato:', raw); throw new Error('Gemini ha risposto con JSON non valido. Riprova.'); }
+  const entries = Array.isArray(parsed) ? parsed : (parsed.entries || []);
+  if (!entries.length) throw new Error('Nessuna segnalazione riconosciuta nel testo.');
+  return entries;
+}
+
+// ── Estrazione ───────────────────────────────────────────────────────────
+const btnEstrai = document.getElementById('btn-estrai');
+btnEstrai.addEventListener('click', async () => {
+  const testo = document.getElementById('src').value.trim();
+  const errBox = document.getElementById('estrai-err');
+  const status = document.getElementById('estrai-status');
+  errBox.style.display = 'none';
+  if (!testo) { errBox.textContent = 'Incolla prima il testo della circolare.'; errBox.style.display = 'block'; return; }
+  btnEstrai.disabled = true; status.textContent = '⏳ Estrazione in corso...';
+  try {
+    const entries = await chiamaGemini(buildExtractPrompt(testo));
+    renderCandidates(entries.map(normalizzaEntry));
+    status.textContent = `✓ ${entries.length} voce/i estratte.`;
+  } catch (err) {
+    console.error('[FOFI-admin] estrazione:', err);
+    errBox.textContent = 'Errore: ' + err.message; errBox.style.display = 'block';
+    status.textContent = '';
+  } finally { btnEstrai.disabled = false; }
+});
+
+function normalizzaEntry(e) {
+  const tipiValidi = ['F','T','B'];
+  return {
+    n: (e.n === null || e.n === undefined || e.n === '') ? '' : parseInt(e.n, 10) || '',
+    t: Array.isArray(e.t) ? e.t.filter(x => tipiValidi.includes(x)) : [],
+    tx: (e.tx || '').toString().trim(),
+    m: Array.isArray(e.m) ? e.m.filter(Boolean) : [],
+    f: Array.isArray(e.f) ? e.f.filter(Boolean) : []
+  };
+}
+
+// ── Render candidati editabili ───────────────────────────────────────────
+function renderCandidates(cands) {
+  const wrap = document.getElementById('candidates');
+  document.getElementById('cand-card').style.display = 'block';
+  wrap.innerHTML = '';
+  cands.forEach((c, i) => wrap.appendChild(renderCandCard(c, i)));
+}
+
+function renderCandCard(c, i) {
+  const div = document.createElement('div');
+  div.className = 'cand';
+  const tcheck = ['F','T','B'].map(t => {
+    const lbl = { F:'F · falsificazione', T:'T · furto/smarrimento', B:'B · buoni acquisto' }[t];
+    return `<label><input type="checkbox" data-f="t" value="${t}" ${c.t.includes(t)?'checked':''}> ${lbl}</label>`;
+  }).join('');
+  div.innerHTML = `
+    <div class="tline">
+      <label style="margin:0">N° circolare</label>
+      <input type="number" data-f="n" value="${esc(String(c.n))}" style="width:130px" placeholder="es. 15910">
+    </div>
+    <div class="tline">${tcheck}</div>
+    <label>Testo segnalazione (su questo avviene il match — deve contenere medico e farmaco per esteso)</label>
+    <textarea data-f="tx" style="min-height:80px">${esc(c.tx)}</textarea>
+    <div class="row" style="gap:14px;align-items:flex-start">
+      <div style="flex:1;min-width:200px"><label>Medici (uno per riga)</label>
+        <textarea data-f="m" style="min-height:54px">${esc(c.m.join('\n'))}</textarea></div>
+      <div style="flex:1;min-width:200px"><label>Farmaci (uno per riga)</label>
+        <textarea data-f="f" style="min-height:54px">${esc(c.f.join('\n'))}</textarea></div>
+    </div>
+    <div class="check-msg"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn-primary btn-add">Aggiungi in coda ↓</button>
+      <button class="btn-danger btn-skip">Scarta</button>
+    </div>`;
+
+  const readCard = () => ({
+    n: div.querySelector('[data-f=n]').value.trim() ? parseInt(div.querySelector('[data-f=n]').value, 10) : '',
+    t: [...div.querySelectorAll('[data-f=t]:checked')].map(x => x.value),
+    tx: div.querySelector('[data-f=tx]').value.trim(),
+    m: div.querySelector('[data-f=m]').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    f: div.querySelector('[data-f=f]').value.split('\n').map(s=>s.trim()).filter(Boolean)
+  });
+
+  div.querySelector('.btn-add').addEventListener('click', () => {
+    const entry = readCard();
+    const problemi = validaEntry(entry);
+    const msg = div.querySelector('.check-msg');
+    if (problemi.bloccanti.length) {
+      msg.innerHTML = `<div class="errbox">${problemi.bloccanti.map(esc).join('<br>')}</div>`;
+      return;
+    }
+    nuove.push(entry);
+    renderStaged();
+    div.remove();
+  });
+  div.querySelector('.btn-skip').addEventListener('click', () => div.remove());
+  return div;
+}
+
+// ── Validazione ──────────────────────────────────────────────────────────
+function validaEntry(e) {
+  const bloccanti = [], avvisi = [];
+  if (!e.tx) bloccanti.push('Il testo (tx) non può essere vuoto.');
+  if (!e.t.length) bloccanti.push('Seleziona almeno un tipo (F/T/B).');
+  if (e.n !== '' && FOFI_DB.some(r => r.n === e.n) && !nuove.some(x => x.n === e.n)) {
+    avvisi.push(`Attenzione: la circolare n. ${e.n} è già presente in banca dati.`);
+  }
+  // Verifica che i nomi dei medici compaiano nel testo (è lì che il match li cerca)
+  if (typeof tokenize === 'function' && typeof haystackTokens === 'function' && e.tx) {
+    const ht = haystackTokens({ tx: e.tx });
+    e.m.forEach(nome => {
+      const toks = tokenize(nome).filter(t => t.length >= 4);
+      if (toks.length && !toks.some(t => ht.has(t))) {
+        avvisi.push(`Il medico "${nome}" non compare nel testo: il match potrebbe non scattare. Verifica che il nome sia scritto per esteso in tx.`);
+      }
+    });
+  }
+  return { bloccanti, avvisi };
+}
+
+// ── Coda + output ────────────────────────────────────────────────────────
+function entryToJson(e) {
+  return JSON.stringify({ n: e.n === '' ? null : e.n, t: e.t, tx: e.tx, m: e.m, f: e.f });
+}
+
+function renderStaged() {
+  document.getElementById('staged-card').style.display = nuove.length ? 'block' : 'none';
+  document.getElementById('staged-count').textContent = nuove.length;
+  const wrap = document.getElementById('staged');
+  wrap.innerHTML = '';
+  nuove.forEach((e, i) => {
+    const v = validaEntry(e);
+    const div = document.createElement('div');
+    div.className = 'cand staged';
+    div.innerHTML = `
+      <div class="tline" style="justify-content:space-between">
+        <div><strong>n. ${e.n || '—'}</strong> ${e.t.map(t=>`<span class="pill ${t}">${t}</span>`).join('')}</div>
+        <button class="btn-danger btn-rm" data-i="${i}" style="padding:5px 12px">Rimuovi</button>
+      </div>
+      <div class="mono" style="font-size:12px;color:#3a4a2c">${esc(e.tx)}</div>
+      <div class="hint">medici: ${esc(e.m.join(', ')||'—')} · farmaci: ${esc(e.f.join(', ')||'—')}</div>
+      ${v.avvisi.length ? `<div class="warnbox">${v.avvisi.map(esc).join('<br>')}</div>` : ''}`;
+    div.querySelector('.btn-rm').addEventListener('click', () => { nuove.splice(i,1); renderStaged(); });
+    wrap.appendChild(div);
+  });
+  document.getElementById('json-out').value = nuove.map(entryToJson).join(',\n');
+}
+
+// ── Copia + Download ─────────────────────────────────────────────────────
+document.getElementById('btn-copy').addEventListener('click', async () => {
+  const txt = document.getElementById('json-out').value;
+  try { await navigator.clipboard.writeText(txt); document.getElementById('copy-status').textContent = '✓ Copiato'; }
+  catch { const ta = document.getElementById('json-out'); ta.select(); document.execCommand('copy'); document.getElementById('copy-status').textContent = '✓ Copiato'; }
+  setTimeout(() => document.getElementById('copy-status').textContent = '', 2500);
+});
+
+document.getElementById('btn-download').addEventListener('click', () => {
+  if (!nuove.length) return;
+  // Ricostruisce il file: voci esistenti (solo i 5 campi, niente _tok) + nuove.
+  const esistenti = FOFI_DB.map(r => entryToJson({ n: r.n, t: r.t, tx: r.tx, m: r.m || [], f: r.f || [] }));
+  const aggiunte = nuove.map(entryToJson);
+  const tutte = esistenti.concat(aggiunte);
+  const out = HEADER + '\nconst FOFI_DB = [\n' + tutte.join(',\n') + '\n];\n';
+  const blob = new Blob([out], { type: 'text/javascript' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fofi-db.js';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+});
+</script>
+</body>
+</html>

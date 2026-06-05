@@ -9,7 +9,8 @@ Italian-language single-page PWA for **Farmacia della Stazione** (La Spezia) tha
 ## Files
 
 - `index.html` — the entire app (~1570 lines: HTML, CSS, vanilla JS). Inlines the Gemini prompt + FOFI matching logic + UI.
-- `fofi-db.js` — banca dati FOFI as a single `const FOFI_DB = [...]` array, loaded via `<script src>` before the inline script. ~144 entries per object: `{n, t, tx, m, f}` — `n`=numero circolare, `t`=tipi (`F` falsificazione, `T` furto/timbro, `B` buoni acquisto), `tx`=testo originale, `m`=medici estratti, `f`=farmaci estratti. Updated when new FOFI circolari arrive.
+- `fofi-db.js` — banca dati FOFI as a single `const FOFI_DB = [...]` array, loaded via `<script src>` before the inline script. ~144 entries per object: `{n, t, tx, m, f}` — `n`=numero circolare, `t`=tipi (`F` falsificazione, `T` furto/timbro, `B` buoni acquisto), `tx`=testo originale, `m`=medici estratti, `f`=farmaci estratti. **Il matching gira su `tx`** (vedi `cercaFOFI`/`scoreMatch`), non su `m`/`f`: quei due campi sono metadati di corredo — la cosa critica è che `tx` contenga nome medico e farmaco per esteso. Updated when new FOFI circolari arrive (vedi `admin.html`).
+- `admin.html` — pagina di manutenzione **non linkata dall'app** (solo via URL `/admin.html`). Incolli il testo di una circolare FOFI → Gemini estrae `{n,t,tx,m,f}` (stessa chiave e catena di fallback dell'app) → correggi i campi → scarichi un `fofi-db.js` rigenerato (una voce per riga, per diff puliti) da committare. Non è nel precache del service worker (tool owner-only, richiede rete). Dopo l'inserimento ricordarsi di bumpare `CACHE_NAME` in `sw.js`.
 - `sw.js` — service worker, cache-first for app shell, bypass for cross-origin (Gemini API).
 - `manifest.webmanifest` — PWA manifest, standalone display, "Verifica Ricetta" short name.
 - `icon-{180,192,512}.png` — PWA icons.
