@@ -75,6 +75,12 @@ New repository secret**. Crea i tre:
 
 ## Se qualcosa va storto
 
+- **`Errore 403: access_denied` durante l'autorizzazione** ("app in fase di test,
+  accessibile solo ai tester approvati"): l'account non è tra gli utenti di test.
+  Vai su **Schermata consenso OAuth → Utenti di test → Aggiungi utenti** e inserisci
+  `farmaciadellastazione@gmail.com`, poi riprova. **Lascia l'app in stato "Test"**
+  (non pubblicarla): in Test lo scope `gmail.readonly` funziona per i tuoi utenti di
+  test senza verifica Google. All'avviso "app non verificata" → *Avanzate → Vai a… (non sicura)*.
 - **Job fallito su "fetch mail"**: token scaduto/revocato o quota → rigenera il
   refresh token (passo 2) e aggiorna il secret.
 - **Job fallito su build/test**: probabile cambio di formato dell'Excel → apri
