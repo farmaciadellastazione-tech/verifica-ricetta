@@ -5,7 +5,8 @@
   "description": "Verifica ricette mediche -- test infrastructure (l'app gira come PWA single-file, nessun build step in prod)",
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "update-fofi": "node tools/build-fofi-db.mjs"
   },
   "devDependencies": {
     "vitest": "^2.1.8"

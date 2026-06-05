@@ -51,6 +51,8 @@ Google secret scanning. Per un eventuale percorso con chiave server-side esiste
 | `index.html` | L'intera app: HTML + CSS + JS vanilla. Inlina il prompt Gemini, la logica di matching FOFI e la UI. |
 | `fofi-db.js` | Banca dati FOFI come array `const FOFI_DB = [...]`. Ogni voce: `{n, t, tx, m, f}` (numero circolare, tipi, testo, medici, farmaci). |
 | `fofi-match.js` | Logica pura di matching FOFI + calcolo scadenza. Condivisa da app e test. |
+| `fofi-xlsx.js` | Core puro: converte il foglio Excel FOFI in voci `FOFI_DB`. Condiviso da script Node, `admin.html` e test. |
+| `tools/build-fofi-db.mjs` | Script Node: legge l'Excel FOFI e accoda le nuove circolari a `fofi-db.js` (vedi sotto). |
 | `admin.html` | Pagina di manutenzione per **aggiornare la banca dati FOFI** (vedi sotto). |
 | `sw.js` | Service worker, cache-first per l'app shell. |
 | `manifest.webmanifest` | Manifest PWA. |
@@ -60,22 +62,40 @@ Google secret scanning. Per un eventuale percorso con chiave server-side esiste
 
 ## Aggiornare la banca dati FOFI
 
-Quando arrivano nuove circolari (ricette falsificate, timbri/ricettari rubati),
-**non serve editare a mano** l'array di `fofi-db.js`. Usa `admin.html`:
+**Fonte degli aggiornamenti:** l'Ordine dei Farmacisti della Spezia
+(`ordinesp@fofiruf.it`) invia periodicamente una mail *"Segnalazioni urgenti FOFI —
+falsificazione ricette / smarrimento timbro / buoni acquisto"* con allegato un
+file **Excel** che sostituisce il precedente. Il foglio è strutturato a colonne:
+colonna **B** = numero circolare, **C** = falsificazione ricette (`F`),
+**D** = furto/smarrimento timbro o ricettario (`T`), **E** = buoni acquisto (`B`).
+Da qui i campi `n`, `t` e `tx` si ricavano in modo **deterministico, senza AI**.
 
-1. Apri `…/admin.html` (pagina non linkata dall'app, raggiungibile solo via URL).
-2. Incolla il testo della circolare (anche più segnalazioni insieme).
-3. Premi **Estrai con Gemini** → riconosce numero, tipo (F/T/B), medici, farmaci.
-4. **Controlla e correggi** i campi. Il riconoscimento del farmacista avviene sul
-   campo `tx` (il testo): assicurati che nome del medico e farmaco vi compaiano
-   per esteso. La pagina avvisa se un medico manca dal testo.
-5. **Aggiungi in coda** le voci e **Scarica `fofi-db.js`** rigenerato (una voce
-   per riga, per diff puliti).
-6. Sostituisci il file nel repo, commit/push su `dev`, e **bumpa `CACHE_NAME` in
-   `sw.js`** — altrimenti le PWA installate restano alla banca dati vecchia.
+Due strumenti, stesso motore (`fofi-xlsx.js`):
 
-Codici tipo: `F` = falsificazione · `T` = furto/smarrimento timbro o ricettario ·
-`B` = buoni acquisto.
+### A) Script Node (consigliato)
+
+```bash
+# anteprima: mostra solo le circolari nuove, non scrive nulla
+node tools/build-fofi-db.mjs "Circolari FOFI Segnalazioni.xlsx"
+
+# applica: accoda le nuove voci a fofi-db.js (preserva le esistenti e i loro m/f)
+node tools/build-fofi-db.mjs "Circolari FOFI Segnalazioni.xlsx" --write
+```
+
+Poi commit/push su `dev` e **bumpa `CACHE_NAME` in `sw.js`**.
+
+### B) Pagina admin (`admin.html`)
+
+Pagina non linkata dall'app, raggiungibile solo via URL. Due modi:
+
+- **Carica l'Excel FOFI** (sezione "2-bis"): trascini il `.xlsx`, vengono messe
+  in coda solo le circolari non ancora presenti, poi **Scarica `fofi-db.js`**.
+- **Incolla il testo** di una singola circolare (sezione "2"): Gemini estrae
+  `{n, t, tx, m, f}` per i casi fuori-Excel. Riusa la chiave dell'app.
+
+> Il matching del farmacista avviene sul campo `tx`: i campi `m`/`f`
+> (medici/farmaci) sono solo metadati di corredo. Per le voci importate da Excel
+> restano vuoti — il riconoscimento funziona comunque sul testo.
 
 ---
 

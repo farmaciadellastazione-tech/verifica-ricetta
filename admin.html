@@ -84,6 +84,19 @@
     <div id="estrai-err" class="errbox" style="display:none"></div>
   </div>
 
+  <div class="card">
+    <h2>2-bis · …oppure carica l'Excel FOFI (consigliato)</h2>
+    <p class="hint" style="margin-top:0">
+      È il modo più affidabile: carica l'allegato <code>.xlsx</code> della mail
+      <em>"Segnalazioni urgenti FOFI"</em> dell'Ordine. Numero, tipo (F/T/B) e testo
+      vengono letti <strong>direttamente dalle colonne, senza AI</strong>. Vengono
+      messe in coda <strong>solo le circolari non ancora in banca dati</strong>.
+    </p>
+    <input type="file" id="xlsx-input" accept=".xlsx">
+    <div id="xlsx-status" class="hint" style="margin-top:8px"></div>
+    <div id="xlsx-err" class="errbox" style="display:none"></div>
+  </div>
+
   <div class="card" id="cand-card" style="display:none">
     <h2>3 · Voci estratte — controlla e correggi</h2>
     <div id="candidates"></div>
@@ -113,6 +126,7 @@
 
 <script src="fofi-db.js"></script>
 <script src="fofi-match.js"></script>
+<script src="fofi-xlsx.js"></script>
 <script>
 const API_KEY_STORAGE = 'gemini-api-key';
 const MODELLI_FALLBACK = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
@@ -354,6 +368,84 @@ document.getElementById('btn-download').addEventListener('click', () => {
   a.download = 'fofi-db.js';
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(a.href);
+});
+
+// ── Import da Excel FOFI ─────────────────────────────────────────────────
+// Inflate raw DEFLATE via DecompressionStream (no librerie esterne).
+async function inflateRaw(bytes) {
+  const ds = new DecompressionStream('deflate-raw');
+  const stream = new Blob([bytes]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+// Mini-lettore ZIP in-browser: ritorna { nomeFile: stringaXML } per i file richiesti.
+async function unzipXlsx(arrayBuffer) {
+  const buf = new Uint8Array(arrayBuffer);
+  const dv = new DataView(arrayBuffer);
+  // End Of Central Directory (firma 0x06054b50), cercato dal fondo.
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= 0; i--) { if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+  if (eocd < 0) throw new Error('File Excel non valido (ZIP/EOCD non trovato).');
+  const nEntries = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const dec = new TextDecoder('utf-8');
+  const files = {};
+  for (let i = 0; i < nEntries; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true);
+    const compSize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const localOff = dv.getUint32(p + 42, true);
+    const name = dec.decode(buf.subarray(p + 46, p + 46 + nameLen));
+    if (name === 'xl/sharedStrings.xml' || /^xl\/worksheets\/sheet\d+\.xml$/.test(name)) {
+      const lNameLen = dv.getUint16(localOff + 26, true);
+      const lExtraLen = dv.getUint16(localOff + 28, true);
+      const dataStart = localOff + 30 + lNameLen + lExtraLen;
+      const raw = buf.subarray(dataStart, dataStart + compSize);
+      const bytes = method === 0 ? raw : await inflateRaw(raw);
+      files[name] = dec.decode(bytes);
+    }
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return files;
+}
+
+document.getElementById('xlsx-input').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  const status = document.getElementById('xlsx-status');
+  const errBox = document.getElementById('xlsx-err');
+  errBox.style.display = 'none'; status.textContent = '';
+  if (!file) return;
+  if (typeof DecompressionStream === 'undefined') {
+    errBox.textContent = 'Questo browser non supporta la decompressione necessaria. Usa Safari/Chrome aggiornati, oppure lo script Node tools/build-fofi-db.mjs.';
+    errBox.style.display = 'block'; return;
+  }
+  status.textContent = '⏳ Lettura Excel...';
+  try {
+    const files = await unzipXlsx(await file.arrayBuffer());
+    const sheetName = Object.keys(files).filter(n => /sheet\d+\.xml$/.test(n))
+      .sort((a, b) => parseInt(a.match(/\d+/)) - parseInt(b.match(/\d+/)))[0];
+    if (!sheetName) throw new Error('Foglio di lavoro non trovato nell\'Excel.');
+    const fromXlsx = sheetToEntries(files['xl/sharedStrings.xml'] || '', files[sheetName]);
+    const { added } = mergeNewEntries(FOFI_DB, fromXlsx);
+    // Evita di accodare due volte se l'utente ricarica lo stesso file.
+    const giaInCoda = new Set(nuove.map(e => e.n));
+    const daAggiungere = added.filter(e => !giaInCoda.has(e.n));
+    daAggiungere.forEach(e => nuove.push({ n: e.n, t: e.t, tx: e.tx, m: [], f: [] }));
+    renderStaged();
+    const nums = [...new Set(added.map(e => e.n))];
+    status.innerHTML = added.length
+      ? `<span style="color:#3B6D11">✓ ${fromXlsx.length} voci nell'Excel · <strong>${daAggiungere.length} nuove circolari accodate</strong> (${nums.join(', ')}). Controlla la coda qui sotto e scarica fofi-db.js.</span>`
+      : `<span style="color:#3B6D11">✓ Banca dati già aggiornata: nessuna circolare nuova nell'Excel (${fromXlsx.length} voci confrontate).</span>`;
+  } catch (err) {
+    console.error('[FOFI-admin] xlsx:', err);
+    errBox.textContent = 'Errore nella lettura dell\'Excel: ' + err.message;
+    errBox.style.display = 'block'; status.textContent = '';
+  } finally {
+    ev.target.value = ''; // permette di ricaricare lo stesso file
+  }
 });
 </script>
 </body>
