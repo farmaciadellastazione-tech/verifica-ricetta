@@ -1,0 +1,90 @@
+name: Aggiornamento banca dati FOFI
+
+# Controlla periodicamente la mail dell'Ordine, e se è arrivato un Excel con
+# circolari nuove apre/aggiorna una Pull Request su `dev`. Non tocca mai `main`.
+#
+# NB: lo scheduler di GitHub Actions parte solo dal workflow presente sul branch
+# di DEFAULT del repo: l'automazione si attiva quindi dopo il merge su quel branch.
+# Prima di allora si può provare a mano (Run workflow / workflow_dispatch).
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-6'   # lun-sab alle 06:00 UTC (~07/08 in Italia)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Scarica l'ultima mail FOFI
+        id: fetch
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+        run: |
+          set +e
+          node tools/fetch-fofi-email.mjs .fofi-incoming.xlsx
+          code=$?
+          set -e
+          if [ "$code" -eq 3 ]; then echo "found=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$code" -ne 0 ]; then echo "::error::fetch mail fallito (exit $code)"; exit "$code"; fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+
+      - name: Applica aggiornamento alla banca dati
+        id: build
+        if: steps.fetch.outputs.found == 'true'
+        run: |
+          node tools/build-fofi-db.mjs .fofi-incoming.xlsx --write | tee build.out
+          rm -f .fofi-incoming.xlsx
+          if git diff --quiet fofi-db.js; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "added=$(grep -oP 'FOFI_ADDED=\K.*' build.out)" >> "$GITHUB_OUTPUT"
+          fi
+          rm -f build.out
+
+      - name: Bump versione + cache PWA
+        if: steps.build.outputs.changed == 'true'
+        run: node tools/bump-build.mjs
+
+      - name: Test
+        if: steps.build.outputs.changed == 'true'
+        run: |
+          npm ci
+          npm test
+
+      - name: Apri/aggiorna la Pull Request su dev
+        if: steps.build.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADDED: ${{ steps.build.outputs.added }}
+        run: |
+          git config user.name "fofi-update-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH=auto/fofi-update
+          git checkout -b "$BRANCH"
+          git add fofi-db.js sw.js index.html
+          git commit -m "FOFI: nuove segnalazioni (circ. $ADDED)"
+          git push -f origin "$BRANCH"
+          if [ -n "$(gh pr list --head "$BRANCH" --base dev --state open --json number -q '.[0].number')" ]; then
+            echo "PR già aperta: aggiornata con il force-push."
+          else
+            gh pr create --base dev --head "$BRANCH" \
+              --title "FOFI: nuove segnalazioni (circ. $ADDED)" \
+              --body "Aggiornamento automatico della banca dati FOFI dall'Excel dell'Ordine dei Farmacisti. Nuove circolari: $ADDED. Prima del merge: controllare il diff di fofi-db.js (testo segnalazioni integro) e che il banner FOFI scatti su un nome nuovo; poi merge in dev e infine dev verso main con conferma (vedi AGGIORNAMENTO-FOFI.md). Generato da .github/workflows/fofi-update.yml."
+          fi

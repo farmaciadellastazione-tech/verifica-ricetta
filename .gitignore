@@ -3,3 +3,7 @@
 node_modules/
 .vitest-cache/
 coverage/
+
+# File temporanei dell'automazione FOFI (allegato scaricato, output di build)
+.fofi-incoming.xlsx
+build.out

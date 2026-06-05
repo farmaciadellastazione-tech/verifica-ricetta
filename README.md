@@ -53,6 +53,9 @@ Google secret scanning. Per un eventuale percorso con chiave server-side esiste
 | `fofi-match.js` | Logica pura di matching FOFI + calcolo scadenza. Condivisa da app e test. |
 | `fofi-xlsx.js` | Core puro: converte il foglio Excel FOFI in voci `FOFI_DB`. Condiviso da script Node, `admin.html` e test. |
 | `tools/build-fofi-db.mjs` | Script Node: legge l'Excel FOFI e accoda le nuove circolari a `fofi-db.js` (vedi sotto). |
+| `tools/fetch-fofi-email.mjs` | Script Node: scarica l'allegato Excel dall'ultima mail FOFI via Gmail API (usato dall'automazione). |
+| `tools/bump-build.mjs` | Script Node: incrementa `APP_BUILD`/data e allinea `CACHE_NAME` in `sw.js`. |
+| `.github/workflows/fofi-update.yml` | Workflow schedulato: mail FOFI → aggiorna banca dati → Pull Request su `dev`. |
 | `admin.html` | Pagina di manutenzione per **aggiornare la banca dati FOFI** (vedi sotto). |
 | `sw.js` | Service worker, cache-first per l'app shell. |
 | `manifest.webmanifest` | Manifest PWA. |
@@ -71,6 +74,8 @@ colonna **B** = numero circolare, **C** = falsificazione ricette (`F`),
 Da qui i campi `n`, `t` e `tx` si ricavano in modo **deterministico, senza AI**.
 
 📋 **Checklist operativa passo-passo:** [`AGGIORNAMENTO-FOFI.md`](AGGIORNAMENTO-FOFI.md).
+🤖 **Automazione (GitHub Actions → PR):** [`AUTOMAZIONE-FOFI.md`](AUTOMAZIONE-FOFI.md) —
+un workflow controlla la mail FOFI e apre una Pull Request su `dev` con le nuove circolari.
 
 Due strumenti, stesso motore (`fofi-xlsx.js`):
 

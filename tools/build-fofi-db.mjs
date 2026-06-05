@@ -118,6 +118,8 @@ added.forEach(e => console.log(`  n.${e.n} [${e.t}] ${e.tx.replace(/\n/g, ' ').s
 if (flags.has('--write')) {
   writeFileSync(resolve(ROOT, 'fofi-db.js'), entriesToDbFile(merged));
   console.log(`\n✓ Scritto fofi-db.js: ${merged.length} voci totali. Ricorda di bumpare CACHE_NAME in sw.js.`);
+  // Riga machine-readable per la CI (lista numeri circolare accodati).
+  console.log('FOFI_ADDED=' + [...new Set(added.map(e => e.n))].join(','));
 } else {
   console.log('\n(anteprima — niente scritto. Rilancia con --write per applicare.)');
 }
