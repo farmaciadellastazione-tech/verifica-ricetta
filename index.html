@@ -160,6 +160,8 @@
 
   /* Install PWA button — visibile solo quando installabile */
   .install-btn { display: none; margin-top: 8px; font-size: 14px; font-weight: 500; color: #fff; background: var(--teal-400); border: none; border-radius: 20px; padding: 8px 16px; cursor: pointer; transition: opacity 0.15s; }
+  .nav-btn { display: inline-block; margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--teal-600); background: var(--teal-50); border: 0.5px solid var(--teal-100); border-radius: 20px; padding: 8px 16px; cursor: pointer; text-decoration: none; transition: opacity 0.15s; }
+  .nav-btn:hover { opacity: 0.85; }
   .install-btn:hover { opacity: 0.9; }
   .install-btn.show { display: inline-block; }
 
@@ -221,6 +223,7 @@
     <p>Analisi AI + Banca Dati Circolari FOFI (falsificazioni e furti)</p>
     <div class="db-badge"><div class="db-badge-dot"></div><span id="db-status">Caricamento banca dati...</span></div>
     <br>
+    <a class="nav-btn" href="banca-dati.html">📖 Consulta banca dati FOFI</a>
     <button class="install-btn" id="install-btn" onclick="installaPWA()">📲 Installa app sul telefono</button>
   </div>
 
@@ -422,8 +425,8 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 57;
-const APP_BUILD_DATE = '25/05/2026';
+const APP_BUILD = 58;
+const APP_BUILD_DATE = '06/06/2026';
 
 let tipoSelezionato = 'bianca';
 let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)

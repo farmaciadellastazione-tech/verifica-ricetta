@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Banca Dati FOFI — Farmacia della Stazione</title>
+<meta name="description" content="Consultazione banca dati circolari FOFI 2025-2026: cerca per medico, farmaco o n° circolare" />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#1D9E75" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Banca Dati FOFI" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --teal-50: #E1F5EE; --teal-100: #9FE1CB; --teal-400: #1D9E75; --teal-600: #0F6E56; --teal-800: #085041;
+    --red-50: #FCEBEB; --red-100: #F7C1C1; --red-400: #E24B4A; --red-600: #A32D2D; --red-800: #791F1F;
+    --amber-50: #FAEEDA; --amber-100: #FAC775; --amber-600: #854F0B; --amber-800: #633806;
+    --gray-50: #F1EFE8; --gray-100: #D3D1C7; --gray-400: #888780; --gray-600: #5F5E5A;
+    --text: #1a1a18; --text-sec: #5F5E5A; --text-ter: #888780;
+    --bg: #ffffff; --bg-sec: #F8F7F3; --border: rgba(0,0,0,0.12); --border-sec: rgba(0,0,0,0.22);
+    --radius: 8px; --radius-lg: 12px;
+    --font: 'Helvetica Neue', Arial, sans-serif;
+  }
+  body { font-family: var(--font); background: #F4F2EC; color: var(--text); min-height: 100vh; padding: 1.5rem 1rem 3rem; }
+  .container { max-width: 680px; margin: 0 auto; }
+
+  .page-header { text-align: center; margin-bottom: 1.5rem; }
+  .page-header .logo { font-size: 14px; color: var(--text-ter); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
+  .page-header h1 { font-size: 28px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .page-header p { font-size: 16px; color: var(--text-sec); }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; color: var(--teal-600); text-decoration: none; font-weight: 600; margin-bottom: 1rem; }
+  .back-link:hover { text-decoration: underline; }
+
+  /* Barra ricerca sticky */
+  .search-bar { position: sticky; top: 0; z-index: 10; background: #F4F2EC; padding: 8px 0 12px; margin-bottom: 4px; }
+  .search-input { font-family: var(--font); font-size: 17px; font-weight: 500; color: var(--text); border: 0.5px solid var(--border-sec); border-radius: var(--radius); padding: 13px 14px; background: var(--bg); outline: none; width: 100%; transition: border-color 0.15s; }
+  .search-input:focus { border-color: var(--teal-400); }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .filter-chip { padding: 7px 13px; font-size: 14px; font-weight: 600; border: 0.5px solid var(--border-sec); border-radius: 20px; cursor: pointer; background: var(--bg); color: var(--text-sec); transition: all 0.15s; user-select: none; }
+  .filter-chip:hover { background: var(--bg-sec); }
+  .filter-chip.active { background: var(--teal-50); color: var(--teal-600); border-color: var(--teal-100); }
+  .filter-chip .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .dot.F { background: var(--red-400); } .dot.T { background: var(--amber-100); } .dot.B { background: var(--gray-400); }
+  .count { margin-left: auto; font-size: 14px; color: var(--text-ter); white-space: nowrap; }
+
+  /* Schede risultato */
+  .results { margin-top: 8px; }
+  .entry { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 10px; }
+  .entry-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .entry-n { font-size: 13px; font-weight: 700; color: var(--text-sec); letter-spacing: 0.02em; }
+  .tipo-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.02em; }
+  .tipo-badge.F { background: var(--red-100); color: var(--red-800); }
+  .tipo-badge.T { background: var(--amber-100); color: var(--amber-800); }
+  .tipo-badge.B { background: var(--gray-100); color: var(--gray-600); }
+  .entry-tx { font-size: 15px; color: var(--text); line-height: 1.5; }
+  .entry-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip-meta { font-size: 13px; font-weight: 500; padding: 3px 9px; border-radius: 14px; background: var(--bg-sec); border: 0.5px solid var(--border); color: var(--text-sec); }
+  .chip-meta.medico::before { content: '👤 '; }
+  .chip-meta.farmaco::before { content: '💊 '; }
+  mark { background: #FFE9A8; color: inherit; padding: 0 1px; border-radius: 2px; }
+
+  .empty { text-align: center; color: var(--text-ter); font-size: 16px; padding: 3rem 1rem; }
+
+  .footer { text-align: center; font-size: 13px; color: var(--text-ter); margin-top: 2rem; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back-link" href="index.html">&larr; Torna alla verifica ricetta</a>
+  <div class="page-header">
+    <div class="logo">Farmacia della Stazione — La Spezia</div>
+    <h1>Banca Dati FOFI</h1>
+    <p>Circolari di falsificazione, furto timbri e buoni acquisto.<br>Cerca per nome medico, farmaco o n° circolare.</p>
+  </div>
+
+  <div class="search-bar">
+    <input type="search" id="q" class="search-input" placeholder="🔍 Cerca medico, farmaco, n° circolare…" autocomplete="off" />
+    <div class="filters">
+      <span class="filter-chip active" data-tipo="">Tutti</span>
+      <span class="filter-chip" data-tipo="F"><span class="dot F"></span>Falsificazione</span>
+      <span class="filter-chip" data-tipo="T"><span class="dot T"></span>Furto timbro</span>
+      <span class="filter-chip" data-tipo="B"><span class="dot B"></span>Buoni</span>
+      <span class="count" id="count"></span>
+    </div>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <div class="footer">
+    Farmacia della Stazione · Via Fiume 75, 19122 La Spezia · P.I. 01317570115<br>
+    Strumento ad uso interno — i risultati non sostituiscono la valutazione professionale del farmacista<br>
+    <span id="app-version" style="opacity:0.7;font-size:12px;letter-spacing:0.05em;">Build —</span>
+  </div>
+</div>
+
+<script src="fofi-db.js"></script>
+<script src="fofi-match.js"></script>
+<script>
+// ─── Versioning (allineato a index.html) ──────────────────────────────
+const APP_BUILD = 58;
+const APP_BUILD_DATE = '06/06/2026';
+document.getElementById('app-version').textContent =
+  `Build ${APP_BUILD} · ${APP_BUILD_DATE} · ${FOFI_DB.length} segnalazioni`;
+
+// PWA: registra il service worker (stesso scope dell'app)
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+const TIPO_LABEL = { F: 'Falsificazione', T: 'Furto/smarrimento timbro', B: 'Buoni acquisto' };
+
+// Indice di ricerca: testo normalizzato per voce (tx + medici + farmaci + n°).
+// normalize() arriva da fofi-match.js (stessa logica del matching dell'app).
+const INDEX = FOFI_DB.map(rec => ({
+  rec,
+  hay: normalize([rec.tx, (rec.m || []).join(' '), (rec.f || []).join(' '), rec.n].join(' '))
+}));
+
+let filtroTipo = '';
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Evidenzia nel testo (già escapato) i termini cercati, parola per parola.
+function highlight(text, termini) {
+  let html = escHtml(text);
+  for (const t of termini) {
+    if (t.length < 2) continue;
+    const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    html = html.replace(re, '<mark>$1</mark>');
+  }
+  return html;
+}
+
+function render() {
+  const q = document.getElementById('q').value.trim();
+  const termini = normalize(q).split(' ').filter(w => w.length > 0);
+
+  let voci = INDEX.filter(({ rec, hay }) => {
+    if (filtroTipo && !(rec.t || []).includes(filtroTipo)) return false;
+    return termini.every(t => hay.includes(t));
+  }).map(x => x.rec);
+
+  // Più recenti in cima (n° circolare decrescente)
+  voci.sort((a, b) => b.n - a.n);
+
+  document.getElementById('count').textContent =
+    `${voci.length} su ${FOFI_DB.length}`;
+
+  const box = document.getElementById('results');
+  if (voci.length === 0) {
+    box.innerHTML = '<div class="empty">Nessuna segnalazione corrisponde alla ricerca.</div>';
+    return;
+  }
+
+  box.innerHTML = voci.map(rec => {
+    const badges = (rec.t || []).map(t =>
+      `<span class="tipo-badge ${t}">${TIPO_LABEL[t] || t}</span>`).join('');
+    const medici = (rec.m || []).map(m =>
+      `<span class="chip-meta medico">${highlight(m, termini)}</span>`).join('');
+    const farmaci = (rec.f || []).map(f =>
+      `<span class="chip-meta farmaco">${highlight(f, termini)}</span>`).join('');
+    const meta = (medici || farmaci) ? `<div class="entry-meta">${medici}${farmaci}</div>` : '';
+    return `<div class="entry">
+      <div class="entry-head">${badges}<span class="entry-n">Circ. FOFI n. ${escHtml(rec.n)}</span></div>
+      <div class="entry-tx">${highlight(rec.tx, termini)}</div>
+      ${meta}
+    </div>`;
+  }).join('');
+}
+
+// Eventi
+document.getElementById('q').addEventListener('input', render);
+document.querySelectorAll('.filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    filtroTipo = chip.dataset.tipo;
+    render();
+  });
+});
+
+render();
+</script>
+</body>
+</html>
