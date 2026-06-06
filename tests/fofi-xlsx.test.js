@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseSharedStrings, sheetToEntries, entryToJson, entriesToDbFile, mergeNewEntries, COLTYPE,
+  parseSharedStrings, sheetToEntries, entryToJson, entriesToDbFile, mergeNewEntries,
+  formatEmailDate, COLTYPE,
 } from '../fofi-xlsx.js';
 
 // ── Fixture: una sharedStrings + un foglio in miniatura che riproduce la
@@ -122,5 +123,35 @@ describe('entriesToDbFile — serializzazione', () => {
 
   it('entryToJson normalizza n vuoto/mancante a null e default m/f', () => {
     expect(JSON.parse(entryToJson({ t: ['F'], tx: 'x' }))).toEqual({ n: null, t: ['F'], tx: 'x', m: [], f: [] });
+  });
+
+  it('senza data NON emette FOFI_DB_AGGIORNATA (retrocompatibile)', () => {
+    const file = entriesToDbFile(sheetToEntries(SHARED, SHEET));
+    expect(file).not.toMatch(/FOFI_DB_AGGIORNATA/);
+  });
+
+  it('con data emette la costante FOFI_DB_AGGIORNATA leggibile', () => {
+    const file = entriesToDbFile(sheetToEntries(SHARED, SHEET), '21/05/2026');
+    const sandbox = {};
+    // eslint-disable-next-line no-new-func
+    new Function('globalThis', file + ';globalThis.D=FOFI_DB_AGGIORNATA;globalThis.OUT=FOFI_DB;')(sandbox);
+    expect(sandbox.D).toBe('21/05/2026');
+    expect(sandbox.OUT).toHaveLength(5);
+  });
+});
+
+describe('formatEmailDate — header mail -> dd/mm/yyyy', () => {
+  it('converte un header RFC 2822 in UTC', () => {
+    expect(formatEmailDate('Wed, 21 May 2026 10:30:00 +0200')).toBe('21/05/2026');
+  });
+
+  it('zero-padding di giorno e mese', () => {
+    expect(formatEmailDate('Mon, 02 Jan 2026 09:00:00 +0000')).toBe('02/01/2026');
+  });
+
+  it('ritorna stringa vuota su data assente o non valida', () => {
+    expect(formatEmailDate('')).toBe('');
+    expect(formatEmailDate('non una data')).toBe('');
+    expect(formatEmailDate(undefined)).toBe('');
   });
 });
