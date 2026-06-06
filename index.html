@@ -277,6 +277,7 @@
         <input type="file" id="foto-galleria" accept="image/*" class="foto-input" />
       </div>
       <div class="img-thumbs" id="img-thumbs"></div>
+      <button type="button" id="img-clear" onclick="rimuoviImg(event)" style="display:none;margin-top:10px;font-size:14px;font-weight:600;color:var(--red-600);background:var(--red-50);border:0.5px solid var(--red-100);border-radius:20px;padding:8px 16px;cursor:pointer;">🗑 Rimuovi foto</button>
       <div class="img-hint" id="img-hint">Per le ricette fronte/retro carica una foto del fronte e una del retro (max 4 foto).</div>
     </div>
 
@@ -425,12 +426,12 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 59;
+const APP_BUILD = 60;
 const APP_BUILD_DATE = '06/06/2026';
 
 let tipoSelezionato = 'bianca';
 let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)
-let images = []; // [{base64, mime, dataUrl}, ...] - supporta fronte/retro o piu' allegati
+let images = []; // [{base64, mime}, ...] - supporta fronte/retro o piu' allegati; miniatura ricostruita al volo
 const MAX_IMAGES = 4;
 let fofiHits = [];
 let ultimoRisultato = null;   // usato da correggiERiverifica per limitare i campi a quelli non conformi
@@ -579,8 +580,10 @@ async function ridimensionaImmagine(file) {
   canvas.width = w; canvas.height = h;
   canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
   bitmap.close && bitmap.close();
-  const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-  return { base64: dataUrl.split(',')[1], mime: 'image/jpeg', dataUrl };
+  // Salviamo SOLO il base64 (+ mime): la miniatura si ricostruisce al volo in
+  // renderImgThumbs. Evita di tenere in RAM una seconda copia (il dataUrl
+  // conteneva di nuovo lo stesso base64) -> memoria dimezzata per immagine.
+  return { base64: canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1], mime: 'image/jpeg' };
 }
 
 function leggiOriginale(file) {
@@ -588,8 +591,7 @@ function leggiOriginale(file) {
     const reader = new FileReader();
     reader.onload = ev => resolve({
       base64: ev.target.result.split(',')[1],
-      mime: file.type || 'image/jpeg',
-      dataUrl: ev.target.result
+      mime: file.type || 'image/jpeg'
     });
     reader.onerror = reject;
     reader.readAsDataURL(file);
@@ -618,9 +620,13 @@ function renderImgThumbs() {
     const div = document.createElement('div');
     div.className = 'img-thumb';
     const labelTxt = images.length === 1 ? 'Foto 1' : (idx === 0 ? 'Fronte' : (idx === 1 ? 'Retro' : `Foto ${idx + 1}`));
-    div.innerHTML = `<div class="img-thumb-label">${labelTxt}</div><img src="${img.dataUrl}" alt="Anteprima"><button type="button" class="img-thumb-remove" aria-label="Rimuovi" onclick="rimuoviImgAt(${idx})">✕</button>`;
+    const src = `data:${img.mime};base64,${img.base64}`;
+    div.innerHTML = `<div class="img-thumb-label">${labelTxt}</div><img src="${src}" alt="Anteprima"><button type="button" class="img-thumb-remove" aria-label="Rimuovi" onclick="rimuoviImgAt(${idx})">✕</button>`;
     wrap.appendChild(div);
   });
+  // Pulsante manuale per liberare tutte le foto (compare solo se ce n'e' almeno una)
+  const clearBtn = document.getElementById('img-clear');
+  if (clearBtn) clearBtn.style.display = images.length > 0 ? 'inline-block' : 'none';
   // Hint dinamico
   const hint = document.getElementById('img-hint');
   if (images.length === 0) hint.textContent = 'Per le ricette fronte/retro carica una foto del fronte e una del retro (max 4 foto).';
@@ -631,7 +637,14 @@ function renderImgThumbs() {
   document.querySelectorAll('#photo-buttons .photo-btn').forEach(b => { b.disabled = atLimit; });
 }
 
+// Azzera gli src delle miniature prima di scartarle: aiuta WebKit/iOS a
+// rilasciare subito la memoria delle immagini decodificate.
+function rilasciaThumbSrc() {
+  document.querySelectorAll('#img-thumbs img').forEach(im => { im.src = ''; });
+}
+
 function rimuoviImgAt(idx) {
+  rilasciaThumbSrc();
   images.splice(idx, 1);
   renderImgThumbs();
   // Reset valore degli input file cosi' che la stessa foto possa essere riselezionata
@@ -645,9 +658,11 @@ document.querySelectorAll('.foto-input').forEach(inp => {
   });
 });
 
-// Wrapper per compatibilita' con codice che svuotava tutte le foto (es. nuovaVerifica)
+// Libera tutte le foto dalla memoria (manuale via pulsante 🗑, a fine verifica,
+// o automaticamente dopo ogni analisi). Accetta un evento opzionale.
 function rimuoviImg(e) {
   e && e.stopPropagation && e.stopPropagation();
+  rilasciaThumbSrc();
   images = [];
   renderImgThumbs();
   document.querySelectorAll('.foto-input').forEach(inp => { inp.value = ''; });
@@ -1172,6 +1187,11 @@ async function analizza() {
       throw new Error(`Risposta dell'AI non valida (JSON malformato — finishReason: ${candidate?.finishReason || 'sconosciuto'}). Riprova.`);
     }
     mostraRisultati(result);
+    // Le foto non servono piu' una volta ottenuto l'esito: liberale subito
+    // dalla memoria (su iOS l'accumulo di immagini blocca la PWA). "Correggi e
+    // riverifica" rianalizza sui dati del form. Solo su successo: in caso di
+    // errore le foto restano per poter riprovare.
+    rimuoviImg();
   } catch(err) {
     console.error('[Verifica Ricetta] errore analizza:', err);
     let msg = 'Errore: ' + err.message;
