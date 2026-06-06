@@ -1,5 +1,6 @@
-#!/usr/bin/env node
 // bump-build.mjs — incrementa la versione e invalida la cache PWA in modo coerente.
+// (niente shebang: è importato dai test e il transform di Vite non strippa `#!`,
+//  causando "Invalid or unexpected token". Si lancia come `node tools/bump-build.mjs`.)
 //
 // Tiene allineati i due marcatori (vedi CLAUDE.md → Versioning):
 //   • index.html : APP_BUILD (intero) + APP_BUILD_DATE ('DD/MM/YYYY')

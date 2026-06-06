@@ -49,7 +49,7 @@ jobs:
         if: steps.fetch.outputs.found == 'true'
         run: |
           node tools/build-fofi-db.mjs .fofi-incoming.xlsx --write | tee build.out
-          rm -f .fofi-incoming.xlsx
+          rm -f .fofi-incoming.xlsx .fofi-incoming.xlsx.date
           if git diff --quiet fofi-db.js; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else

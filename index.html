@@ -413,7 +413,7 @@
 
   <div class="footer">
     Farmacia della Stazione · Via Fiume 75, 19122 La Spezia · P.I. 01317570115<br>
-    Banca dati FOFI circolari 15373–15909 · 144 segnalazioni · Aggiornamento 21/05/2026<br>
+    <span id="fofi-db-info"></span><br>
     Strumento ad uso interno — i risultati non sostituiscono la valutazione professionale del farmacista<br>
     <span id="app-version" style="opacity:0.7;font-size:12px;letter-spacing:0.05em;">Build —</span>
   </div>
@@ -426,7 +426,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 60;
+const APP_BUILD = 61;
 const APP_BUILD_DATE = '06/06/2026';
 
 let tipoSelezionato = 'bianca';
@@ -438,8 +438,19 @@ let ultimoRisultato = null;   // usato da correggiERiverifica per limitare i cam
 
 document.getElementById('app-version').textContent = `Build ${APP_BUILD} · ${APP_BUILD_DATE}`;
 
-// Init DB status
-document.getElementById('db-status').textContent = `Banca dati FOFI attiva — ${FOFI_DB.length} segnalazioni (circ. ${FOFI_DB[0].n}–${FOFI_DB[FOFI_DB.length-1].n})`;
+// Init DB status + riga banca dati nel footer.
+// Range circolari e conteggio sono calcolati da FOFI_DB (sempre coerenti col
+// contenuto). La data di aggiornamento è FOFI_DB_AGGIORNATA, ricavata dalla
+// mail FOFI che porta l'Excel (vedi tools/fetch-fofi-email.mjs → build-fofi-db.mjs):
+// non è la data del build, ma quella della segnalazione dell'Ordine. Fallback ad
+// APP_BUILD_DATE solo se la costante manca (banca dati pre-automazione).
+// Voci ordinate per numero: min/max robusti anche se l'array non è in ordine.
+const fofiNumeri = FOFI_DB.map(e => e.n).filter(Boolean).sort((a, b) => a - b);
+const fofiMin = fofiNumeri[0];
+const fofiMax = fofiNumeri[fofiNumeri.length - 1];
+const fofiAggiornata = (typeof FOFI_DB_AGGIORNATA !== 'undefined' && FOFI_DB_AGGIORNATA) ? FOFI_DB_AGGIORNATA : APP_BUILD_DATE;
+document.getElementById('db-status').textContent = `Banca dati FOFI attiva — ${FOFI_DB.length} segnalazioni (circ. ${fofiMin}–${fofiMax})`;
+document.getElementById('fofi-db-info').textContent = `Banca dati FOFI circolari ${fofiMin}–${fofiMax} · ${FOFI_DB.length} segnalazioni · Aggiornamento ${fofiAggiornata}`;
 
 // Init testo bottone (allineato allo stato default 'da-spedire').
 // Lo script gira a fine <body>: il bottone esiste già, niente DOMContentLoaded.

@@ -68,13 +68,22 @@ function firstSheet(files) {
   return names[0];
 }
 
-// Carica l'array FOFI_DB corrente da fofi-db.js (eval in sandbox).
+// Carica da fofi-db.js l'array FOFI_DB corrente e la data di aggiornamento
+// (FOFI_DB_AGGIORNATA, se presente) -> { db, aggiornata }.
 function loadCurrentDb() {
   const src = readFileSync(resolve(ROOT, 'fofi-db.js'), 'utf8');
   const ctx = {};
   vm.createContext(ctx);
-  vm.runInContext(src + ';globalThis.__FOFI=FOFI_DB;', ctx);
-  return ctx.__FOFI;
+  vm.runInContext(src + ';globalThis.__FOFI=FOFI_DB;' +
+    'globalThis.__AGG=(typeof FOFI_DB_AGGIORNATA!=="undefined")?FOFI_DB_AGGIORNATA:null;', ctx);
+  return { db: ctx.__FOFI, aggiornata: ctx.__AGG };
+}
+
+// Data di aggiornamento da scrivere in fofi-db.js: la mail (file .date scritto da
+// fetch-fofi-email.mjs) ha priorità; altrimenti si conserva quella già presente.
+function readSidecarDate() {
+  try { return readFileSync(resolve(xlsxPath) + '.date', 'utf8').trim() || null; }
+  catch { return null; }
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────
@@ -96,14 +105,19 @@ const fromXlsx = sheetToEntries(sharedStrings, sheetXml);
 const numbers = [...new Set(fromXlsx.map(e => e.n).filter(Boolean))];
 console.log(`Excel: ${fromXlsx.length} voci · ${numbers.length} circolari · range ${Math.min(...numbers)}–${Math.max(...numbers)}`);
 
+const sidecarDate = readSidecarDate();
+
 if (flags.has('--full')) {
-  const out = entriesToDbFile(fromXlsx);
+  // Anche rigenerando da zero, conserviamo la data (mail se presente, altrimenti
+  // quella già in banca dati): non è un metadato m/f, non va persa.
+  const aggiornata = sidecarDate || loadCurrentDb().aggiornata;
+  const out = entriesToDbFile(fromXlsx, aggiornata);
   writeFileSync(resolve(ROOT, 'fofi-db.js'), out);
   console.log(`⚠ Rigenerato fofi-db.js da zero: ${fromXlsx.length} voci (metadati m/f azzerati).`);
   process.exit(0);
 }
 
-const current = loadCurrentDb();
+const { db: current, aggiornata: aggiornataAttuale } = loadCurrentDb();
 const { merged, added } = mergeNewEntries(current, fromXlsx);
 console.log(`Banca dati attuale: ${current.length} voci.`);
 
@@ -116,8 +130,9 @@ console.log(`\n→ ${added.length} voci nuove da accodare (circolari ${[...new S
 added.forEach(e => console.log(`  n.${e.n} [${e.t}] ${e.tx.replace(/\n/g, ' ').slice(0, 90)}`));
 
 if (flags.has('--write')) {
-  writeFileSync(resolve(ROOT, 'fofi-db.js'), entriesToDbFile(merged));
-  console.log(`\n✓ Scritto fofi-db.js: ${merged.length} voci totali. Ricorda di bumpare CACHE_NAME in sw.js.`);
+  const aggiornata = sidecarDate || aggiornataAttuale;
+  writeFileSync(resolve(ROOT, 'fofi-db.js'), entriesToDbFile(merged, aggiornata));
+  console.log(`\n✓ Scritto fofi-db.js: ${merged.length} voci totali${aggiornata ? ` · aggiornamento ${aggiornata}` : ''}. Ricorda di bumpare CACHE_NAME in sw.js.`);
   // Riga machine-readable per la CI (lista numeri circolare accodati).
   console.log('FOFI_ADDED=' + [...new Set(added.map(e => e.n))].join(','));
 } else {

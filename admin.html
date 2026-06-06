@@ -106,6 +106,10 @@
     <h2>4 · Coda da inserire (<span id="staged-count">0</span>)</h2>
     <div id="staged"></div>
 
+    <label style="margin-top:16px">Data della mail FOFI (giorno della segnalazione, mostrata nel footer come "Aggiornamento")</label>
+    <input type="date" id="data-mail" style="max-width:200px">
+    <div class="hint">Inserisci la data della mail dell'Ordine che porta queste circolari. Precompilata con l'ultima salvata.</div>
+
     <label style="margin-top:16px">Righe JSON (da incollare prima di <code>];</code> in <code>fofi-db.js</code>, se preferisci)</label>
     <textarea id="json-out" class="mono" readonly style="min-height:90px"></textarea>
     <div class="row" style="margin-top:10px">
@@ -145,6 +149,13 @@ keyInput.addEventListener('input', () => localStorage.setItem(API_KEY_STORAGE, k
 const maxN = FOFI_DB.reduce((m, r) => Math.max(m, r.n || 0), 0);
 document.getElementById('db-status').textContent =
   `Banca dati attuale: ${FOFI_DB.length} segnalazioni · ultima circolare n. ${maxN}.`;
+
+// ── Data aggiornamento (footer "Aggiornamento ...") ───────────────────────
+// La costante FOFI_DB_AGGIORNATA è in dd/mm/yyyy; <input type="date"> usa yyyy-mm-dd.
+const ddmmyyyyToIso = s => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
+const isoToDdmmyyyy = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+document.getElementById('data-mail').value =
+  ddmmyyyyToIso(typeof FOFI_DB_AGGIORNATA !== 'undefined' ? FOFI_DB_AGGIORNATA : '');
 
 const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -361,7 +372,12 @@ document.getElementById('btn-download').addEventListener('click', () => {
   const esistenti = FOFI_DB.map(r => entryToJson({ n: r.n, t: r.t, tx: r.tx, m: r.m || [], f: r.f || [] }));
   const aggiunte = nuove.map(entryToJson);
   const tutte = esistenti.concat(aggiunte);
-  const out = HEADER + '\nconst FOFI_DB = [\n' + tutte.join(',\n') + '\n];\n';
+  // Data di aggiornamento (footer): dal campo, in formato dd/mm/yyyy. Conservata
+  // come costante FOFI_DB_AGGIORNATA; se vuota, riusa quella già in banca dati.
+  const dataDdmm = isoToDdmmyyyy(document.getElementById('data-mail').value)
+    || (typeof FOFI_DB_AGGIORNATA !== 'undefined' ? FOFI_DB_AGGIORNATA : '');
+  const dateLine = dataDdmm ? `const FOFI_DB_AGGIORNATA = ${JSON.stringify(dataDdmm)};\n` : '';
+  const out = HEADER + '\n' + dateLine + 'const FOFI_DB = [\n' + tutte.join(',\n') + '\n];\n';
   const blob = new Blob([out], { type: 'text/javascript' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

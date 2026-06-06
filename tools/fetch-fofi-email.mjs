@@ -11,9 +11,18 @@
 //            3 = nessuna mail/allegato (niente da fare) · altro = errore.
 
 import { writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const require = createRequire(import.meta.url);
+const { formatEmailDate } = require(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'fofi-xlsx.js'));
 
 const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = process.env;
 const OUT = process.argv[2] || '.fofi-incoming.xlsx';
+// File di appoggio con la data della mail (dd/mm/yyyy): build-fofi-db.mjs la
+// legge e la scrive in fofi-db.js come FOFI_DB_AGGIORNATA.
+const DATE_OUT = OUT + '.date';
 
 if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
   console.error('Mancano i secret GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN.');
@@ -72,7 +81,10 @@ for (const { id } of list.messages) {
   const att = await (await fetch(`${API}/messages/${id}/attachments/${part.body.attachmentId}`, { headers: H })).json();
   const buf = Buffer.from(att.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
   writeFileSync(OUT, buf);
-  console.log(`Scaricato "${part.filename}" (${buf.length} byte) dalla mail del ${header(msg.payload, 'Date')} -> ${OUT}`);
+  const rawDate = header(msg.payload, 'Date');
+  const dataMail = formatEmailDate(rawDate);
+  if (dataMail) writeFileSync(DATE_OUT, dataMail);
+  console.log(`Scaricato "${part.filename}" (${buf.length} byte) dalla mail del ${rawDate}${dataMail ? ` (${dataMail})` : ''} -> ${OUT}`);
   process.exit(0);
 }
 

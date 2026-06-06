@@ -106,9 +106,23 @@ const DB_HEADER =
   '// Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026\n' +
   "// Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.";
 
+// Converte l'header "Date" di una mail (RFC 2822, es. "Wed, 21 May 2026 10:30:00 +0200")
+// nel formato dd/mm/yyyy usato nel footer. Usa UTC per essere deterministica a
+// prescindere dal fuso del runner CI. Ritorna '' se la data non è valida.
+function formatEmailDate(rfc) {
+  const d = new Date(rfc);
+  if (!rfc || isNaN(d.getTime())) return '';
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getUTCFullYear()}`;
+}
+
 // entries -> contenuto completo di fofi-db.js (una voce per riga, per diff puliti).
-function entriesToDbFile(entries) {
-  return DB_HEADER + '\nconst FOFI_DB = [\n' + entries.map(entryToJson).join(',\n') + '\n];\n';
+// Se `aggiornata` è valorizzata (data dd/mm/yyyy ricavata dalla mail FOFI), viene
+// emessa la costante FOFI_DB_AGGIORNATA letta dal footer dell'app.
+function entriesToDbFile(entries, aggiornata) {
+  const dateLine = aggiornata ? `const FOFI_DB_AGGIORNATA = ${JSON.stringify(aggiornata)};\n` : '';
+  return DB_HEADER + '\n' + dateLine + 'const FOFI_DB = [\n' + entries.map(entryToJson).join(',\n') + '\n];\n';
 }
 
 // Fonde voci esistenti + nuove dall'xlsx: preserva le voci già presenti (con i loro
@@ -122,7 +136,7 @@ function mergeNewEntries(existing, fromXlsx) {
 
 const _exports = {
   COLTYPE, decodeXmlEntities, parseSharedStrings, rowCells,
-  sheetToEntries, entryToJson, entriesToDbFile, mergeNewEntries, DB_HEADER
+  sheetToEntries, entryToJson, entriesToDbFile, mergeNewEntries, formatEmailDate, DB_HEADER
 };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
