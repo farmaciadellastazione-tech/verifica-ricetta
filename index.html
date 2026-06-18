@@ -426,7 +426,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 68;
+const APP_BUILD = 69;
 const APP_BUILD_DATE = '18/06/2026';
 
 let tipoSelezionato = 'bianca';
@@ -594,7 +594,29 @@ async function ridimensionaImmagine(file) {
   // Salviamo SOLO il base64 (+ mime): la miniatura si ricostruisce al volo in
   // renderImgThumbs. Evita di tenere in RAM una seconda copia (il dataUrl
   // conteneva di nuovo lo stesso base64) -> memoria dimezzata per immagine.
-  return { base64: canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1], mime: 'image/jpeg' };
+  // L'encoding JPEG passa per toBlob asincrono (fuori dal main thread dove
+  // supportato): non congela la UI mentre la foto viene compressa, a differenza
+  // del vecchio toDataURL sincrono che bloccava il thread per decine di ms su mobile.
+  const base64 = await canvasToBase64(canvas, JPEG_QUALITY);
+  return { base64, mime: 'image/jpeg' };
+}
+
+// canvas -> base64 (senza prefisso "data:..."), preferendo toBlob asincrono;
+// fallback a toDataURL sincrono se toBlob non e' disponibile o non produce blob.
+function canvasToBase64(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    if (!canvas.toBlob) {
+      resolve(canvas.toDataURL('image/jpeg', quality).split(',')[1]);
+      return;
+    }
+    canvas.toBlob(blob => {
+      if (!blob) { resolve(canvas.toDataURL('image/jpeg', quality).split(',')[1]); return; }
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }, 'image/jpeg', quality);
+  });
 }
 
 function leggiOriginale(file) {
@@ -698,36 +720,38 @@ function cercaFOFI() {
     return;
   }
 
-  // Score all records
-  const scored = FOFI_DB.map(rec => {
-    const { score, matchedTokens } = scoreMatch(allToks, rec);
-    return { rec, score, matchedTokens };
-  }).filter(x => x.score >= 3).sort((a, b) => b.score - a.score);
+  // Token "lunghi" (>=4) per il match a parola intera dei live indicator:
+  // pre-calcolati una volta (prima venivano rifiltrati per ogni record, 149x).
+  const tokMedicoLong = tokMedico.filter(t => t.length >= 4);
+  const tokFarmacoLong = tokFarmaco.filter(t => t.length >= 4);
 
+  // Un solo passaggio sulla banca dati: punteggio complessivo + conteggi live
+  // per campo, riusando lo stesso token-set per record (prima erano tre
+  // scansioni separate di FOFI_DB a ogni battitura).
+  const scored = [];
+  let medicoCount = 0, farmacoCount = 0;
+  for (const rec of FOFI_DB) {
+    const ht = haystackTokens(rec);
+    if (tokMedicoLong.length && tokMedicoLong.some(t => ht.has(t))) medicoCount++;
+    if (tokFarmacoLong.length && tokFarmacoLong.some(t => ht.has(t))) farmacoCount++;
+    const { score } = scoreMatch(allToks, rec);
+    if (score >= 3) scored.push({ rec, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
   fofiHits = scored.slice(0, 5);
 
-  // Live indicator per campo — match a parola intera tramite haystackTokens
-  const medicoHits = tokMedico.length > 0 ? FOFI_DB.filter(r => {
-    const ht = haystackTokens(r);
-    return tokMedico.filter(t => t.length >= 4).some(t => ht.has(t));
-  }) : [];
-
-  const farmacoHits = tokFarmaco.length > 0 ? FOFI_DB.filter(r => {
-    const ht = haystackTokens(r);
-    return tokFarmaco.filter(t => t.length >= 4).some(t => ht.has(t));
-  }) : [];
-
+  // Live indicator per campo — conteggio match a parola intera
   const lm = document.getElementById('fofi-live-medico');
   if (tokMedico.length > 0 && medico.length > 3) {
-    lm.innerHTML = medicoHits.length > 0
-      ? `<span class="fofi-live-warn">⚠ ${medicoHits.length} segnalazione${medicoHits.length>1?'i':''} FOFI per questo medico</span>`
+    lm.innerHTML = medicoCount > 0
+      ? `<span class="fofi-live-warn">⚠ ${medicoCount} segnalazione${medicoCount>1?'i':''} FOFI per questo medico</span>`
       : `<span class="fofi-live-ok">✓ Nessuna segnalazione FOFI per questo medico</span>`;
   } else { lm.innerHTML = ''; }
 
   const lf = document.getElementById('fofi-live-farmaco');
   if (tokFarmaco.length > 0 && farmaco.length > 3) {
-    lf.innerHTML = farmacoHits.length > 0
-      ? `<span class="fofi-live-warn">⚠ ${farmacoHits.length} segnalazione${farmacoHits.length>1?'i':''} FOFI per questo farmaco</span>`
+    lf.innerHTML = farmacoCount > 0
+      ? `<span class="fofi-live-warn">⚠ ${farmacoCount} segnalazione${farmacoCount>1?'i':''} FOFI per questo farmaco</span>`
       : `<span class="fofi-live-ok">✓ Nessuna segnalazione FOFI per questo farmaco</span>`;
   } else { lf.innerHTML = ''; }
 
