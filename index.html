@@ -426,8 +426,8 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 62;
-const APP_BUILD_DATE = '06/06/2026';
+const APP_BUILD = 63;
+const APP_BUILD_DATE = '18/06/2026';
 
 let tipoSelezionato = 'bianca';
 let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)
@@ -889,11 +889,11 @@ CLASSIFICAZIONE FARMACI COMUNI (per determinazione validita'):
     stupefacenti: `Requisiti ricetta stupefacenti (DPR 309/90):
 1. Ricettario ministeriale a ricalco 3 copie (RMR)
 2. Numero progressivo ricettario
-3. Data compilazione
-4. Nome, cognome, data nascita, indirizzo PAZIENTE
-5. Farmaco: denominazione, dosaggio, n. pezzi in LETTERE e CIFRE
-6. Posologia obbligatoria
-7. Firma autografa e timbro medico con CF
+3. Data di compilazione
+4. Cognome e nome del PAZIENTE. NON sono elementi obbligatori della ricetta a ricalco l'indirizzo del paziente ne' la data di nascita/eta' (art. 43 DPR 309/90, lett. a): se mancano NON segnalare errore.
+5. Farmaco: denominazione, dosaggio, n. pezzi. ATTENZIONE: col modello DM 10/3/2006 il "tutte lettere" (quantita' scritta in lettere oltre che in cifre) NON e' piu' obbligatorio: se il numero di confezioni e' indicato solo in cifre, NON segnalare errore.
+6. Posologia e modo di somministrazione (obbligatori sulla ricetta a ricalco)
+7. Indirizzo e numero telefonico PROFESSIONALI del medico (obbligatori, art. 43 DPR 309/90 lett. c) + timbro personale del medico + firma autografa
 8. ZERO cancellature ammesse
 9. Max 2 confezioni per ricetta, una sola sostanza (salvo terapia dolore Allegato III-bis: fino a 30 gg di terapia)
 
