@@ -426,7 +426,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 67;
+const APP_BUILD = 68;
 const APP_BUILD_DATE = '18/06/2026';
 
 let tipoSelezionato = 'bianca';
@@ -1104,6 +1104,12 @@ REGOLE TIPO RICETTA (importanti, valide in entrambe le modalita'):
   * Stupefacenti: ricettario ministeriale beige/giallo a ricalco con 3 copie e numero progressivo prestampato.
   * Veterinaria: intestazione veterinaria con dati animale/proprietario.
 - Se il tipo VISIVO differisce dal tipo DICHIARATO: aggiungi un controllo con campo "Discordanza tipo ricetta" stato "attenzione" che evidenzia la discordanza, ma continua ad applicare i requisiti del tipo DICHIARATO (il farmacista sa cosa sta verificando). Sommario menziona la discordanza.
+
+CASISTICHE PARTICOLARI DI EROGAZIONE (valide per tutti i tipi, verifica giugno 2026):
+- FUORI REGIONE: la ricetta SSN dematerializzata (promemoria/NRE) e' erogabile in QUALSIASI regione (ricetta elettronica nazionale a pieno regime). Ticket ed esenzioni sono quelli della regione di iscrizione sanitaria dell'assistito, NON di quella di erogazione. NON segnalare come errore una ricetta DEM prescritta in altra regione: e' valida e spedibile. I farmaci in DPC prescritti fuori regione si erogano comunque in regime DPC.
+- DPC (DISTRIBUZIONE PER CONTO): alcuni farmaci di fascia A del PHT sono inseriti dalla Regione in DPC e si erogano PER CONTO della ASL (farmaco di proprieta' ASL, remunerazione fissa, il paziente non paga il prezzo del farmaco), NON sul normale canale convenzionato. L'elenco e' REGIONALE (Liguria: "Elenco A DPC", aggiornato spesso). Se il farmaco prescritto e' un tipico farmaco da PHT/DPC (molti oncologici orali, alcuni antivirali, immunosoppressori, ecc.), aggiungi un controllo "attenzione": "Verificare se rientra nell'Elenco DPC regionale; in tal caso erogazione in regime DPC per conto ASL, non SSN convenzionato". Non conoscendo l'elenco regionale completo, NON darlo per certo: segnala solo come verifica.
+- RICETTA SASN (gente di mare / personale navigante marittimo e aviazione civile): modulo speciale (DM 18/5/2004) simile alla ricetta SSN, otticamente leggibile (esiste anche la versione dematerializzata). E' VALIDA su tutto il territorio nazionale e ogni farmacia convenzionata DEVE spedirla. Trattala come una ricetta SSN ai fini dei requisiti; il rimborso passa dall'Ufficio SASN (Trieste), non dalla ASL. NON segnalarla come "tipo errato".
+- RICETTA ESTERA UE (Direttiva 2011/24/UE, D.Lgs. 38/2014): valida in Italia se contiene nome/cognome paziente, data di nascita, identificazione del prescrittore (nome, qualifica, contatti, indirizzo, firma) e del farmaco (DCI o nome commerciale, forma, quantita', dosaggio, posologia). Erogazione PRIVATA (il paziente paga, nessun rimborso SSN). ESCLUSI gli stupefacenti/psicotropi (non ammessi con ricetta transfrontaliera). Il farmaco deve essere autorizzato e in commercio in Italia. RICETTA EXTRA-UE: trattata come ricetta privata, senza valore SSN; stupefacenti esclusi.
 
 Rispondi SOLO con JSON valido, senza testo prima o dopo:
 
