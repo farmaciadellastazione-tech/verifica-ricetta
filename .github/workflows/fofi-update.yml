@@ -73,6 +73,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ADDED: ${{ steps.build.outputs.added }}
         run: |
+          set -e
           git config user.name "fofi-update-bot"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
@@ -81,10 +82,16 @@ jobs:
           git add fofi-db.js sw.js index.html
           git commit -m "FOFI: nuove segnalazioni (circ. $ADDED)"
           git push -f origin "$BRANCH"
-          if [ -n "$(gh pr list --head "$BRANCH" --base dev --state open --json number -q '.[0].number')" ]; then
-            echo "PR già aperta: aggiornata con il force-push."
+          REPO="${{ github.repository }}"
+          EXISTING=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&base=dev&state=open" \
+            | jq -r '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING già aperta: aggiornata con il force-push."
           else
-            gh pr create --base dev --head "$BRANCH" \
-              --title "FOFI: nuove segnalazioni (circ. $ADDED)" \
-              --body "Aggiornamento automatico della banca dati FOFI dall'Excel dell'Ordine dei Farmacisti. Nuove circolari: $ADDED. Prima del merge: controllare il diff di fofi-db.js (testo segnalazioni integro) e che il banner FOFI scatti su un nome nuovo; poi merge in dev e infine dev verso main con conferma (vedi AGGIORNAMENTO-FOFI.md). Generato da .github/workflows/fofi-update.yml."
+            curl -sf -X POST -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/$REPO/pulls" \
+              -d "{\"title\":\"FOFI: nuove segnalazioni (circ. $ADDED)\",\"head\":\"$BRANCH\",\"base\":\"dev\",\"body\":\"Aggiornamento automatico della banca dati FOFI. Nuove circolari: $ADDED. Prima del merge: verificare diff fofi-db.js e banner FOFI. Poi merge in dev e dev→main con conferma.\"}"
+            echo "PR aperta."
           fi
