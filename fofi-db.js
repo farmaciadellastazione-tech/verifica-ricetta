@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "04/06/2026";
+const FOFI_DB_AGGIORNATA = "22/06/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -150,5 +150,8 @@ const FOFI_DB = [
 {"n":15914,"t":["T"],"tx":"furto 1 RICETTARIO ROSSO, di n. 1 RICETTARIO BIANCO e di 1 TIMBRO STUDIO MEDICO del Dr. NASSER EDDINE HUSSEIN  Medico di Medicina Generale ASST BG EST","m":[],"f":[]},
 {"n":15915,"t":["T"],"tx":"SMARRIMENTO del timbro nominativo della Dott.ssa BALICE GABRIELLA, Medico Specialista in cardiologia","m":[],"f":[]},
 {"n":15918,"t":["F"],"tx":"ricette false emesse a nome della Dr.ssa  LINDENMEYER RENATE  - Albo OMCeo BZ n. 206 Odontoiatria (Bressanone)","m":[],"f":[]},
-{"n":15927,"t":["F"],"tx":"circolazione di ricette false riportanti quale medico titolare il Dr.LEONE CARLO e con timbro e firma dei medici sostituti Dr. STRANIERI FRANCESCO e Dr. BURASCHI GIUSEPPE","m":[],"f":[]}
+{"n":15927,"t":["F"],"tx":"circolazione di ricette false riportanti quale medico titolare il Dr.LEONE CARLO e con timbro e firma dei medici sostituti Dr. STRANIERI FRANCESCO e Dr. BURASCHI GIUSEPPE","m":[],"f":[]},
+{"n":15948,"t":["T"],"tx":"furto ricettario della Dr.ssa ARIANNA SALBEGO COLLETTI   Medico della SC Oculistica – ASST Spedali Civili (BS) ; furto ricettario e timbro del Dr. ENRICO CAPOCHIANI Medico UO Ematologia – Azienda Toscana Nord Ovest","m":[],"f":[]},
+{"n":15949,"t":["F"],"tx":"falsificazione ricetta a nome della Dr.ssa ANNA INES GREGORINI","m":[],"f":[]},
+{"n":15950,"t":["T"],"tx":"furto timbri dei Dr. MARCO CESARE AULISO    e   ALESSANDRO MACCARIO","m":[],"f":[]}
 ];
