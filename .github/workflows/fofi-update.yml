@@ -75,6 +75,7 @@ jobs:
         run: |
           git config user.name "fofi-update-bot"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           BRANCH=auto/fofi-update
           git checkout -b "$BRANCH"
           git add fofi-db.js sw.js index.html
