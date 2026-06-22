@@ -15,6 +15,7 @@
 //
 // Esposto su globalThis (browser) e module.exports (Node), come fofi-match.js.
 
+(function () {
 const COLTYPE = { C: 'F', D: 'T', E: 'B' };
 
 // Decodifica entità XML di base presenti nelle celle Excel.
@@ -140,3 +141,4 @@ const _exports = {
 };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
+})();
