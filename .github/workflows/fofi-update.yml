@@ -3,9 +3,8 @@ name: Aggiornamento banca dati FOFI
 # Controlla periodicamente la mail dell'Ordine, e se è arrivato un Excel con
 # circolari nuove apre/aggiorna una Pull Request su `dev`. Non tocca mai `main`.
 #
-# NB: lo scheduler di GitHub Actions parte solo dal workflow presente sul branch
-# di DEFAULT del repo: l'automazione si attiva quindi dopo il merge su quel branch.
-# Prima di allora si può provare a mano (Run workflow / workflow_dispatch).
+# Autenticazione: App Password Gmail (GMAIL_USER + GMAIL_APP_PASSWORD).
+# Nessun token OAuth da rigenerare: le App Password non scadono.
 
 on:
   schedule:
@@ -29,12 +28,14 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Installa dipendenze
+        run: npm ci
+
       - name: Scarica l'ultima mail FOFI
         id: fetch
         env:
-          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
-          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
-          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: |
           set +e
           node tools/fetch-fofi-email.mjs .fofi-incoming.xlsx
@@ -64,9 +65,7 @@ jobs:
 
       - name: Test
         if: steps.build.outputs.changed == 'true'
-        run: |
-          npm ci
-          npm test
+        run: npm test
 
       - name: Apri/aggiorna la Pull Request su dev
         if: steps.build.outputs.changed == 'true'
