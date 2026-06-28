@@ -454,7 +454,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 77;
+const APP_BUILD = 78;
 const APP_BUILD_DATE = '28/06/2026';
 
 let tipoSelezionato = 'bianca';
@@ -554,6 +554,7 @@ document.querySelectorAll('.tipo-tabs .tipo-tab').forEach(tab => {
     tipoSelezionato = tab.dataset.tipo;
     document.getElementById('nre-row').style.display = tipoSelezionato === 'ssn' ? '' : 'none';
     document.getElementById('ricettario-row').style.display = tipoSelezionato === 'stupefacenti' ? '' : 'none';
+    aggiornaCampiPost();
     aggiornaScadenza();
   });
 });
@@ -572,7 +573,7 @@ document.querySelectorAll('.stato-tabs .tipo-tab').forEach(tab => {
 function aggiornaCampiPost() {
   const isPost = statoRicetta === 'gia-spedita';
   document.getElementById('timbro-sped-row').style.display = isPost ? '' : 'none';
-  document.getElementById('prezzo-sped-row').style.display = isPost ? '' : 'none';
+  document.getElementById('prezzo-sped-row').style.display = (isPost && tipoSelezionato !== 'ssn') ? '' : 'none';
 }
 aggiornaCampiPost();
 
@@ -1449,7 +1450,8 @@ function campiDaControllo(nomeControllo) {
 function visibilitaCondizionale(id) {
   if (id === 'nre-row')         return tipoSelezionato === 'ssn' ? '' : 'none';
   if (id === 'ricettario-row')  return tipoSelezionato === 'stupefacenti' ? '' : 'none';
-  if (id === 'timbro-sped-row' || id === 'prezzo-sped-row') return statoRicetta === 'gia-spedita' ? '' : 'none';
+  if (id === 'timbro-sped-row') return statoRicetta === 'gia-spedita' ? '' : 'none';
+  if (id === 'prezzo-sped-row') return (statoRicetta === 'gia-spedita' && tipoSelezionato !== 'ssn') ? '' : 'none';
   return '';
 }
 
