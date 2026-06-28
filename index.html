@@ -486,7 +486,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 80;
+const APP_BUILD = 81;
 const APP_BUILD_DATE = '28/06/2026';
 
 let tipoSelezionato = 'bianca';
@@ -1760,29 +1760,29 @@ function apriEmailSegnalazione() {
       <div class="segnala-sezione">
         <div class="segnala-titolo">Cosa fare</div>
         <ol class="segnala-lista">
-          <li><strong>Non erogare</strong> il farmaco.</li>
-          <li>Se possibile, <strong>trattenere la ricetta</strong> — senza creare confronto diretto (il farmacista non ha poteri coercitivi).</li>
-          <li><strong>Annotare discretamente</strong> ora, descrizione del presentatore, eventuale targa.</li>
-          <li>Dopo che il soggetto è uscito, <strong>chiamare il 112</strong> e/o il NAS di Genova.</li>
-          <li>Segnalare all'<strong>Ordine Farmacisti La Spezia</strong> per aggiornare la banca dati FOFI.</li>
+          <li><strong>Verifica i formalismi:</strong> nome/cognome paziente, timbro e firma del medico (un timbro senza nome e cognome chiari non è regolare).</li>
+          <li><strong>Contatta il medico prescrittore</strong> per confermare l'emissione della ricetta. Verifica l'iscrizione all'Ordine sul portale FNOMCeO (<em>fnomceo.it</em>).</li>
+          <li><strong>Rifiuta la dispensazione</strong> con cortesia e fermezza, senza accusare direttamente il presentatore.</li>
+          <li>Se il medico conferma la falsità o risulta inesistente: <strong>trattieni la ricetta</strong> e <strong>sporgi denuncia</strong> alla più vicina stazione dei Carabinieri o della Polizia.</li>
+          <li><strong>Non tentare di trattenere la persona</strong> — la tua sicurezza viene prima.</li>
+          <li>Segnala all'<strong>Ordine Farmacisti La Spezia</strong> per aggiornare la banca dati FOFI. Per contraffazioni farmaceutiche segnala anche ad <strong>AIFA</strong>.</li>
         </ol>
-        <div class="segnala-nota">⚠ Procedure indicative — da verificare con Federfarma/Ordine prima di usarle come riferimento ufficiale.</div>
       </div>
 
       <div class="segnala-sezione">
         <div class="segnala-titolo">Contatti</div>
         <div class="contatti-grid">
           <div class="contatto-item urgente">
-            <div class="contatto-label">Emergenza / Carabinieri</div>
+            <div class="contatto-label">Carabinieri / Polizia (stazione più vicina)</div>
             <div class="contatto-valore">📞 112</div>
-          </div>
-          <div class="contatto-item">
-            <div class="contatto-label">NAS Genova — Nucleo Antisofisticazione</div>
-            <div class="contatto-valore">📞 [da aggiornare — verificare con Ordine]</div>
           </div>
           <div class="contatto-item">
             <div class="contatto-label">Ordine Farmacisti La Spezia</div>
             <div class="contatto-valore">📞 0187/517249<br>✉ info@federfarmalaspezia.it</div>
+          </div>
+          <div class="contatto-item">
+            <div class="contatto-label">AIFA — Contrasto al crimine farmaceutico</div>
+            <div class="contatto-valore">✉ medicrime@aifa.gov.it</div>
           </div>
         </div>
       </div>
