@@ -233,6 +233,38 @@
     .photo-btn-label { font-size: 15px; }
     .photo-btn-sub { font-size: 12px; }
   }
+  /* ── Modale segnalazione ricetta sospetta ───────────────────────── */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:flex; align-items:flex-end; justify-content:center; z-index:200; }
+  @media(min-width:480px){ .modal-overlay { align-items:center; } }
+  .modal-box { background:#fff; width:100%; max-width:560px; max-height:90vh; border-radius:16px 16px 0 0; overflow-y:auto; box-shadow:0 -4px 32px rgba(0,0,0,0.18); display:flex; flex-direction:column; }
+  @media(min-width:480px){ .modal-box { border-radius:16px; max-height:88vh; } }
+  .modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 18px 12px; border-bottom:1px solid var(--border); position:sticky; top:0; background:#fff; z-index:1; }
+  .modal-title { font-size:17px; font-weight:700; color:#7A1A1A; }
+  .modal-close { background:none; border:none; font-size:22px; color:#888; cursor:pointer; padding:0 4px; line-height:1; }
+  .modal-close:hover { color:#333; }
+  .modal-body { padding:14px 18px 24px; display:flex; flex-direction:column; gap:18px; }
+  .segnala-sezione { display:flex; flex-direction:column; gap:8px; }
+  .segnala-titolo { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#555; }
+  .segnala-lista { margin:0; padding-left:20px; display:flex; flex-direction:column; gap:6px; font-size:14px; color:var(--text); line-height:1.45; }
+  .segnala-lista li { padding-left:2px; }
+  .segnala-nota { font-size:12px; color:#7A5500; background:#FFFAE6; border:1px solid #FFE082; border-radius:6px; padding:7px 10px; }
+  .contatti-grid { display:flex; flex-direction:column; gap:8px; }
+  .contatto-item { padding:9px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg-sec); font-size:14px; }
+  .contatto-item.urgente { border-color:#F7C1C1; background:#FFF0F0; }
+  .contatto-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:#888; margin-bottom:3px; }
+  .contatto-valore { color:var(--text); font-weight:500; line-height:1.5; }
+  .contatto-item.urgente .contatto-valore { color:#7A1A1A; font-size:16px; font-weight:700; }
+  .segnala-sub { font-size:12px; color:#888; }
+  .segnala-textarea { width:100%; min-height:180px; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-family:monospace; font-size:12px; color:var(--text); background:var(--bg-sec); resize:vertical; box-sizing:border-box; line-height:1.5; }
+  .segnala-azioni { display:flex; gap:8px; flex-wrap:wrap; }
+  .btn-segnala-copy { flex:1; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:#F3F3F3; color:#333; font-size:14px; cursor:pointer; }
+  .btn-segnala-email { flex:1; padding:10px 12px; border-radius:8px; border:none; background:#0056B3; color:#fff; font-size:14px; cursor:pointer; font-weight:600; }
+  .btn-segnala-email:hover { background:#004299; }
+  /* bottone nel pannello risultati */
+  .btn-segnala-risultati { width:100%; padding:12px; font-size:15px; background:#FFF0F0; color:#7A1A1A; border:1px solid #F7C1C1; border-radius:var(--radius-lg); cursor:pointer; font-weight:600; transition:background .15s; }
+  .btn-segnala-risultati:hover { background:#FFE0E0; }
+  .btn-segnala-risultati.secondario { background:transparent; color:var(--text-sec); border-color:var(--border-sec); font-weight:400; font-size:14px; }
+  .btn-segnala-risultati.secondario:hover { background:var(--bg-sec); }
 </style>
 </head>
 <body>
@@ -454,7 +486,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 78;
+const APP_BUILD = 80;
 const APP_BUILD_DATE = '28/06/2026';
 
 let tipoSelezionato = 'bianca';
@@ -1417,6 +1449,7 @@ function mostraRisultati(r) {
     <button class="btn-nuova" onclick="stampaReport()" style="background:#E1F5EE;color:#0F6E56;border-color:#9FE1CB;">🖨 Stampa per il medico</button>
     <button class="btn-nuova" onclick="correggiERiverifica()" style="background:#FFE8B0;color:#5C3A00;">✏ Correggi e riverifica</button>
     <button class="btn-nuova" onclick="nuovaVerifica()">↩ Nuova verifica</button>
+    <button class="btn-segnala-risultati${isSospetta ? '' : ' secondario'}" onclick="apriSegnalazione()">${isSospetta ? '🚨 Segnala ricetta sospetta' : 'Segnala ricetta sospetta'}</button>
   </div>`;
 
   sec.style.display = 'block';
@@ -1653,6 +1686,119 @@ function mostraErrore(msg) {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ── Segnalazione ricetta sospetta ────────────────────────────────────────
+function generaTestoSegnalazione() {
+  const now = new Date();
+  const dataOra = now.toLocaleDateString('it-IT') + ' ore ' + now.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+  const medico  = (document.getElementById('f-medico').value  || '').trim();
+  const farmaco = (document.getElementById('f-farmaco').value || '').trim();
+  const tipoLabel = { ssn:'SSN / Dematerializzata', bianca:'Bianca privata', stupefacenti:'Stupefacenti' }[tipoSelezionato] || tipoSelezionato;
+  const sommario = ultimoRisultato ? (ultimoRisultato.sommario || '') : '';
+  return [
+    'SEGNALAZIONE RICETTA SOSPETTA',
+    '',
+    'Data e ora: ' + dataOra,
+    'Farmacia: Farmacia della Stazione — Via Fiume 75, 19122 La Spezia',
+    '',
+    'Tipo ricetta: ' + tipoLabel,
+    medico  ? 'Medico prescrittore: ' + medico  : '',
+    farmaco ? 'Farmaco prescritto:   ' + farmaco : '',
+    '',
+    sommario ? 'Motivo sospetto (AI): ' + sommario : 'Motivo sospetto: [descrivere]',
+    '',
+    'Descrizione del presentatore:',
+    '  [compilare a mano — sesso, età approssimativa, abbigliamento, lingua]',
+    '',
+    'Targa veicolo (se visibile): [compilare]',
+    '',
+    'Note aggiuntive: [compilare]',
+    '',
+    '---',
+    'Farmacista: Dott. Storti Dino',
+    'Tel. farmacia: 0187 706147',
+  ].filter(r => r !== undefined).join('\n');
+}
+
+function apriSegnalazione() {
+  document.getElementById('segnala-testo').value = generaTestoSegnalazione();
+  document.getElementById('modal-segnalazione').style.display = 'flex';
+}
+
+function chiudiSegnalazione() {
+  document.getElementById('modal-segnalazione').style.display = 'none';
+}
+
+function copiaTesto() {
+  const ta = document.getElementById('segnala-testo');
+  navigator.clipboard.writeText(ta.value).then(() => {
+    const btn = document.querySelector('.btn-segnala-copy');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copiato!';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
+}
+
+function apriEmailSegnalazione() {
+  const testo = document.getElementById('segnala-testo').value;
+  const subj  = encodeURIComponent('Segnalazione ricetta sospetta — Farmacia della Stazione La Spezia');
+  const body  = encodeURIComponent(testo);
+  // destinatario preimpostato: Ordine Farmacisti La Spezia — da aggiornare con NAS Genova quando disponibile
+  window.open('mailto:info@federfarmalaspezia.it?subject=' + subj + '&body=' + body);
+}
 </script>
+
+<!-- Modale segnalazione ricetta sospetta -->
+<div id="modal-segnalazione" class="modal-overlay" style="display:none;" onclick="if(event.target===this)chiudiSegnalazione()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">🚨 Segnalazione ricetta sospetta</span>
+      <button class="modal-close" onclick="chiudiSegnalazione()" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="segnala-sezione">
+        <div class="segnala-titolo">Cosa fare</div>
+        <ol class="segnala-lista">
+          <li><strong>Non erogare</strong> il farmaco.</li>
+          <li>Se possibile, <strong>trattenere la ricetta</strong> — senza creare confronto diretto (il farmacista non ha poteri coercitivi).</li>
+          <li><strong>Annotare discretamente</strong> ora, descrizione del presentatore, eventuale targa.</li>
+          <li>Dopo che il soggetto è uscito, <strong>chiamare il 112</strong> e/o il NAS di Genova.</li>
+          <li>Segnalare all'<strong>Ordine Farmacisti La Spezia</strong> per aggiornare la banca dati FOFI.</li>
+        </ol>
+        <div class="segnala-nota">⚠ Procedure indicative — da verificare con Federfarma/Ordine prima di usarle come riferimento ufficiale.</div>
+      </div>
+
+      <div class="segnala-sezione">
+        <div class="segnala-titolo">Contatti</div>
+        <div class="contatti-grid">
+          <div class="contatto-item urgente">
+            <div class="contatto-label">Emergenza / Carabinieri</div>
+            <div class="contatto-valore">📞 112</div>
+          </div>
+          <div class="contatto-item">
+            <div class="contatto-label">NAS Genova — Nucleo Antisofisticazione</div>
+            <div class="contatto-valore">📞 [da aggiornare — verificare con Ordine]</div>
+          </div>
+          <div class="contatto-item">
+            <div class="contatto-label">Ordine Farmacisti La Spezia</div>
+            <div class="contatto-valore">📞 0187/517249<br>✉ info@federfarmalaspezia.it</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="segnala-sezione">
+        <div class="segnala-titolo">Testo segnalazione</div>
+        <div class="segnala-sub">Pre-compilato con i dati dell'analisi — modifica se necessario prima di inviare</div>
+        <textarea id="segnala-testo" class="segnala-textarea"></textarea>
+        <div class="segnala-azioni">
+          <button class="btn-segnala-copy" onclick="copiaTesto()">📋 Copia testo</button>
+          <button class="btn-segnala-email" onclick="apriEmailSegnalazione()">✉ Invia per email</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
 </body>
 </html>
