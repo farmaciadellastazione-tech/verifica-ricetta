@@ -1,7 +1,8 @@
 name: Aggiornamento banca dati FOFI
 
-# Controlla periodicamente la mail dell'Ordine, e se è arrivato un Excel con
-# circolari nuove apre/aggiorna una Pull Request su `dev`. Non tocca mai `main`.
+# Controlla periodicamente la mail dell'Ordine e, se è arrivato un Excel con
+# circolari nuove, apre una PR su `dev`, la mergia automaticamente e poi
+# propaga dev → main (produzione) senza intervento manuale.
 #
 # Autenticazione: App Password Gmail (GMAIL_USER + GMAIL_APP_PASSWORD).
 # Nessun token OAuth da rigenerare: le App Password non scadono.
@@ -68,6 +69,7 @@ jobs:
         run: npm test
 
       - name: Apri/aggiorna la Pull Request su dev
+        id: pr_dev
         if: steps.build.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -88,10 +90,46 @@ jobs:
             | jq -r '.[0].number // empty')
           if [ -n "$EXISTING" ]; then
             echo "PR #$EXISTING già aperta: aggiornata con il force-push."
+            PR_NUM="$EXISTING"
           else
-            curl -sf -X POST -H "Authorization: Bearer $GH_TOKEN" \
+            PR_NUM=$(curl -sf -X POST -H "Authorization: Bearer $GH_TOKEN" \
               -H "Content-Type: application/json" \
               "https://api.github.com/repos/$REPO/pulls" \
-              -d "{\"title\":\"FOFI: nuove segnalazioni (circ. $ADDED)\",\"head\":\"$BRANCH\",\"base\":\"dev\",\"body\":\"Aggiornamento automatico della banca dati FOFI. Nuove circolari: $ADDED. Prima del merge: verificare diff fofi-db.js e banner FOFI. Poi merge in dev e dev→main con conferma.\"}"
-            echo "PR aperta."
+              -d "{\"title\":\"FOFI: nuove segnalazioni (circ. $ADDED)\",\"head\":\"$BRANCH\",\"base\":\"dev\",\"body\":\"Aggiornamento automatico della banca dati FOFI. Nuove circolari: $ADDED. Merge automatico in dev e deploy automatico dev→main.\"}" \
+              | jq -r '.number')
+            echo "PR #$PR_NUM aperta."
           fi
+          echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
+
+      - name: Merge automatico della PR in dev
+        if: steps.build.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          REPO="${{ github.repository }}"
+          curl -sf -X PUT -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/$REPO/pulls/${{ steps.pr_dev.outputs.pr_number }}/merge" \
+            -d '{"merge_method":"merge"}'
+          echo "PR #${{ steps.pr_dev.outputs.pr_number }} mergiata in dev."
+
+      - name: Deploy automatico dev → main (produzione)
+        if: steps.build.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADDED: ${{ steps.build.outputs.added }}
+        run: |
+          set -e
+          REPO="${{ github.repository }}"
+          BEHIND=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/compare/main...dev" | jq -r '.ahead_by')
+          if [ "$BEHIND" = "0" ]; then
+            echo "main già allineato a dev, nulla da fare."
+            exit 0
+          fi
+          curl -sf -X POST -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/$REPO/merges" \
+            -d "{\"base\":\"main\",\"head\":\"dev\",\"commit_message\":\"Merge dev → main: FOFI nuove segnalazioni (circ. $ADDED) [auto]\"}"
+          echo "dev mergiato in main."
