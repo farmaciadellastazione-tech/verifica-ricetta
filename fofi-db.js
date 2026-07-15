@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "22/06/2026";
+const FOFI_DB_AGGIORNATA = "14/07/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -153,5 +153,14 @@ const FOFI_DB = [
 {"n":15927,"t":["F"],"tx":"circolazione di ricette false riportanti quale medico titolare il Dr.LEONE CARLO e con timbro e firma dei medici sostituti Dr. STRANIERI FRANCESCO e Dr. BURASCHI GIUSEPPE","m":[],"f":[]},
 {"n":15948,"t":["T"],"tx":"furto ricettario della Dr.ssa ARIANNA SALBEGO COLLETTI   Medico della SC Oculistica – ASST Spedali Civili (BS) ; furto ricettario e timbro del Dr. ENRICO CAPOCHIANI Medico UO Ematologia – Azienda Toscana Nord Ovest","m":[],"f":[]},
 {"n":15949,"t":["F"],"tx":"falsificazione ricetta a nome della Dr.ssa ANNA INES GREGORINI","m":[],"f":[]},
-{"n":15950,"t":["T"],"tx":"furto timbri dei Dr. MARCO CESARE AULISO    e   ALESSANDRO MACCARIO","m":[],"f":[]}
+{"n":15950,"t":["T"],"tx":"furto timbri dei Dr. MARCO CESARE AULISO    e   ALESSANDRO MACCARIO","m":[],"f":[]},
+{"n":15959,"t":["T"],"tx":"furto ricettario e timbro del Dr. Leonardo Giudici  Istituto Clinico Città Studi matricola 216319","m":[],"f":[]},
+{"n":15960,"t":["F"],"tx":"falsificazione di ricette a nome del Dr. RAFFAELE FALATO  aventi ad oggetto la prescrizione di OXYCONTIN 10 mg, Paracodina gocce e Xanax 2 mg RP","m":[],"f":[]},
+{"n":15962,"t":["T"],"tx":"smarrimento ricettario del Dr. AURELIO EMANUELE  Regione Marche- avente numero S11021 Y0005456002","m":[],"f":[]},
+{"n":15965,"t":["T"],"tx":"smarrimento ricettario della Dr.ssa SAEEDINIYA MANA  Medico presso U.O. di P.S. ASST Cremona","m":[],"f":[]},
+{"n":15966,"t":["T"],"tx":"furto ricettario e timbro della Dr.ssa DE SALVADOR GIULIA    Medico di Medicina Generale presso Bolzano","m":[],"f":[]},
+{"n":15968,"t":["F"],"tx":"falsificazione ricetta a nome del Dr. SASSONE ROCCO LUIGI  medico di Medicina Generale a Mantova","m":[],"f":[]},
+{"n":15970,"t":["F"],"tx":"falsificazione ricetta a nome del Dr. MIGLIO PAOLO  medico di Medicina Generale presso l’ATS Milano.","m":[],"f":[]},
+{"n":15978,"t":["T"],"tx":"furto ricettario  SSN e timbro del Dr. ZEFI ARDIAN  Medico di Continuità Assistenziale del Distretto di Terni","m":[],"f":[]},
+{"n":15980,"t":["T"],"tx":"furto ricettario SSN n. 030190208478002 Dr. CASTELLANI JACOPO medico dell’Ospedale San Raffaele di Milano   e furto ricette mediche dal ricettario avente matrice n. 027767300 Dr.ssa LIZZOLI FRANCESCA  medico pediatra presso l’Ospedale di Magenta\nsmarrimento timbro Dr.ssa MORERO SILVIA e Dr. PORCHEDDU ANTONELLO   specialisti in Anestesia e Rianimazione presso l’Istituto Auxologico Italiano- Milano","m":[],"f":[]}
 ];
