@@ -486,8 +486,8 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 83;
-const APP_BUILD_DATE = '15/07/2026';
+const APP_BUILD = 85;
+const APP_BUILD_DATE = '20/07/2026';
 
 let tipoSelezionato = 'bianca';
 let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)
@@ -893,7 +893,7 @@ REGOLE OPERATIVE PER CONTROLLO NOTE AIFA:
 
 FARMACI CHE RICHIEDONO SPECIALISTA / PIANO TERAPEUTICO (SSN):
 Su ricetta SSN alcuni farmaci sono prescrivibili SOLO da specialista o tramite PT vigente. Esempi:
-- Alprostadil (Caverject, Viridal): urologo/neurologo/endocrinologo + PT (nota 75).
+- Alprostadil (Caverject, Viridal): urologo/neurologo/endocrinologo + PT (nota 75). Ricetta comunque RNR standard (non ripetibile, 30 gg, 1 erogazione), a prescindere da SSN o bianca.
 - Pregabalin per fibromialgia: centro algologico + PT.
 - Oncologici (capecitabina, anastrozolo, ecc.): oncologo + PT.
 - Antiretrovirali HIV: infettivologo + PT.
@@ -920,7 +920,7 @@ NOTA IMPORTANTE (ricetta bianca privata vs SSN):
 VALIDITA' RICETTA BIANCA (terminologia uniforme):
 - RR = Ricetta Ripetibile standard → 6 mesi (180 giorni), max 10 erogazioni. Classe C non controllati.
 - RR benzo orali Sez. E (Tabella Medicinali Sez. E DPR 309/90 mod. DL 36/2014) → 30 giorni, max 3 erogazioni complessive (in qualsiasi combinazione: 1+1+1, 2+1, 3+0). Se il medico prescrive >1 conf in ricetta, la RIPETIBILITA' E' ESCLUSA -> la ricetta diventa di fatto MONOUSO (singola dispensazione, 30 gg). NON serve documento ritirante. Es: Xanax, Tavor compresse, Lexotan, EN gocce, Stilnox.
-- RNR = Ricetta Non Ripetibile standard → 30 giorni, 1 erogazione. Antibiotici a ciclo breve, terapie acute.
+- RNR = Ricetta Non Ripetibile standard → 30 giorni, 1 erogazione, TRATTENUTA in farmacia (conservazione 6 mesi, art. 89 c.3 D.Lgs. 219/2006 — il farmacista la ritira se non la consegna per il rimborso SSN). Antibiotici a ciclo breve, terapie acute, alprostadil iniettabile (Caverject, Viridal — non e' sostanza stupefacente: nessun documento ritirante, ma la ricetta va comunque trattenuta).
 - RNR benzo iniettabili territoriali Sez. D (Tabella Medicinali Sez. D — benzo parenterali in sez. D dal 2006, art. 14 c.1 lettera h punto 2 DPR 309/90 mod. L. 49/2006) → 30 giorni, 1 erogazione, ricetta TRATTENUTA in farmacia, conservazione 6 mesi. NESSUN obbligo di documento ritirante (le benzo iniettabili sono in sez. D PRE-15/6/2009, quindi NON rientrano nell'art. 45 c. 6-bis introdotto dalla L. 38/2010 che richiede il documento solo per i farmaci "transitati" alla sez. D DOPO il 15/6/2009). Es: EN fiale (delorazepam), Valium fiale (diazepam), Noan fiale, Diazemuls.
 - RNR Tab.A allegato III-bis (codeina+paracetamolo, tramadolo+paracetamolo) → vedi sezione apposita sotto.
 - RNR barbiturici Sez. C (Tabella Medicinali Sez. C — fenobarbital: Gardenale, Luminale, Fenobarbitale sodico fiale; barbexaclone/Maliasin; pentazocina) → 30 giorni, 1 erogazione, ricetta TRATTENUTA in farmacia, conservazione 2 ANNI, SOGGETTA a registro entrata/uscita stupefacenti (art. 45 c. 4-5). NESSUN documento ritirante (la sez. C non rientra nell'art. 45 c. 6-bis). NON e' allegato III-bis. Unica classe RNR territoriale comune che va a registro.
