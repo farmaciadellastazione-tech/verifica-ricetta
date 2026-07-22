@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "14/07/2026";
+const FOFI_DB_AGGIORNATA = "21/07/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -162,5 +162,9 @@ const FOFI_DB = [
 {"n":15968,"t":["F"],"tx":"falsificazione ricetta a nome del Dr. SASSONE ROCCO LUIGI  medico di Medicina Generale a Mantova","m":[],"f":[]},
 {"n":15970,"t":["F"],"tx":"falsificazione ricetta a nome del Dr. MIGLIO PAOLO  medico di Medicina Generale presso l’ATS Milano.","m":[],"f":[]},
 {"n":15978,"t":["T"],"tx":"furto ricettario  SSN e timbro del Dr. ZEFI ARDIAN  Medico di Continuità Assistenziale del Distretto di Terni","m":[],"f":[]},
-{"n":15980,"t":["T"],"tx":"furto ricettario SSN n. 030190208478002 Dr. CASTELLANI JACOPO medico dell’Ospedale San Raffaele di Milano   e furto ricette mediche dal ricettario avente matrice n. 027767300 Dr.ssa LIZZOLI FRANCESCA  medico pediatra presso l’Ospedale di Magenta\nsmarrimento timbro Dr.ssa MORERO SILVIA e Dr. PORCHEDDU ANTONELLO   specialisti in Anestesia e Rianimazione presso l’Istituto Auxologico Italiano- Milano","m":[],"f":[]}
+{"n":15980,"t":["T"],"tx":"furto ricettario SSN n. 030190208478002 Dr. CASTELLANI JACOPO medico dell’Ospedale San Raffaele di Milano   e furto ricette mediche dal ricettario avente matrice n. 027767300 Dr.ssa LIZZOLI FRANCESCA  medico pediatra presso l’Ospedale di Magenta\nsmarrimento timbro Dr.ssa MORERO SILVIA e Dr. PORCHEDDU ANTONELLO   specialisti in Anestesia e Rianimazione presso l’Istituto Auxologico Italiano- Milano","m":[],"f":[]},
+{"n":15987,"t":["T"],"tx":"smarrimento del ricettario nr. 137 dal n. 040801 al n. 040830 del Dr. ALESSANDRO SIGISMONDI  Medico di Medicina Generale del Distretto di Spoleto","m":[],"f":[]},
+{"n":15990,"t":["T"],"tx":"furto ricettario e timbro del Dr. MAUSOLEO FRANCESCO; smarrimento ricettario    CON NUMERAZIONE 0902500023577008 090250002357990 del Dr. MARCHI GIAMBATTISTA","m":[],"f":[]},
+{"n":15991,"t":["F"],"tx":"falsificazione di una ricetta relativa alla prescrizione di MINIAS OS  GTT FL 20 ML IMG/ML RIPETIBILE, a nome della Dr.ssa BERRA CARLOTTA Medico di Medicina Generale A.S.L. CN1 Regione Piemonte","m":[],"f":[]},
+{"n":15996,"t":["F"],"tx":"falsificazione ricette a nome del Dr. ALBERTO LENZI   Albo OMCeO Brescia (BS) nr. 2119- Medico in pensione specialista in Neurochirurgia e Neurologia","m":[],"f":[]}
 ];
