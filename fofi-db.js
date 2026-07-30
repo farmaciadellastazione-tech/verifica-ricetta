@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "24/07/2026";
+const FOFI_DB_AGGIORNATA = "30/07/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -170,5 +170,11 @@ const FOFI_DB = [
 {"n":16001,"t":["T"],"tx":"smarrimento del timbro dei Dr.i TARASCONI ANTONIO e NOCCHI ANDREA","m":[],"f":[]},
 {"n":16001,"t":["F"],"tx":"FALSIFICAZIONE RICETTA, prescrivente n. 3 scatole di RIVOTRIL  a della Dr.ssa TIPALDI ANNAGIULIA, medico ASL V.C.O. Regione Piemonte","m":[],"f":[]},
 {"n":16002,"t":["T"],"tx":"furto timbri e ricettari del Dr. Carlo Pandolfi  all’Ordine dei Medici della Provincia di Milano","m":[],"f":[]},
-{"n":16003,"t":["F"],"tx":"falsificazione ricette a nome del Dr. FRANCESCO ARILLOTTA","m":[],"f":[]}
+{"n":16003,"t":["F"],"tx":"falsificazione ricette a nome del Dr. FRANCESCO ARILLOTTA","m":[],"f":[]},
+{"n":16006,"t":["T"],"tx":"furto di timbro  a nome del Dott. CAMINITI ANTONINO DAVIDE  medico geriatra presso l’Ospedale di Sant’Angelo Lodigiano  nel reparto di Riabilitazione Generale Geriatrica.","m":[],"f":[]},
+{"n":16006,"t":["F"],"tx":"falsificazione di ricetta  a nome del Dott. CAMINITI ANTONINO DAVIDE  medico geriatra presso l’Ospedale di Sant’Angelo Lodigiano  nel reparto di Riabilitazione Generale Geriatrica.","m":[],"f":[]},
+{"n":16008,"t":["F"],"tx":"falsificazione di ricette a nome del  Dott. PIERLUIGI BOLDRI","m":[],"f":[]},
+{"n":16014,"t":["F"],"tx":"contraffazione ricetta  relativa alla prescrizione del farmaco  MOUNJARO   a firma della Dr.ssa CAVALLO GIULIA   iscritta all’Ordine della provincia di Milano","m":[],"f":[]},
+{"n":16015,"t":["T"],"tx":"SMARRIMENTO TIMBRO della Dr.ssa ROSA SILVIA Medico presso U.O. Neurologia dell’ASST Fatebenefratelli Sacco - SMARRIMENTO TIMBRO del Dr. ARRIGONI PAOLO  medico presso l’Ospedale sito a Legnano","m":[],"f":[]},
+{"n":16015,"t":["F"],"tx":"FURTO RICETTARIO SSN, con numero seriale S20021 Y0012897, dalla ricetta n. 001289745 alla ricetta n. 001289799 del  Dr. Contini Nicola, Medico di Medicina Generale, ASL di Cagliari","m":[],"f":[]}
 ];
