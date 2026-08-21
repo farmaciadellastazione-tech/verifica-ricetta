@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "05/08/2026";
+const FOFI_DB_AGGIORNATA = "20/08/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -178,5 +178,9 @@ const FOFI_DB = [
 {"n":16015,"t":["T"],"tx":"SMARRIMENTO TIMBRO della Dr.ssa ROSA SILVIA Medico presso U.O. Neurologia dell’ASST Fatebenefratelli Sacco - SMARRIMENTO TIMBRO del Dr. ARRIGONI PAOLO  medico presso l’Ospedale sito a Legnano","m":[],"f":[]},
 {"n":16015,"t":["F"],"tx":"FURTO RICETTARIO SSN, con numero seriale S20021 Y0012897, dalla ricetta n. 001289745 alla ricetta n. 001289799 del  Dr. Contini Nicola, Medico di Medicina Generale, ASL di Cagliari","m":[],"f":[]},
 {"n":16016,"t":["B"],"tx":"denuncia di smarrimento nella provincia di Monza e Brianza IV COPIA N. 1 BUONO ACQUISTO STUPEFACENTI N° 6/2026 del 04/06/2026","m":[],"f":[]},
-{"n":16027,"t":["T"],"tx":"FURTO TIMBRO E RICETTARIO n. matricola 8746 e n. ricettario 030240048404002  della Dr.ssa Francesca Zanellini  Medico specialista presso I.R.C.C.S. Fondazione Policlinico S. Matteo Pavia","m":[],"f":[]}
+{"n":16027,"t":["T"],"tx":"FURTO TIMBRO E RICETTARIO n. matricola 8746 e n. ricettario 030240048404002  della Dr.ssa Francesca Zanellini  Medico specialista presso I.R.C.C.S. Fondazione Policlinico S. Matteo Pavia","m":[],"f":[]},
+{"n":16038,"t":["T"],"tx":"furto ricettari, timbro personale del Dr CONTE Luigi Eduardo e due fogli bianchi con impresso timbro della Dr.ssa TANINI Giulia","m":[],"f":[]},
+{"n":16039,"t":["T"],"tx":"furto timbro e ricettari Dr DONEGANA","m":[],"f":[]},
+{"n":16041,"t":["T"],"tx":"smarrimento timbro Dr.ssa BONO  Medico Ortottista - Ist.Clinico Città di Brescia","m":[],"f":[]},
+{"n":16041,"t":["F"],"tx":"FALSIFICAZIONE RICETTA LYRICA a nome della Dr.ssa Savoldelli  Maria, MMG presso Casa di comunità Ospedale di Leno","m":[],"f":[]}
 ];
