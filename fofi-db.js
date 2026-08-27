@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "21/08/2026";
+const FOFI_DB_AGGIORNATA = "27/08/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -183,5 +183,8 @@ const FOFI_DB = [
 {"n":16039,"t":["T"],"tx":"furto timbro e ricettari Dr DONEGANA","m":[],"f":[]},
 {"n":16041,"t":["T"],"tx":"smarrimento timbro Dr.ssa BONO  Medico Ortottista - Ist.Clinico Città di Brescia","m":[],"f":[]},
 {"n":16041,"t":["F"],"tx":"FALSIFICAZIONE RICETTA LYRICA a nome della Dr.ssa Savoldelli  Maria, MMG presso Casa di comunità Ospedale di Leno","m":[],"f":[]},
-{"n":16043,"t":["T"],"tx":"smarrimento timbro Dr. Gatto Federico, Dr.ssa Murelli Federica Maria  presso   l’Ospedale Policlinico San Martino di Genova    e dell’U.O. Medicina di Emergenza ed Accettazione d’Urgenza (Direttrice Dr.ssa Arboscello Eleonora).","m":[],"f":[]}
+{"n":16043,"t":["T"],"tx":"smarrimento timbro Dr. Gatto Federico, Dr.ssa Murelli Federica Maria  presso   l’Ospedale Policlinico San Martino di Genova    e dell’U.O. Medicina di Emergenza ed Accettazione d’Urgenza (Direttrice Dr.ssa Arboscello Eleonora).","m":[],"f":[]},
+{"n":16044,"t":["F"],"tx":"falsificazione ricetta  n. 3 confezioni di OXICONTIN 40 MG 28 capsule a nome del Dr. MARIO CRISPINO","m":[],"f":[]},
+{"n":16046,"t":["T"],"tx":"smarrimento ricettario della Dr.ssa SAEEDINIYA MANA; smarrimento timbro della Dr.ssa PALMERI ANNAMARIA IOLE","m":[],"f":[]},
+{"n":16047,"t":["F"],"tx":"contraffazione di una ricetta rossa di 3 confezioni di Mounjaro, a nome del Dr. MASSIMO ZURETTI, che non risulta iscritto all’Albo Unico Nazionale dei Medici né a quello degli Odontoiatri","m":[],"f":[]}
 ];
