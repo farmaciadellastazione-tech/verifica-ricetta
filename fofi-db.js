@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "04/09/2026";
+const FOFI_DB_AGGIORNATA = "08/09/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -188,5 +188,6 @@ const FOFI_DB = [
 {"n":16046,"t":["T"],"tx":"smarrimento ricettario della Dr.ssa SAEEDINIYA MANA; smarrimento timbro della Dr.ssa PALMERI ANNAMARIA IOLE","m":[],"f":[]},
 {"n":16047,"t":["F"],"tx":"contraffazione di una ricetta rossa di 3 confezioni di Mounjaro, a nome del Dr. MASSIMO ZURETTI, che non risulta iscritto all’Albo Unico Nazionale dei Medici né a quello degli Odontoiatri","m":[],"f":[]},
 {"n":16048,"t":["T"],"tx":"SMARRIMENTO del TIMBRO intestato a “Istituti Clinici Zucchi\" cod. 001113” (MB), contenente il nominativo e il codice fiscale del Dr.ALIPRANDI ALBERTO","m":[],"f":[]},
-{"n":16052,"t":["T"],"tx":"FURTO del RICETTARIO della Dott.ssa GIULIA MANGINI  Medico di Medicina Generale - ASST Papa Giovanni XXIII -Bergamo","m":[],"f":[]}
+{"n":16052,"t":["T"],"tx":"FURTO del RICETTARIO della Dott.ssa GIULIA MANGINI  Medico di Medicina Generale - ASST Papa Giovanni XXIII -Bergamo","m":[],"f":[]},
+{"n":16055,"t":["F"],"tx":"falsificazione di ricette con la prescrizione di SUMATRIPTAN FIALE  a nome delle Dottoresse: DE NATALE ANNA, Medico specialista in Urologia - ASL TO3-FORNERO ANGELA, Medico specialista in Oculistica-\nASL TO3-BENDINELLI GIOVANNA, Medico specialista in Diabetologia ASL TO3","m":[],"f":[]}
 ];
