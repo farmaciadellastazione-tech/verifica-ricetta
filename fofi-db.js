@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "11/09/2026";
+const FOFI_DB_AGGIORNATA = "24/09/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -191,5 +191,6 @@ const FOFI_DB = [
 {"n":16052,"t":["T"],"tx":"FURTO del RICETTARIO della Dott.ssa GIULIA MANGINI  Medico di Medicina Generale - ASST Papa Giovanni XXIII -Bergamo","m":[],"f":[]},
 {"n":16055,"t":["F"],"tx":"falsificazione di ricette con la prescrizione di SUMATRIPTAN FIALE  a nome delle Dottoresse: DE NATALE ANNA, Medico specialista in Urologia - ASL TO3-FORNERO ANGELA, Medico specialista in Oculistica-\nASL TO3-BENDINELLI GIOVANNA, Medico specialista in Diabetologia ASL TO3","m":[],"f":[]},
 {"n":16065,"t":["F"],"tx":"FALSIFICAZIONE di 2 RICETTE del farmaco Pregabalin 300 mg, a nome del Dr. MASSIMILIANO OLIVA – Dirigente medico presso la Struttura ASST SANTI PAOLO E CARLO MILANO","m":[],"f":[]},
-{"n":16067,"t":["T"],"tx":"FURTO dei TIMBRI e dei RICETTARI BIANCHI del Dr. GIANLUCA GROSSI, iscritto all’Ordine di Medici Chirurghi e degli Odontoiatri di Torino","m":[],"f":[]}
+{"n":16067,"t":["T"],"tx":"FURTO dei TIMBRI e dei RICETTARI BIANCHI del Dr. GIANLUCA GROSSI, iscritto all’Ordine di Medici Chirurghi e degli Odontoiatri di Torino","m":[],"f":[]},
+{"n":16076,"t":["F"],"tx":"RICETTE FALSE emesse a nome della Dr.ssa  MARIA MARCHER","m":[],"f":[]}
 ];
