@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "01/10/2026";
+const FOFI_DB_AGGIORNATA = "08/10/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -196,5 +196,9 @@ const FOFI_DB = [
 {"n":16085,"t":["T"],"tx":"SMARRIMENTO TIMBRO a nome della Dr.ssa ANGERAMO FRANCESCA","m":[],"f":[]},
 {"n":16085,"t":["F"],"tx":"FALSIFICAZIONE DI RICETTA  a nome della Dr.ssa ANGERAMO FRANCESCA","m":[],"f":[]},
 {"n":16090,"t":["T"],"tx":"FURTO del TIMBRO medico e del RICETTARIO privato del Dr. BRIANO LUIGI","m":[],"f":[]},
-{"n":16092,"t":["T"],"tx":"smarrimento/furto timbro ospedaliero U.O. MEDICINA NUCLEARE- CENTRO PET -U85Y DIRETTORE PROF. G. SAMBUCETI - dell’Ospedale Policlinico San Martino di Genova","m":[],"f":[]}
+{"n":16092,"t":["T"],"tx":"smarrimento/furto timbro ospedaliero U.O. MEDICINA NUCLEARE- CENTRO PET -U85Y DIRETTORE PROF. G. SAMBUCETI - dell’Ospedale Policlinico San Martino di Genova","m":[],"f":[]},
+{"n":16097,"t":["T"],"tx":"SMARRIMENTO di un RICETTARIO BIANCO del Dott. SASSI GIANLUCA","m":[],"f":[]},
+{"n":16097,"t":["F"],"tx":"FALSIFICAZIONE RICETTA  a nome del Dottor SASSI GIANLUCA","m":[],"f":[]},
+{"n":16098,"t":["F"],"tx":"falsificazione ricetta a nome della Dr.ssa ANNALISA BASSI","m":[],"f":[]},
+{"n":16103,"t":["F"],"tx":"falsificazione ricetta a nome della Dr.ssa CONTU BARBARA","m":[],"f":[]}
 ];
