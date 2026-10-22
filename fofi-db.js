@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "08/10/2026";
+const FOFI_DB_AGGIORNATA = "22/10/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -200,5 +200,8 @@ const FOFI_DB = [
 {"n":16097,"t":["T"],"tx":"SMARRIMENTO di un RICETTARIO BIANCO del Dott. SASSI GIANLUCA","m":[],"f":[]},
 {"n":16097,"t":["F"],"tx":"FALSIFICAZIONE RICETTA  a nome del Dottor SASSI GIANLUCA","m":[],"f":[]},
 {"n":16098,"t":["F"],"tx":"falsificazione ricetta a nome della Dr.ssa ANNALISA BASSI","m":[],"f":[]},
-{"n":16103,"t":["F"],"tx":"falsificazione ricetta a nome della Dr.ssa CONTU BARBARA","m":[],"f":[]}
+{"n":16103,"t":["F"],"tx":"falsificazione ricetta a nome della Dr.ssa CONTU BARBARA","m":[],"f":[]},
+{"n":16111,"t":["F"],"tx":"FALSIFICAZIONE RICETTA a nome del Dr. CATALETA MARCO MATTEO  Medico ATS Brianza contenente esclusivamente la prescrizione farmaco Augmentin 1g cpr e recante la dicitura aggiuntiva falsificata del farmaco Palexia","m":[],"f":[]},
+{"n":16111,"t":["T"],"tx":"SMARRIMENTO RICETTARIO N. 030260014317007 del Dr. CROCE GIUSEPPE  Dirigente Medico del reparto di Pneumologia del Presidio Ospedaliero di Garbagnate Milanese\nSMARRIMENTO TIMBRO PERSONALE della Dr.ssa AGRIMONTI GLORIA  Dirigente Medico P.O. Oglio Po ASST CREMONA\nSMARRIMENTO RICETTARIO del Dr. MAFFI GABRIELE  Dirigente Medico presso SC Medicina ad indirizzo Metabolico della Fondazione IRCCS Cà Granda Ospedale Maggiore Policlinico","m":[],"f":[]},
+{"n":16117,"t":["T"],"tx":"smarrimento/furto del timbro ospedaliero della U.O. EMATOLOGIA DEGENZA- DIRETTORI PROF. EMANUELE ANGELUCCI e PROF.ROBERTO MASSIMO LEMOLI dell’Ospedale Policlinico San Martino di  Genova\nsmarrimento del timbro ospedaliero della Dr.ssa RAPETTI FRANCESCA   che presta servizio presso l’Ospedale Policlinico San Martino di Genova","m":[],"f":[]}
 ];
