@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "22/10/2026";
+const FOFI_DB_AGGIORNATA = "27/10/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -203,5 +203,10 @@ const FOFI_DB = [
 {"n":16103,"t":["F"],"tx":"falsificazione ricetta a nome della Dr.ssa CONTU BARBARA","m":[],"f":[]},
 {"n":16111,"t":["F"],"tx":"FALSIFICAZIONE RICETTA a nome del Dr. CATALETA MARCO MATTEO  Medico ATS Brianza contenente esclusivamente la prescrizione farmaco Augmentin 1g cpr e recante la dicitura aggiuntiva falsificata del farmaco Palexia","m":[],"f":[]},
 {"n":16111,"t":["T"],"tx":"SMARRIMENTO RICETTARIO N. 030260014317007 del Dr. CROCE GIUSEPPE  Dirigente Medico del reparto di Pneumologia del Presidio Ospedaliero di Garbagnate Milanese\nSMARRIMENTO TIMBRO PERSONALE della Dr.ssa AGRIMONTI GLORIA  Dirigente Medico P.O. Oglio Po ASST CREMONA\nSMARRIMENTO RICETTARIO del Dr. MAFFI GABRIELE  Dirigente Medico presso SC Medicina ad indirizzo Metabolico della Fondazione IRCCS Cà Granda Ospedale Maggiore Policlinico","m":[],"f":[]},
-{"n":16117,"t":["T"],"tx":"smarrimento/furto del timbro ospedaliero della U.O. EMATOLOGIA DEGENZA- DIRETTORI PROF. EMANUELE ANGELUCCI e PROF.ROBERTO MASSIMO LEMOLI dell’Ospedale Policlinico San Martino di  Genova\nsmarrimento del timbro ospedaliero della Dr.ssa RAPETTI FRANCESCA   che presta servizio presso l’Ospedale Policlinico San Martino di Genova","m":[],"f":[]}
+{"n":16117,"t":["T"],"tx":"smarrimento/furto del timbro ospedaliero della U.O. EMATOLOGIA DEGENZA- DIRETTORI PROF. EMANUELE ANGELUCCI e PROF.ROBERTO MASSIMO LEMOLI dell’Ospedale Policlinico San Martino di  Genova\nsmarrimento del timbro ospedaliero della Dr.ssa RAPETTI FRANCESCA   che presta servizio presso l’Ospedale Policlinico San Martino di Genova","m":[],"f":[]},
+{"n":16120,"t":["T"],"tx":"furto ricettario e timbro dei Dr.i. GALATI GIUSEPPE  E e URRU MAURO;\nFURTO RICETTARIO ROSSO N. 01020 NR. 0015229 datato 17/11/2022, del Dr. DI MATTEO DANILO, Medico - ASL CN2 - Alba\nSMARRIMENTO N. 1 RICETTARIO della DR.SSA TODESCATO VALENTINA, Dirigente Medico SC Pediatria ASST CREMONA","m":[],"f":[]},
+{"n":16121,"t":["B"],"tx":"IV COPIA N. 1 BUONO ACQUISTO STUPEFACENTI N° 17/2026 del  29/09/2026 per richiesta GARDENALE 100 MG CPR N. 10 confezioni\nSOLIPHEN 60 MG CPR N. 2 confezioni","m":[],"f":[]},
+{"n":16122,"t":["F"],"tx":"dubbia autenticità di una ricetta medica, a nome del Dr. LORENZO BIANCHI ( presso una farmacia della Provincia di Bologna è stata presentata una ricetta per il farmaco SONIREM con le seguenti incongruenze :\nl’indirizzo dello studio del medico, segnato in intestazione risulta essere fittizio. Nessuno degli indirizzi segnati in basso corrisponde ad un indirizzo reale. Le ultime lettere del codice fiscale del sedicente Dott. Lorenzo Bianchi sono sovrapposte dalla partita iva","m":[],"f":[]},
+{"n":16123,"t":["T"],"tx":"SMARRIMENTO di sette RICETTE del ricettario personale del dr. Carlo Cantamessa medico pensionato residente a Torino, non compilate, ma provviste del timbro recante i dati anagrafici del medico","m":[],"f":[]},
+{"n":16125,"t":["T"],"tx":"furto del timbro professionale e del ricettario medico del Dr. ANDREA GIOVANNI PARATO  iscritto all’Ordine dei Medici Chirurghi e degli Odontoiatri della Provincia di Ascoli Piceno","m":[],"f":[]}
 ];
