@@ -1,7 +1,8 @@
 name: Aggiornamento banca dati FOFI
 
-# Controlla periodicamente la mail dell'Ordine e, se è arrivato un Excel con
-# circolari nuove, apre una PR su `dev`, la mergia automaticamente e poi
+# Controlla periodicamente la mail e, se sono arrivate segnalazioni nuove
+# (Excel storico, PDF delle circolari dell'Ordine, inoltri Federfarma SP),
+# apre una PR su `dev`, la mergia automaticamente e poi
 # propaga dev → main (produzione) senza intervento manuale.
 #
 # Autenticazione: App Password Gmail (GMAIL_USER + GMAIL_APP_PASSWORD).
@@ -10,7 +11,12 @@ name: Aggiornamento banca dati FOFI
 on:
   schedule:
     - cron: '0 6 * * 1-6'   # lun-sab alle 06:00 UTC (~07/08 in Italia)
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Prova a secco: mostra cosa verrebbe aggiunto, senza PR/merge/deploy'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -30,9 +36,11 @@ jobs:
           node-version: '20'
 
       - name: Installa dipendenze
-        run: npm ci
+        run: |
+          npm ci
+          sudo apt-get install -y -qq poppler-utils unzip >/dev/null
 
-      - name: Scarica l'ultima mail FOFI
+      - name: Scarica le segnalazioni dalla mail
         id: fetch
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
@@ -50,15 +58,31 @@ jobs:
         id: build
         if: steps.fetch.outputs.found == 'true'
         run: |
-          node tools/build-fofi-db.mjs .fofi-incoming.xlsx --write | tee build.out
-          rm -f .fofi-incoming.xlsx .fofi-incoming.xlsx.date
+          : > build.out
+          if [ -f .fofi-incoming.xlsx ]; then
+            node tools/build-fofi-db.mjs .fofi-incoming.xlsx --write | tee -a build.out
+          fi
+          if [ -f .fofi-incoming.json ]; then
+            node tools/apply-fofi-entries.mjs .fofi-incoming.json --write | tee -a build.out
+          fi
+          rm -f .fofi-incoming.xlsx .fofi-incoming.xlsx.date .fofi-incoming.json
           if git diff --quiet fofi-db.js; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "added=$(grep -oP 'FOFI_ADDED=\K.*' build.out)" >> "$GITHUB_OUTPUT"
+            echo "added=$(grep -oP 'FOFI_ADDED=\K.*' build.out | paste -sd, -)" >> "$GITHUB_OUTPUT"
           fi
           rm -f build.out
+
+      # Se non arriva nulla da troppo tempo il formato delle mail è probabilmente
+      # cambiato di nuovo: fallire in modo visibile invece di uscire in silenzio.
+      - name: Controllo banca dati ferma
+        if: steps.build.outputs.changed != 'true'
+        run: node tools/check-fofi-stale.mjs 21
+
+      - name: Anteprima (prova a secco)
+        if: steps.build.outputs.changed == 'true' && inputs.dry_run
+        run: git diff fofi-db.js
 
       - name: Bump versione + cache PWA
         if: steps.build.outputs.changed == 'true'
@@ -70,7 +94,7 @@ jobs:
 
       - name: Apri/aggiorna la Pull Request su dev
         id: pr_dev
-        if: steps.build.outputs.changed == 'true'
+        if: steps.build.outputs.changed == 'true' && !inputs.dry_run
         env:
           GH_TOKEN: ${{ github.token }}
           ADDED: ${{ steps.build.outputs.added }}
@@ -102,7 +126,7 @@ jobs:
           echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
 
       - name: Merge automatico della PR in dev
-        if: steps.build.outputs.changed == 'true'
+        if: steps.build.outputs.changed == 'true' && !inputs.dry_run
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -115,7 +139,7 @@ jobs:
           echo "PR #${{ steps.pr_dev.outputs.pr_number }} mergiata in dev."
 
       - name: Deploy automatico dev → main (produzione)
-        if: steps.build.outputs.changed == 'true'
+        if: steps.build.outputs.changed == 'true' && !inputs.dry_run
         env:
           GH_TOKEN: ${{ github.token }}
           ADDED: ${{ steps.build.outputs.added }}

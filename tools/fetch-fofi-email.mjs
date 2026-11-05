@@ -1,23 +1,41 @@
-// fetch-fofi-email.mjs — scarica l'Excel dall'ultima mail FOFI via IMAP.
+// fetch-fofi-email.mjs — raccoglie le segnalazioni FOFI dalla mail via IMAP.
 //
 // Uso: node tools/fetch-fofi-email.mjs [output.xlsx]
+//
+// Tre fonti, tutte facoltative:
+//   1. Excel cumulativo dell'Ordine (allegato o link rufblob .xlsx) -> output.xlsx
+//      (formato storico, sospeso dall'Ordine il 3/11/2026: resta per retrocompatibilità)
+//   2. PDF delle singole circolari FOFI linkati nelle mail dell'Ordine (fofiruf.it)
+//   3. inoltri singoli di Federfarma La Spezia (allegato PDF/docx, senza numero FOFI)
+//   Le voci di 2 e 3 vanno in output.json ({aggiornata, entries}), da applicare con
+//   tools/apply-fofi-entries.mjs. Servono `pdftotext` (poppler-utils) e `unzip` nel PATH.
 //
 // Autenticazione via App Password Gmail (nessun OAuth, nessuna scadenza):
 //   GMAIL_USER         — indirizzo Gmail (es. farmaciadellastazione@gmail.com)
 //   GMAIL_APP_PASSWORD — App Password Google a 16 caratteri (senza spazi)
 //
-// Exit code: 0 = xlsx scaricato · 2 = credenziali mancanti ·
-//            3 = nessuna mail/xlsx (niente da fare) · altro = errore.
+// Exit code: 0 = trovato qualcosa (xlsx e/o json) · 2 = credenziali mancanti ·
+//            3 = niente di nuovo · altro = errore.
 
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
 import { createRequire } from 'node:module';
+import vm from 'node:vm';
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 
 const require = createRequire(import.meta.url);
-const { formatEmailDate } = require(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'fofi-xlsx.js'));
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const { formatEmailDate } = require(resolve(ROOT, 'fofi-xlsx.js'));
+const {
+  extractPdfLinks, circolarePdfToEntry, isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText,
+} = require(resolve(ROOT, 'fofi-avvisi.js'));
+
+const GIORNI_XLSX = 120;
+const GIORNI_AVVISI = 30; // finestra per PDF circolari e inoltri Federfarma
 
 // ── Helper puri (esportati, testati in tests/fetch-fofi-email.test.js) ──────
 // Mantenuti per compatibilità con i test esistenti.
@@ -62,11 +80,125 @@ export function header(payload, name) {
   return (payload.headers || []).find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
 }
 
-// ── Esecuzione (solo se lanciato come script, non quando importato dai test) ──
+// ── I/O ──────────────────────────────────────────────────────────────────
+
+// Numeri circolare e chiavi già in fofi-db.js: evitano download inutili.
+function loadKnown() {
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(readFileSync(resolve(ROOT, 'fofi-db.js'), 'utf8') + ';globalThis.__FOFI=FOFI_DB;', ctx);
+  return {
+    numeri: new Set(ctx.__FOFI.map(e => e.n).filter(n => n != null)),
+    chiavi: new Set(ctx.__FOFI.map(e => e.k).filter(Boolean)),
+  };
+}
+
+// Buffer di un allegato -> testo (pdf via pdftotext, docx via unzip). '' se non leggibile.
+function allegatoToText(buf, nomeFile, tmp) {
+  const f = join(tmp, 'a' + Math.random().toString(36).slice(2) + (/\.docx$/i.test(nomeFile) ? '.docx' : '.pdf'));
+  writeFileSync(f, buf);
+  try {
+    if (/\.pdf$/i.test(nomeFile)) return execFileSync('pdftotext', ['-enc', 'UTF-8', f, '-'], { encoding: 'utf8' });
+    if (/\.docx$/i.test(nomeFile)) return docxXmlToText(execFileSync('unzip', ['-p', f, 'word/document.xml'], { encoding: 'utf8' }));
+  } catch (err) {
+    console.warn(`[FOFI] allegato non leggibile (${nomeFile}): ${err.message}`);
+  }
+  return '';
+}
+
+async function scaricaMail(client, uid) {
+  const { content } = await client.download(String(uid), undefined, { uid: true });
+  const chunks = [];
+  for await (const chunk of content) chunks.push(chunk);
+  return simpleParser(Buffer.concat(chunks));
+}
+
+function giorniFa(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d;
+}
+
+// 1. Excel cumulativo (formato storico): scrive OUT + OUT.date. Ritorna true se trovato.
+async function cercaXlsx(client, OUT) {
+  const uids = await client.search({ from: 'fofiruf.it', subject: 'segnalazioni', since: giorniFa(GIORNI_XLSX) }, { uid: true });
+  for (const uid of [...(uids || [])].sort((a, b) => b - a)) {
+    const parsed = await scaricaMail(client, uid);
+    let buf = null;
+    let sorgente = '';
+    const att = parsed.attachments?.find(a => /\.xlsx$/i.test(a.filename || ''));
+    if (att) {
+      buf = att.content;
+      sorgente = `allegato "${att.filename}"`;
+    } else {
+      const url = extractXlsxUrl(parsed.html || parsed.textAsHtml || '');
+      if (!url) continue;
+      const r = await fetch(url);
+      if (!r.ok) { console.warn(`[FOFI] xlsx non scaricabile (${r.status}): ${url}`); continue; }
+      buf = Buffer.from(await r.arrayBuffer());
+      sorgente = `link ${url}`;
+    }
+    writeFileSync(OUT, buf);
+    const rawDate = parsed.date?.toUTCString() || '';
+    const dataMail = formatEmailDate(rawDate);
+    if (dataMail) writeFileSync(OUT + '.date', dataMail);
+    console.log(`Scaricato xlsx (${buf.length} byte) da ${sorgente} — mail del ${rawDate} -> ${OUT}`);
+    return true;
+  }
+  console.log('Nessun xlsx (allegato o link) nelle mail recenti.');
+  return false;
+}
+
+// 2. PDF delle circolari FOFI nelle mail dell'Ordine. Ritorna [{entry, date}].
+async function cercaPdfCircolari(client, known, tmp) {
+  const out = [];
+  const uids = await client.search({ from: 'fofiruf.it', since: giorniFa(GIORNI_AVVISI) }, { uid: true });
+  for (const uid of uids || []) {
+    const parsed = await scaricaMail(client, uid);
+    const subject = parsed.subject || '';
+    // PDF senza numero nel nome: li apriamo solo se la mail parla di segnalazioni
+    // (le altre circolari sono corsi/note e non vanno in banca dati).
+    const links = extractPdfLinks(parsed.html || parsed.textAsHtml || '')
+      .filter(l => l.n != null ? !known.numeri.has(l.n) : /segnalaz/i.test(subject));
+    for (const l of links) {
+      const r = await fetch(l.url);
+      if (!r.ok) { console.warn(`[FOFI] PDF non scaricabile (${r.status}): ${l.url}`); continue; }
+      const text = allegatoToText(Buffer.from(await r.arrayBuffer()), 'c.pdf', tmp);
+      const e = circolarePdfToEntry(text, l.n ?? undefined);
+      if (e && !known.numeri.has(e.n)) {
+        known.numeri.add(e.n);
+        out.push({ entry: e, date: parsed.date });
+        console.log(`+ circolare ${e.n} [${e.t}] da "${subject}"`);
+      }
+    }
+  }
+  return out;
+}
+
+// 3. Inoltri Federfarma La Spezia (oggetto "furto/smarrimento/falsificazione ...").
+async function cercaFederfarma(client, known, tmp) {
+  const out = [];
+  const uids = await client.search({ from: 'federfarmalaspezia.it', since: giorniFa(GIORNI_AVVISI) }, { uid: true });
+  for (const uid of uids || []) {
+    const parsed = await scaricaMail(client, uid);
+    const subject = (parsed.subject || '').trim();
+    const key = parsed.messageId || '';
+    if (!key || known.chiavi.has(key) || !isFederfarmaSegnalazione(subject)) continue;
+    const text = (parsed.attachments || [])
+      .filter(a => /\.(pdf|docx)$/i.test(a.filename || ''))
+      .map(a => allegatoToText(a.content, a.filename, tmp))
+      .join('\n');
+    const date = formatEmailDate(parsed.date?.toUTCString() || '');
+    known.chiavi.add(key);
+    out.push({ entry: federfarmaEntry({ subject, text, date, key }), date: parsed.date });
+    console.log(`+ Federfarma SP ${date}: ${subject}`);
+  }
+  return out;
+}
 
 async function main() {
   const OUT = process.argv[2] || '.fofi-incoming.xlsx';
-  const DATE_OUT = OUT + '.date';
+  const JSON_OUT = OUT.replace(/\.xlsx$/i, '') + '.json';
 
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
@@ -83,69 +215,35 @@ async function main() {
     logger: false,
   });
 
+  const tmp = mkdtempSync(join(tmpdir(), 'fofi-'));
   await client.connect();
   try {
     // Usa "All Mail" per trovare anche mail archiviate
     const mailboxes = await client.list();
     const allMailbox = mailboxes.find(m => m.specialUse === '\\All');
-    const mailboxPath = allMailbox?.path || 'INBOX';
-
-    const lock = await client.getMailboxLock(mailboxPath);
+    const lock = await client.getMailboxLock(allMailbox?.path || 'INBOX');
     try {
-      const since = new Date();
-      since.setDate(since.getDate() - 120);
-
-      const uids = await client.search({
-        from: 'fofiruf.it',
-        subject: 'segnalazioni',
-        since,
-      }, { uid: true });
-
-      if (!uids?.length) {
-        console.log('Nessuna mail FOFI di segnalazioni trovata.');
-        return 3;
+      const xlsx = await cercaXlsx(client, OUT);
+      const known = loadKnown();
+      const trovate = [
+        ...await cercaPdfCircolari(client, known, tmp),
+        ...await cercaFederfarma(client, known, tmp),
+      ];
+      if (trovate.length) {
+        const piuRecente = trovate.map(t => t.date).filter(Boolean).sort((a, b) => b - a)[0];
+        const aggiornata = piuRecente ? formatEmailDate(piuRecente.toUTCString()) : '';
+        writeFileSync(JSON_OUT, JSON.stringify({ aggiornata, entries: trovate.map(t => t.entry) }, null, 1));
+        console.log(`${trovate.length} voci da PDF/Federfarma -> ${JSON_OUT}`);
+      } else {
+        console.log('Nessuna circolare PDF o inoltro Federfarma nuovo.');
       }
-
-      // UIDs decrescenti = più recenti prima
-      for (const uid of [...uids].sort((a, b) => b - a)) {
-        const { content } = await client.download(String(uid), undefined, { uid: true });
-        const chunks = [];
-        for await (const chunk of content) chunks.push(chunk);
-        const parsed = await simpleParser(Buffer.concat(chunks));
-
-        let buf = null;
-        let sorgente = '';
-
-        // 1. Allegato MIME xlsx (retrocompatibilità)
-        const att = parsed.attachments?.find(a => /\.xlsx$/i.test(a.filename || ''));
-        if (att) {
-          buf = att.content;
-          sorgente = `allegato "${att.filename}"`;
-        } else {
-          // 2. Link rufblob nel corpo HTML (formato attuale da ~giugno 2026)
-          const url = extractXlsxUrl(parsed.html || parsed.textAsHtml || '');
-          if (!url) continue;
-          const r = await fetch(url);
-          if (!r.ok) { console.warn(`[FOFI] xlsx non scaricabile (${r.status}): ${url}`); continue; }
-          buf = Buffer.from(await r.arrayBuffer());
-          sorgente = `link ${url}`;
-        }
-
-        writeFileSync(OUT, buf);
-        const rawDate = parsed.date?.toUTCString() || '';
-        const dataMail = formatEmailDate(rawDate);
-        if (dataMail) writeFileSync(DATE_OUT, dataMail);
-        console.log(`Scaricato xlsx (${buf.length} byte) da ${sorgente} — mail del ${rawDate}${dataMail ? ` (${dataMail})` : ''} -> ${OUT}`);
-        return 0;
-      }
-
-      console.log('Nessun xlsx (allegato o link) nelle mail candidate.');
-      return 3;
+      return (xlsx || trovate.length) ? 0 : 3;
     } finally {
       lock.release();
     }
   } finally {
     await client.logout();
+    rmSync(tmp, { recursive: true, force: true });
   }
 }
 
