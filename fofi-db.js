@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "27/10/2026";
+const FOFI_DB_AGGIORNATA = "03/11/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC 100 mcg/h cerotti","DUROGESIC"]},
@@ -208,5 +208,8 @@ const FOFI_DB = [
 {"n":16121,"t":["B"],"tx":"IV COPIA N. 1 BUONO ACQUISTO STUPEFACENTI N° 17/2026 del  29/09/2026 per richiesta GARDENALE 100 MG CPR N. 10 confezioni\nSOLIPHEN 60 MG CPR N. 2 confezioni","m":[],"f":[]},
 {"n":16122,"t":["F"],"tx":"dubbia autenticità di una ricetta medica, a nome del Dr. LORENZO BIANCHI ( presso una farmacia della Provincia di Bologna è stata presentata una ricetta per il farmaco SONIREM con le seguenti incongruenze :\nl’indirizzo dello studio del medico, segnato in intestazione risulta essere fittizio. Nessuno degli indirizzi segnati in basso corrisponde ad un indirizzo reale. Le ultime lettere del codice fiscale del sedicente Dott. Lorenzo Bianchi sono sovrapposte dalla partita iva","m":[],"f":[]},
 {"n":16123,"t":["T"],"tx":"SMARRIMENTO di sette RICETTE del ricettario personale del dr. Carlo Cantamessa medico pensionato residente a Torino, non compilate, ma provviste del timbro recante i dati anagrafici del medico","m":[],"f":[]},
-{"n":16125,"t":["T"],"tx":"furto del timbro professionale e del ricettario medico del Dr. ANDREA GIOVANNI PARATO  iscritto all’Ordine dei Medici Chirurghi e degli Odontoiatri della Provincia di Ascoli Piceno","m":[],"f":[]}
+{"n":16125,"t":["T"],"tx":"furto del timbro professionale e del ricettario medico del Dr. ANDREA GIOVANNI PARATO  iscritto all’Ordine dei Medici Chirurghi e degli Odontoiatri della Provincia di Ascoli Piceno","m":[],"f":[]},
+{"n":16130,"t":["F","T"],"tx":"SMARRIMENTO TIMBRO PERSONALE della Dr.ssa QUADRELLI VERDIANA SERENA, Medico Sc Medicina - Ospedale Salvini Garbagnate M.SE - ASST RHODENSE;\nSMARRIMENTO TIMBRO PERSONALE della Dr.ssa FERRARO MARGHERITA, Medico Sc Ostetricia Ginecologia -Ospedale Salvini Garbagnate M.SE - ASST RHODENSE;\nFURTO di n. 5 RICETTE SSN e del TIMBRO PERSONALE del Dr. ANIBAN LEO ANDRE’, Medico Chirurgo Milano.","m":[],"f":[]},
+{"n":16132,"t":["F"],"tx":"presentazione di PRESCRIZIONI MEDICHE FALSE nelle farmacie del territorio veronese, per l’ottenimento della specialità medicinale \"DEPALGOS 28 CPR 20MG+ 325MG RIV\" a nome del Dott. STRACI EMANUELE, Medico iscritto all’Ordine dei Medici Chirurghi e Odontoiatri della Provincia di Messina, che contattato da uno dei farmacisti ha dichiarato di non conoscere il paziente e ha disconosciuto la prescrizione. Nelle segnalazioni è precisato che nelle prescrizioni è assente il numero di iscrizione all’Ordine nel timbro del medico.","m":[],"f":[]},
+{"n":16135,"t":["T"],"tx":"FURTO del RICETTARIO nr. 01020 0006360 e del TIMBRO PERSONALE del Dott. SCALINI Dario, Medico del Servizio di Assistenza Primaria ASL TO4.","m":[],"f":[]}
 ];
