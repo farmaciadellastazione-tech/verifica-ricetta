@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza,
+  STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento,
 } from '../fofi-match.js';
 
 describe('normalize — pulizia testo FOFI', () => {
@@ -213,5 +213,18 @@ describe('calcolaScadenza — +30 giorni TZ-safe', () => {
     expect(calcolaScadenza(null)).toBe('');
     expect(calcolaScadenza(undefined)).toBe('');
     expect(calcolaScadenza('non-una-data')).toBe('');
+  });
+});
+
+describe('fofiRiferimento — etichetta della fonte di una voce', () => {
+  it('voce FOFI numerata → "Circ. FOFI n. X"', () => {
+    expect(fofiRiferimento({ n: 16132, t: ['F'], tx: 'x' })).toBe('Circ. FOFI n. 16132');
+  });
+  it('voce senza numero (Federfarma SP) → fonte + data', () => {
+    expect(fofiRiferimento({ n: null, t: ['T'], tx: 'x', src: 'Federfarma SP', d: '05/11/2026' }))
+      .toBe('Segnalazione Federfarma SP del 05/11/2026');
+  });
+  it('voce senza numero né data → solo la fonte', () => {
+    expect(fofiRiferimento({ n: null, t: ['T'], tx: 'x', src: 'Federfarma SP' })).toBe('Segnalazione Federfarma SP');
   });
 });

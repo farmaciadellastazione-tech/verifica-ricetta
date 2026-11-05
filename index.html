@@ -486,7 +486,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 103;
+const APP_BUILD = 104;
 const APP_BUILD_DATE = '05/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -845,7 +845,7 @@ function cercaFOFI() {
       fofiHits.slice(0, 3).map(h => {
         const tipoBadges = h.rec.t.map(t => `<span class="fofi-match-tipo ${t}">${tipoLabel[t]||t}</span>`).join('');
         return `<div class="fofi-match">
-          <div class="fofi-match-n">${tipoBadges} Circ. FOFI n. ${h.rec.n} (corrispondenza: ${h.score})</div>
+          <div class="fofi-match-n">${tipoBadges} ${escHtml(fofiRiferimento(h.rec))} (corrispondenza: ${h.score})</div>
           <div class="fofi-match-tx">${escHtml(h.rec.tx.substring(0, 220))}${h.rec.tx.length > 220 ? '…' : ''}</div>
         </div>`;
       }).join('');
@@ -1050,7 +1050,7 @@ function buildPrompt() {
 
   const fofiBriefing = fofiHits.length > 0
     ? `\n\nALLERTA FOFI: Il sistema ha trovato ${fofiHits.length} segnalazioni nella banca dati circolari FOFI 2025-2026 corrispondenti ai dati inseriti:\n` +
-      fofiHits.map(h => `- Circ. ${h.rec.n} [${h.rec.t.join(',')}]: ${h.rec.tx.substring(0,200)}`).join('\n') +
+      fofiHits.map(h => `- ${fofiRiferimento(h.rec)} [${h.rec.t.join(',')}]: ${h.rec.tx.substring(0,200)}`).join('\n') +
       `\nTieni conto di queste segnalazioni nella tua valutazione e AGGIUNGI un controllo specifico "Verifica FOFI" con stato errore e le segnalazioni trovate.`
     : '\n\nVerifica FOFI: nessuna corrispondenza trovata nella banca dati FOFI per i dati inseriti.';
 
@@ -1392,7 +1392,7 @@ function mostraRisultati(r) {
   </div>` : '';
 
   const fofiBanner = fofiHits.length > 0 ? `<div style="margin:0 16px 14px;padding:10px 14px;background:#FFF0F0;border:1px solid #F7C1C1;border-radius:8px;font-size:14px;color:#791F1F;">
-    <strong>🚨 ${fofiHits.length} corrispondenza${fofiHits.length>1?'e':''} nella banca dati FOFI 2025-2026</strong> — Circ. n. ${fofiHits.map(h=>h.rec.n).join(', ')}
+    <strong>🚨 ${fofiHits.length} corrispondenza${fofiHits.length>1?'e':''} nella banca dati FOFI 2025-2026</strong> — ${fofiHits.map(h=>escHtml(fofiRiferimento(h.rec))).join(', ')}
   </div>` : '';
 
   // Intestazione stampa: dati farmacia + contesto ricetta (medico/farmaco/data/tipo)
