@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   circolarePdfToEntry, tipiDaTesto, extractPdfLinks,
   isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa, dataPiuRecente,
+  testoInsufficiente, serveRilettura, applicaRiletture,
 } from '../fofi-avvisi.js';
 
 const FIX = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -190,5 +191,60 @@ describe('dataPiuRecente — la data "Aggiornamento" non torna indietro', () => 
   it('ignora valori vuoti/non validi', () => {
     expect(dataPiuRecente('', '05/11/2026')).toBe('05/11/2026');
     expect(dataPiuRecente('05/11/2026', null)).toBe('05/11/2026');
+  });
+});
+
+// ── OCR dei PDF scansionati (ATSL: pdftotext estrae solo il timbro di protocollo) ──
+
+const SOLO_TIMBRO = 'ATSL.REGISTRO UFFICIALE.0401016.U.16-10-2026.h.12:26\n\f';
+const TESTO_OCR = 'Si comunica lo smarrimento del timbro personale della Dott.ssa Maria Bianchi, ' +
+  'dirigente medico U.O. Ematologia, Ospedale Policlinico San Martino di Genova.';
+
+describe('testoInsufficiente — quando serve l\'OCR', () => {
+  it('solo timbro di protocollo ATSL → serve OCR', () => {
+    expect(testoInsufficiente(SOLO_TIMBRO)).toBe(true);
+  });
+  it('vuoto → serve OCR', () => {
+    expect(testoInsufficiente('')).toBe(true);
+  });
+  it('testo vero (circolare FOFI) → niente OCR', () => {
+    expect(testoInsufficiente(txt(16135))).toBe(false);
+  });
+});
+
+describe('federfarmaEntry — il timbro di protocollo ATSL non entra nel tx', () => {
+  it('tx = solo oggetto se l\'allegato è solo timbro', () => {
+    const e = federfarmaEntry({ subject: 'dott.ssa RAPETTI Francesca - smarrimento timbro', text: SOLO_TIMBRO, date: '22/10/2026', key: 'k' });
+    expect(e.tx).toBe('dott.ssa RAPETTI Francesca - smarrimento timbro');
+  });
+});
+
+describe('serveRilettura — voci Federfarma già salvate ma senza testo allegato', () => {
+  it('voce con solo oggetto + timbro → da rileggere', () => {
+    expect(serveRilettura({ n: null, src: 'Federfarma SP', k: 'k', tx: 'U.O. EMATOLOGIA - smarrimento timbro\n' + SOLO_TIMBRO })).toBe(true);
+  });
+  it('voce con testo completo → no', () => {
+    expect(serveRilettura({ n: null, src: 'Federfarma SP', k: 'k', tx: 'Oggetto\n' + TESTO_OCR })).toBe(false);
+  });
+  it('circolari FOFI numerate → mai', () => {
+    expect(serveRilettura({ n: 16130, t: ['T'], tx: 'x' })).toBe(false);
+  });
+});
+
+describe('applicaRiletture — sostituisce tx/t delle voci con la stessa k', () => {
+  const vecchia = { n: null, t: ['T'], tx: 'U.O. EMATOLOGIA - smarrimento timbro', m: [], f: [], src: 'Federfarma SP', d: '19/10/2026', k: 'k1' };
+  const altra = { n: 16130, t: ['T'], tx: 'x', m: [], f: [] };
+  it('aggiorna la voce, lascia le altre e conserva posizione, d e k', () => {
+    const nuova = { ...vecchia, tx: 'U.O. EMATOLOGIA - smarrimento timbro\n' + TESTO_OCR, t: ['T'] };
+    const { db, aggiornate } = applicaRiletture([altra, vecchia], [nuova]);
+    expect(db[0]).toBe(altra);
+    expect(db[1].tx).toMatch(/Maria Bianchi/);
+    expect(db[1]).toMatchObject({ d: '19/10/2026', k: 'k1', src: 'Federfarma SP' });
+    expect(aggiornate).toHaveLength(1);
+  });
+  it('non sostituisce con un testo non più ricco (OCR fallito)', () => {
+    const { db, aggiornate } = applicaRiletture([vecchia], [{ ...vecchia, tx: 'U.O. EMATOLOGIA' }]);
+    expect(db[0]).toBe(vecchia);
+    expect(aggiornate).toEqual([]);
   });
 });

@@ -23,7 +23,7 @@ import vm from 'node:vm';
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { entriesToDbFile, mergeNewEntries } = require(resolve(ROOT, 'fofi-xlsx.js'));
-const { circolarePdfToEntry, dataPiuRecente } = require(resolve(ROOT, 'fofi-avvisi.js'));
+const { circolarePdfToEntry, dataPiuRecente, applicaRiletture } = require(resolve(ROOT, 'fofi-avvisi.js'));
 
 function loadCurrentDb() {
   const src = readFileSync(resolve(ROOT, 'fofi-db.js'), 'utf8');
@@ -45,10 +45,12 @@ if (!inputs.length) {
 }
 
 const nuove = [];
+const riletture = []; // voci Federfarma già presenti, rilette con OCR
 for (const f of inputs) {
   if (/\.json$/i.test(f)) {
     const j = JSON.parse(readFileSync(f, 'utf8'));
     nuove.push(...(j.entries || []));
+    riletture.push(...(j.riletture || []));
     if (!aggiornata && j.aggiornata) aggiornata = j.aggiornata;
   } else if (/\.pdf$/i.test(f)) {
     const text = execFileSync('pdftotext', ['-enc', 'UTF-8', f, '-'], { encoding: 'utf8' });
@@ -59,18 +61,20 @@ for (const f of inputs) {
 }
 
 const { db, aggiornata: aggiornataAttuale } = loadCurrentDb();
-const { merged, added } = mergeNewEntries(db, nuove);
-console.log(`Banca dati attuale: ${db.length} voci · candidate: ${nuove.length} · nuove: ${added.length}`);
-if (!added.length) { console.log('✓ Nessuna voce nuova.'); process.exit(0); }
+const { merged: conNuove, added } = mergeNewEntries(db, nuove);
+const { db: merged, aggiornate } = applicaRiletture(conNuove, riletture);
+console.log(`Banca dati attuale: ${db.length} voci · candidate: ${nuove.length} · nuove: ${added.length} · rilette (OCR): ${aggiornate.length}`);
+if (!added.length && !aggiornate.length) { console.log('✓ Nessuna voce nuova.'); process.exit(0); }
 
 const etichetta = e => e.n != null ? String(e.n) : `FF ${e.d}`;
 added.forEach(e => console.log(`  ${etichetta(e)} [${e.t}] ${e.tx.replace(/\n/g, ' ').slice(0, 100)}`));
+aggiornate.forEach(e => console.log(`  ~ OCR ${etichetta(e)} [${e.t}] ${e.tx.replace(/\n/g, ' ').slice(0, 100)}`));
 
 if (write) {
   const data = dataPiuRecente(aggiornata, aggiornataAttuale); // mai all'indietro
   writeFileSync(resolve(ROOT, 'fofi-db.js'), entriesToDbFile(merged, data));
   console.log(`✓ Scritto fofi-db.js: ${merged.length} voci${data ? ` · aggiornamento ${data}` : ''}.`);
-  console.log('FOFI_ADDED=' + [...new Set(added.map(etichetta))].join(','));
+  console.log('FOFI_ADDED=' + [...new Set([...added.map(etichetta), ...aggiornate.map(e => 'OCR ' + etichetta(e))])].join(','));
 } else {
   console.log('(anteprima — rilancia con --write per applicare)');
 }

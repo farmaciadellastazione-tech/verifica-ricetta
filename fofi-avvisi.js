@@ -27,7 +27,7 @@ function tipiDaTesto(s) {
 // Righe pulite: niente bullet, spazi compressi, righe vuote rimosse.
 function pulisciRighe(s) {
   return String(s || '').split('\n')
-    .map(r => r.replace(/[••]/g, ' ').replace(/[ \t]+/g, ' ').trim())
+    .map(r => r.replace(/[••\f]/g, ' ').replace(/[ \t]+/g, ' ').trim())
     .filter(Boolean).join('\n');
 }
 
@@ -95,7 +95,7 @@ const MAX_TX_FF = 1500; // gli allegati Federfarma possono avere intestazioni lu
 // (data, protocollo, destinatari) e firmatari Federfarma vanno tolti, altrimenti
 // un medico che si chiama come un firmatario farebbe scattare il banner.
 const FINE_CORPO_FF = /^(cordiali saluti|distinti saluti|il segretario|il presidente)\b/i;
-const INTESTAZIONE_FF = /^(roma,|uff\.|prot|alle? |ai |agli |a tutte|loro sedi)/i;
+const INTESTAZIONE_FF = /^(roma,|uff\.|prot|alle? |ai |agli |a tutte|loro sedi)|registro ufficiale/i;
 
 function corpoFederfarma(text) {
   const righe = pulisciRighe(text).split('\n');
@@ -134,6 +134,42 @@ function giorniDa(dmy, now) {
   return Math.floor((oggi - d) / 86400000);
 }
 
+// ── OCR dei PDF scansionati ──────────────────────────────────────────────
+// I PDF di ATSL inoltrati da Federfarma sono scansioni: pdftotext estrae solo il
+// timbro di protocollo ("ATSL.REGISTRO UFFICIALE..."). Sotto questa soglia di
+// lettere il testo non è utilizzabile e va riletto con OCR (Tesseract, in CI).
+const MIN_LETTERE = 80;
+
+function testoInsufficiente(text) {
+  const utile = String(text || '').split('\n')
+    .filter(r => !/registro ufficiale/i.test(r)).join(' ');
+  return (utile.match(/[a-zà-ù]/gi) || []).length < MIN_LETTERE;
+}
+
+// Voce Federfarma già in banca dati ma salvata con solo l'oggetto (allegato
+// scansionato, prima dell'OCR): va riletta per recuperare nomi e dettagli.
+function serveRilettura(e) {
+  if (e.n != null || !e.k) return false;
+  return testoInsufficiente(String(e.tx || '').split('\n').slice(1).join('\n'));
+}
+
+// Sostituisce tx/t delle voci con la stessa k, solo se il nuovo testo è
+// davvero più ricco (un OCR fallito non deve peggiorare la voce).
+// Ritorna { db, aggiornate } con db nello stesso ordine.
+function applicaRiletture(db, riletture) {
+  const perK = new Map(riletture.filter(r => r.k).map(r => [r.k, r]));
+  const aggiornate = [];
+  const out = db.map(e => {
+    const r = e.k && perK.get(e.k);
+    if (!r || r.tx.length <= e.tx.length) return e;
+    if (testoInsufficiente(r.tx.split('\n').slice(1).join('\n'))) return e;
+    const nuova = { ...e, tx: r.tx, t: r.t };
+    aggiornate.push(nuova);
+    return nuova;
+  });
+  return { db: out, aggiornate };
+}
+
 // La più recente fra due date dd/mm/yyyy (valori non validi ignorati).
 function dataPiuRecente(a, b) {
   const k = d => /^\d{2}\/\d{2}\/\d{4}$/.test(d || '') ? d.split('/').reverse().join('') : '';
@@ -143,6 +179,7 @@ function dataPiuRecente(a, b) {
 }
 
 const _exports = {
+  testoInsufficiente, serveRilettura, applicaRiletture,
   dataPiuRecente, tipiDaTesto, circolarePdfToEntry, extractPdfLinks,
   isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa,
 };
