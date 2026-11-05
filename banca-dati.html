@@ -56,6 +56,9 @@
   .tipo-badge.T { background: var(--amber-100); color: var(--amber-800); }
   .tipo-badge.B { background: var(--gray-100); color: var(--gray-600); }
   .entry-tx { font-size: 15px; color: var(--text); line-height: 1.5; }
+  .entry-ocr { margin-top: 8px; font-size: 14px; color: var(--text-sec); }
+  .entry-ocr summary { cursor: pointer; font-weight: 600; }
+  .entry-ocr div { margin-top: 6px; white-space: pre-line; line-height: 1.45; }
   .entry-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .chip-meta { font-size: 13px; font-weight: 500; padding: 3px 9px; border-radius: 14px; background: var(--bg-sec); border: 0.5px solid var(--border); color: var(--text-sec); }
   .chip-meta.medico::before { content: '👤 '; }
@@ -110,11 +113,14 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 
 const TIPO_LABEL = { F: 'Falsificazione', T: 'Furto/smarrimento timbro', B: 'Buoni acquisto' };
 
-// Indice di ricerca: testo normalizzato per voce (tx + medici + farmaci + n°).
+// Indice di ricerca: testo normalizzato per voce (tx + medici + farmaci + n° + OCR).
 // normalize() arriva da fofi-match.js (stessa logica del matching dell'app).
 const INDEX = FOFI_DB.map(rec => ({
   rec,
-  hay: normalize([rec.tx, (rec.m || []).join(' '), (rec.f || []).join(' '), rec.n, rec.src].join(' '))
+  // base = campi principali; hay = base + testo OCR (per aprire il riquadro OCR
+  // solo quando un termine si trova soltanto lì).
+  base: normalize([rec.tx, (rec.m || []).join(' '), (rec.f || []).join(' '), rec.n, rec.src].join(' ')),
+  hay: normalize([rec.tx, (rec.m || []).join(' '), (rec.f || []).join(' '), rec.n, rec.src, rec.ocr].join(' '))
 }));
 
 let filtroTipo = '';
@@ -142,12 +148,12 @@ function render() {
   let voci = INDEX.filter(({ rec, hay }) => {
     if (filtroTipo && !(rec.t || []).includes(filtroTipo)) return false;
     return termini.every(t => hay.includes(t));
-  }).map(x => x.rec);
+  });
 
   // Più recenti in cima: prima gli inoltri senza numero (Federfarma SP) per data
   // decrescente, poi le circolari FOFI per n° decrescente.
   const dataKey = d => (d || '').split('/').reverse().join('');
-  voci.sort((a, b) => {
+  voci.sort(({ rec: a }, { rec: b }) => {
     if (a.n == null && b.n == null) return dataKey(b.d).localeCompare(dataKey(a.d));
     if (a.n == null) return -1;
     if (b.n == null) return 1;
@@ -163,7 +169,7 @@ function render() {
     return;
   }
 
-  box.innerHTML = voci.map(rec => {
+  box.innerHTML = voci.map(({ rec, base }) => {
     const badges = (rec.t || []).map(t =>
       `<span class="tipo-badge ${t}">${TIPO_LABEL[t] || t}</span>`).join('');
     const medici = (rec.m || []).map(m =>
@@ -171,10 +177,15 @@ function render() {
     const farmaci = (rec.f || []).map(f =>
       `<span class="chip-meta farmaco">${highlight(f, termini)}</span>`).join('');
     const meta = (medici || farmaci) ? `<div class="entry-meta">${medici}${farmaci}</div>` : '';
+    // Testo dell'allegato scansionato (OCR): solo da consultare, l'allarme
+    // dell'app non lo usa. Aperto se la ricerca trova qualcosa solo lì.
+    const apri = rec.ocr && termini.some(t => !base.includes(t)) ? ' open' : '';
+    const ocr = rec.ocr ? `<details class="entry-ocr"${apri}><summary>Testo dell'allegato (letto con OCR, può contenere errori, non usato per l'allarme)</summary><div>${highlight(rec.ocr, termini)}</div></details>` : '';
     return `<div class="entry">
       <div class="entry-head">${badges}<span class="entry-n">${escHtml(fofiRiferimento(rec))}</span></div>
       <div class="entry-tx">${highlight(rec.tx, termini)}</div>
       ${meta}
+      ${ocr}
     </div>`;
   }).join('');
 }

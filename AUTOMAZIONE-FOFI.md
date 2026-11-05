@@ -72,6 +72,16 @@ New repository secret**. Crea i tre:
    - **inoltri di Federfarma La Spezia** (`info@federfarmalaspezia.it`) con oggetto
      "furto/smarrimento/falsificazione…" di un medico: voci senza numero
      (`n:null`, `src:"Federfarma SP"`, `d`=data mail, `k`=Message-ID per la deduplica).
+     Gli allegati PDF scansionati (es. ATSL: `pdftotext` legge solo il timbro di
+     protocollo) passano per **OCR** (`pdftoppm` + `tesseract -l ita`). Le voci già
+     salvate con solo l'oggetto vengono rilette automaticamente (finestra 45 giorni)
+     e il loro testo sostituito, solo se l'OCR produce testo utile.
+     Il testo OCR va nel campo **`ocr`**, consultabile nella pagina Banca dati
+     (riquadro "Testo dell'allegato") ma **escluso dal matching**: le lettere degli
+     ospedali contengono decine di nomi estranei (amministrativi, infermieri,
+     direttori) che farebbero scattare il banner per ogni omonimo. L'allarme resta
+     sull'oggetto della mail. La pagina di accompagnamento ATSL ("invio copia
+     smarrimento/furto…") viene scartata.
 2. `tools/build-fofi-db.mjs --write` (Excel) e `tools/apply-fofi-entries.mjs --write`
    (PDF/Federfarma) — accodano solo le voci nuove (deterministico, nessuna AI).
    A mano: `node tools/apply-fofi-entries.mjs 16130.pdf 16132.pdf --date 03/11/2026 --write`.

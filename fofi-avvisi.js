@@ -27,7 +27,7 @@ function tipiDaTesto(s) {
 // Righe pulite: niente bullet, spazi compressi, righe vuote rimosse.
 function pulisciRighe(s) {
   return String(s || '').split('\n')
-    .map(r => r.replace(/[••]/g, ' ').replace(/[ \t]+/g, ' ').trim())
+    .map(r => r.replace(/[••\f]/g, ' ').replace(/[ \t]+/g, ' ').trim())
     .filter(Boolean).join('\n');
 }
 
@@ -94,24 +94,77 @@ const MAX_TX_FF = 1500; // gli allegati Federfarma possono avere intestazioni lu
 // Il matching gira su tx e basta un token lungo per dare l'allarme: intestazione
 // (data, protocollo, destinatari) e firmatari Federfarma vanno tolti, altrimenti
 // un medico che si chiama come un firmatario farebbe scattare il banner.
-const FINE_CORPO_FF = /^(cordiali saluti|distinti saluti|il segretario|il presidente)\b/i;
-const INTESTAZIONE_FF = /^(roma,|uff\.|prot|alle? |ai |agli |a tutte|loro sedi)/i;
+// Fine del corpo: saluti, firmatari Federfarma, oppure una riga che è SOLO un
+// titolo di firma ("Il Direttore Sanitario"). "Il Dirigente Medico dott. Rossi
+// ha denunciato…" invece è testo della segnalazione e va tenuto.
+// Il taglio vale sul testo intero (non per pagina): le firme a pagina 2 restano fuori.
+const FINE_CORPO_FF = /^(cordiali saluti|distinti saluti|il segretario|il presidente)\b|^(il direttore|il dirigente|il responsabile)(\s+(sanitario|generale|medico|f\.?\s?f\.?))?\s*$/i;
+const INTESTAZIONE_FF = /^(roma,|uff\.|prot|alle? |ai |agli |a tutte|loro sedi)|registro ufficiale/i;
+// Pagina di accompagnamento ATSL ("invio copia smarrimento/furto…"): solo
+// intestazioni e destinatari, la segnalazione vera è nelle pagine dopo.
+// Per il tx si usa solo la frase ATSL specifica: "massima diffusione" compare
+// anche negli avvisi normali e non deve far sparire il testo.
+const PAGINA_ACCOMPAGNAMENTO = /invio copia (dello? )?(smarrimento|furto)/i;
+const ACCOMPAGNAMENTO_ATSL = /invio copia (dello? )?(smarrimento|furto)|preghiera di massima diffusione/i;
+// Residui di carta intestata ATSL/Federfarma: usati SOLO per scartare una
+// rilettura dubbia (applicaRiletture), mai per svuotare il tx di una voce nuova.
+const RESIDUI_INTESTAZIONE = /bartolomeo|sarzana|federfarma|farmacisti|liguria|massima diffusione/i;
 
 function corpoFederfarma(text) {
-  const righe = pulisciRighe(text).split('\n');
+  const testo = String(text || '').split('\f')
+    .filter(p => !PAGINA_ACCOMPAGNAMENTO.test(p.replace(/\s+/g, ' ')))
+    .join('\n');
+  const righe = pulisciRighe(testo).split('\n');
   const fine = righe.findIndex(r => FINE_CORPO_FF.test(r));
   return (fine >= 0 ? righe.slice(0, fine) : righe)
     .filter(r => !INTESTAZIONE_FF.test(r))
     .join('\n');
 }
 
-function federfarmaEntry({ subject, text, date, key }) {
+// Testo OCR delle scansioni -> campo `ocr`, solo da consultare (pagina Banca
+// dati): NON entra nel tx perché le lettere degli ospedali contengono decine di
+// nomi estranei (amministrativi, infermieri, direttori) che farebbero scattare
+// il banner per qualunque medico omonimo. '' se l'OCR non ha prodotto nulla.
+//
+// PRIVACY: gli allegati contengono anche i verbali di denuncia (codice fiscale,
+// indirizzo, telefono, documento del denunciante) e fofi-db.js è pubblico su
+// GitHub Pages. Si tiene SOLO il paragrafo "Oggetto: … Distinti saluti" della
+// lettera dell'ospedale (reparto, direttori, evento) e si scarta ogni paragrafo
+// che sembri un verbale o contenga dati personali.
+const MAX_OCR = 1500;
+const BLOCCO_OGGETTO = /oggetto\s*:[\s\S]*?(?=\n\s*(?:distinti|cordiali)\s+saluti|\n\s*oggetto\s*:|$)/gi;
+const DATI_PERSONALI = new RegExp([
+  /denuncia (?:orale|di (?:smarrimento|furto))|verbale|sottoscritt|dichiaro|matricola/.source,
+  /codice fiscale|\bnat[oa] a\b|residente|carta d.?identit|e-?mail|@|\btel\b/.source,
+  // l'input è OCR rumoroso: pattern larghi, meglio scartare un paragrafo in più
+  /\b(?=[A-Z0-9]{16}\b)(?=(?:[A-Z]*[0-9]){2})[A-Z0-9]{16}\b/.source, // codice fiscale (anche O/0, I/1)
+  /\d{6,}/.source,                                      // documenti, matricole, cellulari
+  /\b3\d{2}[\s.]?\d{6,7}\b/.source,                     // cellulare con spazio
+  /\b0\d{1,3}[\s.\/-]?\d{5,8}\b/.source,                // telefono fisso
+  /\b(via|viale|piazza|corso|largo|vico|salita)\s+[^\n,]{2,40}?\s\d{1,4}\b/.source, // indirizzo con civico
+].join('|'), 'i');
+
+function testoOcr(text) {
+  const pagine = String(text || '').split('\f')
+    .filter(p => !ACCOMPAGNAMENTO_ATSL.test(p.replace(/\s+/g, ' ')))
+    .join('\n').replace(/\r/g, '');
+  const s = (pagine.match(BLOCCO_OGGETTO) || [])
+    .map(b => pulisciRighe(b))
+    .filter(b => b && !DATI_PERSONALI.test(b))
+    .join('\n').slice(0, MAX_OCR);
+  return testoInsufficiente(s) ? '' : s;
+}
+
+function federfarmaEntry({ subject, text, ocr, date, key }) {
   const sogg = String(subject || '').trim();
   const corpo = corpoFederfarma(text).slice(0, MAX_TX_FF);
   const tx = corpo ? sogg + '\n' + corpo : sogg;
   let t = tipiDaTesto(sogg + '\n' + corpo);
   if (!t.length) t = ['F'];
-  return { n: null, t, tx, m: [], f: [], src: 'Federfarma SP', d: date || '', k: key || '' };
+  const e = { n: null, t, tx, m: [], f: [], src: 'Federfarma SP', d: date || '', k: key || '' };
+  const o = testoOcr(ocr);
+  if (o) e.ocr = o;
+  return e;
 }
 
 // word/document.xml di un .docx -> testo semplice (un paragrafo per riga).
@@ -134,6 +187,49 @@ function giorniDa(dmy, now) {
   return Math.floor((oggi - d) / 86400000);
 }
 
+// ── OCR dei PDF scansionati ──────────────────────────────────────────────
+// I PDF di ATSL inoltrati da Federfarma sono scansioni: pdftotext estrae solo il
+// timbro di protocollo ("ATSL.REGISTRO UFFICIALE..."). Sotto questa soglia di
+// lettere il testo non è utilizzabile e va riletto con OCR (Tesseract, in CI).
+const MIN_LETTERE = 80;
+
+function testoInsufficiente(text) {
+  const utile = String(text || '').split('\n')
+    .filter(r => !/registro ufficiale/i.test(r)).join(' ');
+  return (utile.match(/[a-zà-ù]/gi) || []).length < MIN_LETTERE;
+}
+
+// Voce Federfarma già in banca dati ma salvata con solo l'oggetto (allegato
+// scansionato, prima dell'OCR): va riletta per recuperare nomi e dettagli.
+function serveRilettura(e) {
+  if (e.n != null || !e.k || e.ocr) return false;
+  return testoInsufficiente(String(e.tx || '').split('\n').slice(1).join('\n'));
+}
+
+// Sostituisce tx/t delle voci con la stessa k, solo se il nuovo testo è
+// davvero più ricco (un OCR fallito non deve peggiorare la voce).
+// Ritorna { db, aggiornate } con db nello stesso ordine.
+function applicaRiletture(db, riletture) {
+  const perK = new Map(riletture.filter(r => r.k).map(r => [r.k, r]));
+  const aggiornate = [];
+  const out = db.map(e => {
+    const r = e.k && perK.get(e.k);
+    if (!r) return e;
+    let nuova = e;
+    // tx: solo testo vero (pdftotext/docx), più ricco e senza intestazioni
+    const corpoNuovo = String(r.tx || '').split('\n').slice(1).join('\n');
+    if (r.tx && r.tx.length > e.tx.length &&
+        !testoInsufficiente(corpoNuovo) && !RESIDUI_INTESTAZIONE.test(corpoNuovo)) {
+      nuova = { ...nuova, tx: r.tx, t: r.t };
+    }
+    // ocr: testo delle scansioni, solo consultabile (fuori dal matching)
+    if (r.ocr && r.ocr.length > String(e.ocr || '').length) nuova = { ...nuova, ocr: r.ocr };
+    if (nuova !== e) aggiornate.push(nuova);
+    return nuova;
+  });
+  return { db: out, aggiornate };
+}
+
 // La più recente fra due date dd/mm/yyyy (valori non validi ignorati).
 function dataPiuRecente(a, b) {
   const k = d => /^\d{2}\/\d{2}\/\d{4}$/.test(d || '') ? d.split('/').reverse().join('') : '';
@@ -143,6 +239,7 @@ function dataPiuRecente(a, b) {
 }
 
 const _exports = {
+  testoInsufficiente, serveRilettura, applicaRiletture,
   dataPiuRecente, tipiDaTesto, circolarePdfToEntry, extractPdfLinks,
   isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa,
 };

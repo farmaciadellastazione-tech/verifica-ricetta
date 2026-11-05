@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   circolarePdfToEntry, tipiDaTesto, extractPdfLinks,
   isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa, dataPiuRecente,
+  testoInsufficiente, serveRilettura, applicaRiletture,
 } from '../fofi-avvisi.js';
 
 const FIX = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -190,5 +191,261 @@ describe('dataPiuRecente — la data "Aggiornamento" non torna indietro', () => 
   it('ignora valori vuoti/non validi', () => {
     expect(dataPiuRecente('', '05/11/2026')).toBe('05/11/2026');
     expect(dataPiuRecente('05/11/2026', null)).toBe('05/11/2026');
+  });
+});
+
+// ── OCR dei PDF scansionati (ATSL: pdftotext estrae solo il timbro di protocollo) ──
+
+const SOLO_TIMBRO = 'ATSL.REGISTRO UFFICIALE.0401016.U.16-10-2026.h.12:26\n\f';
+const TESTO_OCR = 'Si comunica lo smarrimento del timbro personale della Dott.ssa Maria Bianchi, ' +
+  'dirigente medico U.O. Ematologia, Ospedale Policlinico San Martino di Genova.';
+
+describe('testoInsufficiente — quando serve l\'OCR', () => {
+  it('solo timbro di protocollo ATSL → serve OCR', () => {
+    expect(testoInsufficiente(SOLO_TIMBRO)).toBe(true);
+  });
+  it('vuoto → serve OCR', () => {
+    expect(testoInsufficiente('')).toBe(true);
+  });
+  it('testo vero (circolare FOFI) → niente OCR', () => {
+    expect(testoInsufficiente(txt(16135))).toBe(false);
+  });
+});
+
+describe('federfarmaEntry — il timbro di protocollo ATSL non entra nel tx', () => {
+  it('tx = solo oggetto se l\'allegato è solo timbro', () => {
+    const e = federfarmaEntry({ subject: 'dott.ssa RAPETTI Francesca - smarrimento timbro', text: SOLO_TIMBRO, date: '22/10/2026', key: 'k' });
+    expect(e.tx).toBe('dott.ssa RAPETTI Francesca - smarrimento timbro');
+  });
+});
+
+describe('serveRilettura — voci Federfarma già salvate ma senza testo allegato', () => {
+  it('voce con solo oggetto + timbro → da rileggere', () => {
+    expect(serveRilettura({ n: null, src: 'Federfarma SP', k: 'k', tx: 'U.O. EMATOLOGIA - smarrimento timbro\n' + SOLO_TIMBRO })).toBe(true);
+  });
+  it('voce con testo completo → no', () => {
+    expect(serveRilettura({ n: null, src: 'Federfarma SP', k: 'k', tx: 'Oggetto\n' + TESTO_OCR })).toBe(false);
+  });
+  it('circolari FOFI numerate → mai', () => {
+    expect(serveRilettura({ n: 16130, t: ['T'], tx: 'x' })).toBe(false);
+  });
+});
+
+describe('applicaRiletture — sostituisce tx/t delle voci con la stessa k', () => {
+  const vecchia = { n: null, t: ['T'], tx: 'U.O. EMATOLOGIA - smarrimento timbro', m: [], f: [], src: 'Federfarma SP', d: '19/10/2026', k: 'k1' };
+  const altra = { n: 16130, t: ['T'], tx: 'x', m: [], f: [] };
+  it('aggiorna la voce, lascia le altre e conserva posizione, d e k', () => {
+    const nuova = { ...vecchia, tx: 'U.O. EMATOLOGIA - smarrimento timbro\n' + TESTO_OCR, t: ['T'] };
+    const { db, aggiornate } = applicaRiletture([altra, vecchia], [nuova]);
+    expect(db[0]).toBe(altra);
+    expect(db[1].tx).toMatch(/Maria Bianchi/);
+    expect(db[1]).toMatchObject({ d: '19/10/2026', k: 'k1', src: 'Federfarma SP' });
+    expect(aggiornate).toHaveLength(1);
+  });
+  it('non sostituisce con un testo non più ricco (OCR fallito)', () => {
+    const { db, aggiornate } = applicaRiletture([vecchia], [{ ...vecchia, tx: 'U.O. EMATOLOGIA' }]);
+    expect(db[0]).toBe(vecchia);
+    expect(aggiornate).toEqual([]);
+  });
+});
+
+// ── OCR ATSL: lettera di accompagnamento e firmatari (dry run #143) ─────────
+// L'OCR reale ha letto solo la pagina 1 (accompagnamento ATSL), piena di
+// intestazioni ("Via Cisa Sud c/o P.O. San Bartolomeo — SARZANA"): un medico di
+// nome Bartolomeo avrebbe fatto scattare il banner. Le pagine arrivano separate
+// da \f (pdftotext e OCR); il taglio firme vale pagina per pagina.
+const ACCOMPAGNAMENTO = [
+  'ATS LIGURIA',
+  'AZIENDA TUTELA DELLA SALUTE LIGURIA',
+  'AREA SOCIOSANITARIA LOCALE 5',
+  'S.C. Assistenza Farmaceutica',
+  'Via Cisa Sud c/o P.O. San Bartolomeo — SARZANA SP',
+  'Tel.: 0187-604736',
+  'Associazione Titolari Farmacia',
+  'Provincia della Spezia',
+  'ap.laspezia@pec.federfarma.it',
+  'Oggetto: invio copia smarrimento/furto ricettari e/o timbri medici.',
+  'Si trasmette in allegato comunicazione prot. n. 123 relativa all\'oggetto, per conoscenza e con preghiera di massima diffusione.',
+  'Distinti saluti',
+  'Il Direttore',
+  'Dott. Ernesto Pallavicini',
+].join('\n');
+const COMUNICAZIONE = [
+  'Si comunica lo smarrimento del timbro personale della dott.ssa RAPETTI Francesca,',
+  'medico di continuità assistenziale, codice regionale 123456.',
+  'Il Direttore Sanitario',
+  'Dott. Gualtiero Bonaventura',
+].join('\n');
+
+describe('federfarmaEntry — OCR ATSL: niente pagina di accompagnamento né firmatari', () => {
+  const sogg = 'dott.ssa RAPETTI Francesca - smarrimento timbro';
+
+  it('scarta la pagina di accompagnamento ma tiene la comunicazione delle pagine successive', () => {
+    const text = 'ATSL.REGISTRO UFFICIALE.0408733.U.22-10-2026.h.11:59\f' + ACCOMPAGNAMENTO + '\f' + COMUNICAZIONE;
+    const e = federfarmaEntry({ subject: sogg, text, date: '22/10/2026', key: '<x@y>' });
+    expect(e.tx).toMatch(/smarrimento del timbro personale della dott\.ssa RAPETTI/);
+    expect(e.tx).not.toMatch(/Bartolomeo|SARZANA|Liguria|Spezia|Pallavicini|massima diffusione/i);
+  });
+
+  it('i firmatari ATSL/ospedale (Il Direttore…) non entrano nel tx', () => {
+    const e = federfarmaEntry({ subject: sogg, text: COMUNICAZIONE, date: '22/10/2026', key: '<x@y>' });
+    expect(e.tx).not.toMatch(/Bonaventura|Direttore/);
+  });
+
+  it('se c\'è solo la pagina di accompagnamento il tx resta l\'oggetto', () => {
+    const e = federfarmaEntry({ subject: sogg, text: ACCOMPAGNAMENTO, date: '22/10/2026', key: '<x@y>' });
+    expect(e.tx).toBe(sogg);
+  });
+});
+
+describe('applicaRiletture — scarta OCR con residui di intestazione', () => {
+  it('non applica una rilettura che contiene ancora intestazioni ATSL/Federfarma', () => {
+    const db = [{ n: null, t: ['T'], tx: 'dott.ssa X - smarrimento timbro', m: [], f: [], k: '<a>' }];
+    const sporca = 'dott.ssa X - smarrimento timbro\n' +
+      'Comunicazione relativa allo smarrimento del timbro, presso P.O. San Bartolomeo SARZANA, ' +
+      'si prega di diffondere a tutte le farmacie interessate del territorio provinciale.';
+    const { aggiornate } = applicaRiletture(db, [{ k: '<a>', t: ['T'], tx: sporca }]);
+    expect(aggiornate).toHaveLength(0);
+  });
+});
+
+// ── OCR solo consultabile (dry run #144) ─────────────────────────────────
+// Le lettere dell'ospedale lette con OCR contengono decine di nomi estranei
+// (amministrativi, infermieri, direttori, città): nel tx farebbero scattare il
+// banner per ogni medico "Roberto" o "Amato". Il testo OCR va nel campo `ocr`,
+// mostrato nella pagina Banca dati ma escluso dal matching (che gira su tx).
+const LETTERA_OSPEDALE = [
+  'PLESSO OSPEDALIERO IRCCS POLICLINICO SAN MARTINO',
+  'Responsabile del procedimento: Dott.ssa Rosa Amato',
+  'Oggetto: Smarrimento o furto timbro di reparto',
+  'Si trasmette, per opportuna conoscenza, l\'acclusa copia della denuncia riguardante lo smarrimento',
+  'di un timbro ospedaliero relativo alla U.O. EMATOLOGIA DEGENZA (Direttore Prof. ROBERTO MASSIMO LEMOLI).',
+].join('\n');
+
+describe('federfarmaEntry — testo OCR nel campo ocr, non nel tx', () => {
+  const sogg = 'U.O. EMATOLOGIA DEGENZA - Osp. S. Martino GE - smarrimento timbro';
+  const timbro = 'ATSL.REGISTRO UFFICIALE.0401016.U.16-10-2026.h.12:26';
+
+  it('tx resta l\'oggetto, ocr contiene la lettera senza la pagina di accompagnamento', () => {
+    const e = federfarmaEntry({ subject: sogg, text: timbro, ocr: ACCOMPAGNAMENTO + '\f' + LETTERA_OSPEDALE, date: '19/10/2026', key: 'k1' });
+    expect(e.tx).toBe(sogg);
+    expect(e.ocr).toMatch(/EMATOLOGIA DEGENZA/);
+    expect(e.ocr).not.toMatch(/massima diffusione|REGISTRO UFFICIALE/);
+  });
+
+  it('OCR vuoto o inutilizzabile → nessun campo ocr', () => {
+    const e = federfarmaEntry({ subject: sogg, text: timbro, ocr: ACCOMPAGNAMENTO, date: '19/10/2026', key: 'k1' });
+    expect(e.ocr).toBeUndefined();
+  });
+});
+
+describe('serveRilettura / applicaRiletture — campo ocr', () => {
+  const vecchia = { n: null, t: ['T'], tx: 'U.O. EMATOLOGIA - smarrimento timbro', m: [], f: [], src: 'Federfarma SP', d: '19/10/2026', k: 'k1' };
+
+  it('voce che ha già il testo OCR → non va riletta', () => {
+    expect(serveRilettura({ ...vecchia, ocr: LETTERA_OSPEDALE })).toBe(false);
+  });
+
+  it('la rilettura aggiunge ocr e lascia tx invariato', () => {
+    const { db, aggiornate } = applicaRiletture([vecchia], [{ ...vecchia, ocr: LETTERA_OSPEDALE }]);
+    expect(db[0].tx).toBe(vecchia.tx);
+    expect(db[0].ocr).toBe(LETTERA_OSPEDALE);
+    expect(aggiornate).toHaveLength(1);
+  });
+
+  it('i nomi del testo OCR non fanno scattare il matching (che gira su tx)', async () => {
+    const { scoreMatch, tokenize } = await import('../fofi-match.js');
+    const { db } = applicaRiletture([vecchia], [{ ...vecchia, ocr: LETTERA_OSPEDALE }]);
+    expect(scoreMatch(tokenize('Amato Roberto'), db[0]).score).toBe(0);
+  });
+});
+
+// ── OCR: niente dati personali dai verbali di denuncia (dry run #145) ────────
+// Gli allegati contengono anche i verbali dei Carabinieri con codice fiscale,
+// indirizzo, telefono e documento del denunciante: fofi-db.js è pubblico (GitHub
+// Pages), quindi del testo OCR si tiene solo il paragrafo "Oggetto: … Distinti
+// saluti" della lettera dell'ospedale. Dati di fantasia.
+const LETTERA_E_VERBALE = [
+  'PLESSO OSPEDALIERO IRCCS POLICLINICO SAN MARTINO',
+  'Responsabile del procedimento: Dott.ssa Mara Rossetti',
+  'E-mail: mara.rossetti@ospedale.it Tel, 0105550000 Segreteria',
+  'Al Presidente Ordine dei Medici di Genova',
+  'Oggetto: Smarrimento timbro medico Dott.ssa Bianchi Lucia.',
+  'Si trasmette, per opportuna conoscenza, l\'acclusa copia della denuncia riguardante lo smarrimento',
+  'del timbro della U.O. Cardiologia (Direttore Prof. Carlo Neri).',
+  'Distinti Saluti',
+  'LA DIRETTRICE ff',
+].join('\n') + '\f' + [
+  'VERBALE di ricezione denuncia orale sporta da:',
+  'BIANCHI LUCIA nata a Genova (GE) il 01/01/1980, codice fiscale: BNCLCU80A41D969X, residente a',
+  'Genova (GE) in VIA ROMA, 1, tel. 3330000000, professione: Medico, carta identita\' nr. CA0000000',
+  'Genova, li 28 Settembre 2026',
+  'OGGETTO: Denuncia di smarrimento/furto timbro',
+  'Io sottoscritta, Verdi Anna, CPSI in servizio presso la Cardiologia, con matricola 0000000,',
+  'DICHIARO che: mi sono accorta della sparizione del timbro.',
+].join('\n');
+
+describe('federfarmaEntry — ocr senza dati personali dei verbali', () => {
+  const e = federfarmaEntry({ subject: 'dott.ssa BIANCHI Lucia - smarrimento timbro', text: '', ocr: LETTERA_E_VERBALE, date: '22/10/2026', key: 'k' });
+
+  it('tiene il paragrafo Oggetto della lettera dell\'ospedale', () => {
+    expect(e.ocr).toMatch(/Oggetto: Smarrimento timbro medico Dott\.ssa Bianchi Lucia/);
+    expect(e.ocr).toMatch(/U\.O\. Cardiologia/);
+  });
+
+  it('niente codice fiscale, telefono, indirizzo, nascita, documento, email', () => {
+    expect(e.ocr).not.toMatch(/BNCLCU80A41D969X|3330000000|VIA ROMA|nata a|residente|CA0000000|@|0105550000/i);
+  });
+
+  it('niente dichiarazioni dei denuncianti (verbale, "sottoscritta", matricola)', () => {
+    expect(e.ocr).not.toMatch(/VERBALE|sottoscritt|DICHIARO|matricola|Verdi Anna/i);
+  });
+
+  it('nessun paragrafo Oggetto utilizzabile → nessun campo ocr', () => {
+    const solo = federfarmaEntry({ subject: 's', text: '', ocr: LETTERA_E_VERBALE.split('\f')[1], date: '', key: 'k' });
+    expect(solo.ocr).toBeUndefined();
+  });
+});
+
+// ── Code review pre-merge: i filtri non devono togliere il medico dal tx ─────
+// Il matching gira su tx: perdere nome medico/farmaco = banner che non scatta.
+describe('federfarmaEntry — il nome del medico resta nel tx (code review)', () => {
+  const ff = text => federfarmaEntry({ subject: 'Furto timbro dr Rossi', text, date: '', key: 'k' }).tx;
+
+  it('parole come Sarzana/Federfarma/Liguria nel corpo non svuotano il tx', () => {
+    expect(ff('Oggetto: furto timbro dott. Mario Rossi, P.O. di Sarzana, ASL Liguria')).toMatch(/Mario Rossi/);
+  });
+  it('"Il Dirigente Medico dott. X ha denunciato…" non è una firma', () => {
+    expect(ff('Oggetto: furto timbro\nIl Dirigente Medico dott. Mario Rossi ha denunciato il furto del timbro.')).toMatch(/Mario Rossi/);
+  });
+  it('"preghiera di massima diffusione" in un avviso normale non cancella il testo', () => {
+    expect(ff('Si comunica con preghiera di massima diffusione il furto del ricettario del dott. Mario Rossi')).toMatch(/Mario Rossi/);
+  });
+  it('righe che iniziano con un cognome Tel…/contengono email restano', () => {
+    const tx = ff('Si comunica il furto del timbro del dott.\nTellini Mario, medico di base (tellini@asl.it)');
+    expect(tx).toMatch(/Tellini Mario/);
+  });
+  it('dopo "Cordiali saluti" a pagina 1 le pagine successive (firme) restano fuori', () => {
+    const tx = ff('Oggetto: furto timbro dott. Mario Rossi\nCordiali saluti.\n\fDott. Michele PELLEGRINI CALACE Dott. Marco COSSOLO\n\f');
+    expect(tx).toMatch(/Mario Rossi/);
+    expect(tx).not.toMatch(/PELLEGRINI|COSSOLO/);
+  });
+});
+
+describe('federfarmaEntry — ocr: filtro privacy robusto agli errori OCR', () => {
+  const blocco = riga => federfarmaEntry({ subject: 's', text: '', key: 'k',
+    ocr: 'Oggetto: Smarrimento timbro di reparto\nSi trasmette copia relativa alla U.O. Cardiologia del Policlinico.\n' + riga }).ocr;
+
+  it('codice fiscale letto male (O/0, I/1) → paragrafo scartato', () => {
+    expect(blocco('denunciante RSSMRA8OA01E463X')).toBeUndefined();
+  });
+  it('telefono fisso senza "tel" → scartato', () => {
+    expect(blocco('recapito 0187 524111')).toBeUndefined();
+  });
+  it('indirizzo con numero civico → scartato', () => {
+    expect(blocco('abitante in Via Roma 5')).toBeUndefined();
+  });
+  it('paragrafo pulito → tenuto', () => {
+    expect(blocco('reparto afferente allo scrivente Policlinico.')).toMatch(/U\.O\. Cardiologia/);
   });
 });
