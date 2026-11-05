@@ -34,7 +34,7 @@ const {
   extractPdfLinks, circolarePdfToEntry, isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText,
 } = require(resolve(ROOT, 'fofi-avvisi.js'));
 
-const GIORNI_XLSX = 120;
+const GIORNI_XLSX = 30; // Excel sospeso dal 3/11/2026: non riscaricare quello vecchio per mesi
 const GIORNI_AVVISI = 30; // finestra per PDF circolari e inoltri Federfarma
 
 // ── Helper puri (esportati, testati in tests/fetch-fofi-email.test.js) ──────

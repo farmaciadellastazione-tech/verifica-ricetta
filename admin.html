@@ -331,8 +331,12 @@ function validaEntry(e) {
 }
 
 // ── Coda + output ────────────────────────────────────────────────────────
+// src/d/k (voci Federfarma SP senza numero) vanno conservati: k evita che il
+// workflow le riaccodi come duplicati, src/d servono all'etichetta in UI.
 function entryToJson(e) {
-  return JSON.stringify({ n: e.n === '' ? null : e.n, t: e.t, tx: e.tx, m: e.m, f: e.f });
+  const o = { n: e.n === '' ? null : e.n, t: e.t, tx: e.tx, m: e.m, f: e.f };
+  for (const k of ['src', 'd', 'k']) if (e[k]) o[k] = e[k];
+  return JSON.stringify(o);
 }
 
 function renderStaged() {
@@ -368,8 +372,8 @@ document.getElementById('btn-copy').addEventListener('click', async () => {
 
 document.getElementById('btn-download').addEventListener('click', () => {
   if (!nuove.length) return;
-  // Ricostruisce il file: voci esistenti (solo i 5 campi, niente _tok) + nuove.
-  const esistenti = FOFI_DB.map(r => entryToJson({ n: r.n, t: r.t, tx: r.tx, m: r.m || [], f: r.f || [] }));
+  // Ricostruisce il file: voci esistenti (campi dati + src/d/k, niente _tok) + nuove.
+  const esistenti = FOFI_DB.map(r => entryToJson({ n: r.n, t: r.t, tx: r.tx, m: r.m || [], f: r.f || [], src: r.src, d: r.d, k: r.k }));
   const aggiunte = nuove.map(entryToJson);
   const tutte = esistenti.concat(aggiunte);
   // Data di aggiornamento (footer): dal campo, in formato dd/mm/yyyy. Conservata
