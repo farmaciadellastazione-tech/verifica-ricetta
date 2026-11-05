@@ -108,7 +108,7 @@ function ocrPdf(f, tmp) {
     const base = basename(prefisso);
     return readdirSync(tmp).filter(n => n.startsWith(base) && n.endsWith('.png')).sort()
       .map(n => execFileSync('tesseract', [join(tmp, n), '-', '-l', 'ita'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }))
-      .join('\n');
+      .join('\f'); // pagine separate: accompagnamento e firme si tolgono per pagina
   } catch (err) {
     console.warn(`[FOFI] OCR non riuscito: ${err.message}`);
     return '';
@@ -125,7 +125,7 @@ function allegatoToText(buf, nomeFile, tmp) {
       const testo = execFileSync('pdftotext', ['-enc', 'UTF-8', f, '-'], { encoding: 'utf8' });
       if (!testoInsufficiente(testo)) return testo;
       console.log(`  (${nomeFile}: scansione, uso OCR)`);
-      return testo + '\n' + ocrPdf(f, tmp);
+      return testo + '\f' + ocrPdf(f, tmp);
     }
     if (/\.docx$/i.test(nomeFile)) return docxXmlToText(execFileSync('unzip', ['-p', f, 'word/document.xml'], { encoding: 'utf8' }));
   } catch (err) {
@@ -216,7 +216,7 @@ async function cercaFederfarma(client, known, tmp) {
     const text = (parsed.attachments || [])
       .filter(a => /\.(pdf|docx)$/i.test(a.filename || ''))
       .map(a => allegatoToText(a.content, a.filename, tmp))
-      .join('\n');
+      .join('\f');
     const date = formatEmailDate(parsed.date?.toUTCString() || '');
     known.chiavi.add(key);
     known.daRileggere.delete(key);

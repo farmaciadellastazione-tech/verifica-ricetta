@@ -248,3 +248,63 @@ describe('applicaRiletture — sostituisce tx/t delle voci con la stessa k', () 
     expect(aggiornate).toEqual([]);
   });
 });
+
+// ── OCR ATSL: lettera di accompagnamento e firmatari (dry run #143) ─────────
+// L'OCR reale ha letto solo la pagina 1 (accompagnamento ATSL), piena di
+// intestazioni ("Via Cisa Sud c/o P.O. San Bartolomeo — SARZANA"): un medico di
+// nome Bartolomeo avrebbe fatto scattare il banner. Le pagine arrivano separate
+// da \f (pdftotext e OCR); il taglio firme vale pagina per pagina.
+const ACCOMPAGNAMENTO = [
+  'ATS LIGURIA',
+  'AZIENDA TUTELA DELLA SALUTE LIGURIA',
+  'AREA SOCIOSANITARIA LOCALE 5',
+  'S.C. Assistenza Farmaceutica',
+  'Via Cisa Sud c/o P.O. San Bartolomeo — SARZANA SP',
+  'Tel.: 0187-604736',
+  'Associazione Titolari Farmacia',
+  'Provincia della Spezia',
+  'ap.laspezia@pec.federfarma.it',
+  'Oggetto: invio copia smarrimento/furto ricettari e/o timbri medici.',
+  'Si trasmette in allegato comunicazione prot. n. 123 relativa all\'oggetto, per conoscenza e con preghiera di massima diffusione.',
+  'Distinti saluti',
+  'Il Direttore',
+  'Dott. Ernesto Pallavicini',
+].join('\n');
+const COMUNICAZIONE = [
+  'Si comunica lo smarrimento del timbro personale della dott.ssa RAPETTI Francesca,',
+  'medico di continuità assistenziale, codice regionale 123456.',
+  'Il Direttore Sanitario',
+  'Dott. Gualtiero Bonaventura',
+].join('\n');
+
+describe('federfarmaEntry — OCR ATSL: niente pagina di accompagnamento né firmatari', () => {
+  const sogg = 'dott.ssa RAPETTI Francesca - smarrimento timbro';
+
+  it('scarta la pagina di accompagnamento ma tiene la comunicazione delle pagine successive', () => {
+    const text = 'ATSL.REGISTRO UFFICIALE.0408733.U.22-10-2026.h.11:59\f' + ACCOMPAGNAMENTO + '\f' + COMUNICAZIONE;
+    const e = federfarmaEntry({ subject: sogg, text, date: '22/10/2026', key: '<x@y>' });
+    expect(e.tx).toMatch(/smarrimento del timbro personale della dott\.ssa RAPETTI/);
+    expect(e.tx).not.toMatch(/Bartolomeo|SARZANA|Liguria|Spezia|Pallavicini|massima diffusione/i);
+  });
+
+  it('i firmatari ATSL/ospedale (Il Direttore…) non entrano nel tx', () => {
+    const e = federfarmaEntry({ subject: sogg, text: COMUNICAZIONE, date: '22/10/2026', key: '<x@y>' });
+    expect(e.tx).not.toMatch(/Bonaventura|Direttore/);
+  });
+
+  it('se c\'è solo la pagina di accompagnamento il tx resta l\'oggetto', () => {
+    const e = federfarmaEntry({ subject: sogg, text: ACCOMPAGNAMENTO, date: '22/10/2026', key: '<x@y>' });
+    expect(e.tx).toBe(sogg);
+  });
+});
+
+describe('applicaRiletture — scarta OCR con residui di intestazione', () => {
+  it('non applica una rilettura che contiene ancora intestazioni ATSL/Federfarma', () => {
+    const db = [{ n: null, t: ['T'], tx: 'dott.ssa X - smarrimento timbro', m: [], f: [], k: '<a>' }];
+    const sporca = 'dott.ssa X - smarrimento timbro\n' +
+      'Comunicazione relativa allo smarrimento del timbro, presso P.O. San Bartolomeo SARZANA, ' +
+      'si prega di diffondere a tutte le farmacie interessate del territorio provinciale.';
+    const { aggiornate } = applicaRiletture(db, [{ k: '<a>', t: ['T'], tx: sporca }]);
+    expect(aggiornate).toHaveLength(0);
+  });
+});

@@ -94,15 +94,32 @@ const MAX_TX_FF = 1500; // gli allegati Federfarma possono avere intestazioni lu
 // Il matching gira su tx e basta un token lungo per dare l'allarme: intestazione
 // (data, protocollo, destinatari) e firmatari Federfarma vanno tolti, altrimenti
 // un medico che si chiama come un firmatario farebbe scattare il banner.
-const FINE_CORPO_FF = /^(cordiali saluti|distinti saluti|il segretario|il presidente)\b/i;
-const INTESTAZIONE_FF = /^(roma,|uff\.|prot|alle? |ai |agli |a tutte|loro sedi)|registro ufficiale/i;
+const FINE_CORPO_FF = /^(cordiali saluti|distinti saluti|il segretario|il presidente|il direttore|il dirigente|il responsabile)\b/i;
+const INTESTAZIONE_FF = new RegExp([
+  /^(roma,|uff\.|prot|alle? |ai |agli |a tutte|loro sedi)/.source,
+  /registro ufficiale/.source,
+  // carta intestata ATSL / destinatari delle lettere di accompagnamento
+  /^(ats liguria|azienda tutela|area sociosanitaria|s\.c\. |via |tel|associazione titolari|ordine farmacisti|provincia della spezia)/.source,
+  /@|\bpec\./.source,
+].join('|'), 'i');
+// Pagina di accompagnamento ATSL ("invio copia smarrimento/furto…"): solo
+// intestazioni e destinatari, la segnalazione vera è nelle pagine dopo.
+const ACCOMPAGNAMENTO_ATSL = /invio copia (dello? )?(smarrimento|furto)|preghiera di massima diffusione/i;
+// Se dopo la pulizia restano parole di intestazione (OCR sporco), meglio tenere
+// solo l'oggetto: "Bartolomeo" (P.O. San Bartolomeo) farebbe scattare il banner
+// per qualunque medico con quel nome.
+const RESIDUI_INTESTAZIONE = /bartolomeo|sarzana|federfarma|farmacisti|liguria|massima diffusione/i;
 
 function corpoFederfarma(text) {
-  const righe = pulisciRighe(text).split('\n');
-  const fine = righe.findIndex(r => FINE_CORPO_FF.test(r));
-  return (fine >= 0 ? righe.slice(0, fine) : righe)
-    .filter(r => !INTESTAZIONE_FF.test(r))
-    .join('\n');
+  const corpo = String(text || '').split('\f')
+    .filter(p => !ACCOMPAGNAMENTO_ATSL.test(p.replace(/\s+/g, ' ')))
+    .map(p => {
+      const righe = pulisciRighe(p).split('\n');
+      const fine = righe.findIndex(r => FINE_CORPO_FF.test(r));
+      return (fine >= 0 ? righe.slice(0, fine) : righe).filter(r => !INTESTAZIONE_FF.test(r));
+    })
+    .flat().join('\n');
+  return RESIDUI_INTESTAZIONE.test(corpo) ? '' : corpo;
 }
 
 function federfarmaEntry({ subject, text, date, key }) {
@@ -162,7 +179,8 @@ function applicaRiletture(db, riletture) {
   const out = db.map(e => {
     const r = e.k && perK.get(e.k);
     if (!r || r.tx.length <= e.tx.length) return e;
-    if (testoInsufficiente(r.tx.split('\n').slice(1).join('\n'))) return e;
+    const corpoNuovo = r.tx.split('\n').slice(1).join('\n');
+    if (testoInsufficiente(corpoNuovo) || RESIDUI_INTESTAZIONE.test(corpoNuovo)) return e;
     const nuova = { ...e, tx: r.tx, t: r.t };
     aggiornate.push(nuova);
     return nuova;

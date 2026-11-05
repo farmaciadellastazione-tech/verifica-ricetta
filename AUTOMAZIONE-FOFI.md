@@ -76,6 +76,10 @@ New repository secret**. Crea i tre:
      protocollo) passano per **OCR** (`pdftoppm` + `tesseract -l ita`). Le voci già
      salvate con solo l'oggetto vengono rilette automaticamente (finestra 45 giorni)
      e il loro testo sostituito, solo se l'OCR produce testo utile.
+     La pagina di accompagnamento ATSL ("invio copia smarrimento/furto…") viene
+     scartata e le firme ("Il Direttore…") tagliate pagina per pagina; se restano
+     parole di carta intestata (Sarzana, San Bartolomeo, Liguria…) la voce tiene
+     solo l'oggetto, per non generare falsi allarmi.
 2. `tools/build-fofi-db.mjs --write` (Excel) e `tools/apply-fofi-entries.mjs --write`
    (PDF/Federfarma) — accodano solo le voci nuove (deterministico, nessuna AI).
    A mano: `node tools/apply-fofi-entries.mjs 16130.pdf 16132.pdf --date 03/11/2026 --write`.
