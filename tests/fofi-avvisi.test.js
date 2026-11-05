@@ -359,3 +359,50 @@ describe('serveRilettura / applicaRiletture — campo ocr', () => {
     expect(scoreMatch(tokenize('Amato Roberto'), db[0]).score).toBe(0);
   });
 });
+
+// ── OCR: niente dati personali dai verbali di denuncia (dry run #145) ────────
+// Gli allegati contengono anche i verbali dei Carabinieri con codice fiscale,
+// indirizzo, telefono e documento del denunciante: fofi-db.js è pubblico (GitHub
+// Pages), quindi del testo OCR si tiene solo il paragrafo "Oggetto: … Distinti
+// saluti" della lettera dell'ospedale. Dati di fantasia.
+const LETTERA_E_VERBALE = [
+  'PLESSO OSPEDALIERO IRCCS POLICLINICO SAN MARTINO',
+  'Responsabile del procedimento: Dott.ssa Mara Rossetti',
+  'E-mail: mara.rossetti@ospedale.it Tel, 0105550000 Segreteria',
+  'Al Presidente Ordine dei Medici di Genova',
+  'Oggetto: Smarrimento timbro medico Dott.ssa Bianchi Lucia.',
+  'Si trasmette, per opportuna conoscenza, l\'acclusa copia della denuncia riguardante lo smarrimento',
+  'del timbro della U.O. Cardiologia (Direttore Prof. Carlo Neri).',
+  'Distinti Saluti',
+  'LA DIRETTRICE ff',
+].join('\n') + '\f' + [
+  'VERBALE di ricezione denuncia orale sporta da:',
+  'BIANCHI LUCIA nata a Genova (GE) il 01/01/1980, codice fiscale: BNCLCU80A41D969X, residente a',
+  'Genova (GE) in VIA ROMA, 1, tel. 3330000000, professione: Medico, carta identita\' nr. CA0000000',
+  'Genova, li 28 Settembre 2026',
+  'OGGETTO: Denuncia di smarrimento/furto timbro',
+  'Io sottoscritta, Verdi Anna, CPSI in servizio presso la Cardiologia, con matricola 0000000,',
+  'DICHIARO che: mi sono accorta della sparizione del timbro.',
+].join('\n');
+
+describe('federfarmaEntry — ocr senza dati personali dei verbali', () => {
+  const e = federfarmaEntry({ subject: 'dott.ssa BIANCHI Lucia - smarrimento timbro', text: '', ocr: LETTERA_E_VERBALE, date: '22/10/2026', key: 'k' });
+
+  it('tiene il paragrafo Oggetto della lettera dell\'ospedale', () => {
+    expect(e.ocr).toMatch(/Oggetto: Smarrimento timbro medico Dott\.ssa Bianchi Lucia/);
+    expect(e.ocr).toMatch(/U\.O\. Cardiologia/);
+  });
+
+  it('niente codice fiscale, telefono, indirizzo, nascita, documento, email', () => {
+    expect(e.ocr).not.toMatch(/BNCLCU80A41D969X|3330000000|VIA ROMA|nata a|residente|CA0000000|@|0105550000/i);
+  });
+
+  it('niente dichiarazioni dei denuncianti (verbale, "sottoscritta", matricola)', () => {
+    expect(e.ocr).not.toMatch(/VERBALE|sottoscritt|DICHIARO|matricola|Verdi Anna/i);
+  });
+
+  it('nessun paragrafo Oggetto utilizzabile → nessun campo ocr', () => {
+    const solo = federfarmaEntry({ subject: 's', text: '', ocr: LETTERA_E_VERBALE.split('\f')[1], date: '', key: 'k' });
+    expect(solo.ocr).toBeUndefined();
+  });
+});

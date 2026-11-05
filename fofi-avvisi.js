@@ -126,13 +126,29 @@ function corpoFederfarma(text) {
 // dati): NON entra nel tx perché le lettere degli ospedali contengono decine di
 // nomi estranei (amministrativi, infermieri, direttori) che farebbero scattare
 // il banner per qualunque medico omonimo. '' se l'OCR non ha prodotto nulla.
-const MAX_OCR = 3000;
+//
+// PRIVACY: gli allegati contengono anche i verbali di denuncia (codice fiscale,
+// indirizzo, telefono, documento del denunciante) e fofi-db.js è pubblico su
+// GitHub Pages. Si tiene SOLO il paragrafo "Oggetto: … Distinti saluti" della
+// lettera dell'ospedale (reparto, direttori, evento) e si scarta ogni paragrafo
+// che sembri un verbale o contenga dati personali.
+const MAX_OCR = 1500;
+const BLOCCO_OGGETTO = /oggetto\s*:[\s\S]*?(?=\n\s*(?:distinti|cordiali)\s+saluti|\n\s*oggetto\s*:|$)/gi;
+const DATI_PERSONALI = new RegExp([
+  /denuncia (?:orale|di (?:smarrimento|furto))|verbale|sottoscritt|dichiaro|matricola/.source,
+  /codice fiscale|\bnat[oa] a\b|residente|carta d.?identit|e-?mail|@|\btel\b/.source,
+  /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/.source,   // codice fiscale
+  /\b3\d{2}[\s.]?\d{6,7}\b/.source,                     // cellulare
+].join('|'), 'i');
 
 function testoOcr(text) {
-  const s = String(text || '').split('\f')
+  const pagine = String(text || '').split('\f')
     .filter(p => !ACCOMPAGNAMENTO_ATSL.test(p.replace(/\s+/g, ' ')))
-    .map(p => pulisciRighe(p).split('\n').filter(r => !/registro ufficiale/i.test(r)).join('\n'))
-    .filter(Boolean).join('\n').slice(0, MAX_OCR);
+    .join('\n').replace(/\r/g, '');
+  const s = (pagine.match(BLOCCO_OGGETTO) || [])
+    .map(b => pulisciRighe(b))
+    .filter(b => b && !DATI_PERSONALI.test(b))
+    .join('\n').slice(0, MAX_OCR);
   return testoInsufficiente(s) ? '' : s;
 }
 
