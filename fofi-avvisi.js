@@ -40,7 +40,9 @@ function circolarePdfToEntry(text, nHint) {
 
   let n = Number.isInteger(nHint) ? nHint : null;
   if (n == null) {
-    const m = s.match(/(?:^|\s)(1[5-9]\d{3})(?=\s|$)/m);
+    // Cerca dopo "Circolare n." (se c'è): prima potrebbero esserci CAP o codici.
+    const i = s.search(/Circolare n\./i);
+    const m = s.slice(Math.max(i, 0)).match(/(?:^|\s)(1[5-9]\d{3})(?=\s|$)/m);
     n = m ? parseInt(m[1], 10) : null;
   }
   if (n == null) return null;
@@ -80,7 +82,7 @@ function extractPdfLinks(html) {
 // Esclude furti di medicinali, lotti falsificati, riepiloghi.
 function isFederfarmaSegnalazione(subject) {
   const s = String(subject || '').toLowerCase();
-  if (/lotto|medicinali|specialit|riepilogo/.test(s)) return false;
+  if (/lotto|riepilogo|furto (di )?medicinali|farmacia ospedaliera/.test(s)) return false;
   return /furt|smarrim|falsific|\bfals[ei]\b/.test(s) &&
          /\bdr\b|\bdr\.|\bdott|timbr|ricett|\bmedic[oa]\b|\bu\.\s?o\./.test(s);
 }
@@ -89,9 +91,23 @@ const MAX_TX_FF = 1500; // gli allegati Federfarma possono avere intestazioni lu
 
 // Voce senza numero FOFI per un inoltro Federfarma SP. `key` (Message-ID) serve
 // a non riaccodarla ai giri successivi; `date` (dd/mm/yyyy) è mostrata in UI.
+// Il matching gira su tx e basta un token lungo per dare l'allarme: intestazione
+// (data, protocollo, destinatari) e firmatari Federfarma vanno tolti, altrimenti
+// un medico che si chiama come un firmatario farebbe scattare il banner.
+const FINE_CORPO_FF = /^(cordiali saluti|distinti saluti|il segretario|il presidente)\b/i;
+const INTESTAZIONE_FF = /^(roma,|uff\.|prot|alle? |ai |agli |a tutte|loro sedi)/i;
+
+function corpoFederfarma(text) {
+  const righe = pulisciRighe(text).split('\n');
+  const fine = righe.findIndex(r => FINE_CORPO_FF.test(r));
+  return (fine >= 0 ? righe.slice(0, fine) : righe)
+    .filter(r => !INTESTAZIONE_FF.test(r))
+    .join('\n');
+}
+
 function federfarmaEntry({ subject, text, date, key }) {
   const sogg = String(subject || '').trim();
-  const corpo = pulisciRighe(text).slice(0, MAX_TX_FF);
+  const corpo = corpoFederfarma(text).slice(0, MAX_TX_FF);
   const tx = corpo ? sogg + '\n' + corpo : sogg;
   let t = tipiDaTesto(sogg + '\n' + corpo);
   if (!t.length) t = ['F'];
@@ -118,8 +134,16 @@ function giorniDa(dmy, now) {
   return Math.floor((oggi - d) / 86400000);
 }
 
+// La più recente fra due date dd/mm/yyyy (valori non validi ignorati).
+function dataPiuRecente(a, b) {
+  const k = d => /^\d{2}\/\d{2}\/\d{4}$/.test(d || '') ? d.split('/').reverse().join('') : '';
+  if (!k(a)) return k(b) ? b : '';
+  if (!k(b)) return a;
+  return k(a) >= k(b) ? a : b;
+}
+
 const _exports = {
-  tipiDaTesto, circolarePdfToEntry, extractPdfLinks,
+  dataPiuRecente, tipiDaTesto, circolarePdfToEntry, extractPdfLinks,
   isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa,
 };
 Object.assign(globalThis, _exports);

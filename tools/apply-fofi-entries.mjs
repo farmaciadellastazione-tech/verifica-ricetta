@@ -23,7 +23,7 @@ import vm from 'node:vm';
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { entriesToDbFile, mergeNewEntries } = require(resolve(ROOT, 'fofi-xlsx.js'));
-const { circolarePdfToEntry } = require(resolve(ROOT, 'fofi-avvisi.js'));
+const { circolarePdfToEntry, dataPiuRecente } = require(resolve(ROOT, 'fofi-avvisi.js'));
 
 function loadCurrentDb() {
   const src = readFileSync(resolve(ROOT, 'fofi-db.js'), 'utf8');
@@ -67,7 +67,7 @@ const etichetta = e => e.n != null ? String(e.n) : `FF ${e.d}`;
 added.forEach(e => console.log(`  ${etichetta(e)} [${e.t}] ${e.tx.replace(/\n/g, ' ').slice(0, 100)}`));
 
 if (write) {
-  const data = aggiornata || aggiornataAttuale;
+  const data = dataPiuRecente(aggiornata, aggiornataAttuale); // mai all'indietro
   writeFileSync(resolve(ROOT, 'fofi-db.js'), entriesToDbFile(merged, data));
   console.log(`✓ Scritto fofi-db.js: ${merged.length} voci${data ? ` · aggiornamento ${data}` : ''}.`);
   console.log('FOFI_ADDED=' + [...new Set(added.map(etichetta))].join(','));

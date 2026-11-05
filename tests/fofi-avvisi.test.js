@@ -4,7 +4,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   circolarePdfToEntry, tipiDaTesto, extractPdfLinks,
-  isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa,
+  isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa, dataPiuRecente,
 } from '../fofi-avvisi.js';
 
 const FIX = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -143,5 +143,52 @@ describe('giorniDa — età dell\'ultimo aggiornamento', () => {
   });
   it('data non valida → Infinity (va trattata come "vecchia")', () => {
     expect(giorniDa('', new Date())).toBe(Infinity);
+  });
+});
+
+// ── Correzioni dalla code review (05/11/2026) ────────────────────────────
+
+describe('federfarmaEntry — niente firmatari/intestazioni nel tx (falsi positivi)', () => {
+  // Testo reale dell'allegato docx Federfarma (furto timbro dr Cantatore).
+  const e = federfarmaEntry({
+    subject: 'Furto dr Andrea CANTATORE - Rozzano (MI)',
+    text: readFileSync(resolve(FIX, 'federfarma-cantatore.txt'), 'utf8'),
+    date: '05/11/2026', key: 'k',
+  });
+  it('tiene medico, timbro e farmaco', () => {
+    expect(e.tx).toMatch(/CANTATORE/);
+    expect(e.tx).toMatch(/28672/);
+    expect(e.tx).toMatch(/Mounjaro/);
+  });
+  it('taglia saluti e firmatari Federfarma', () => {
+    expect(e.tx).not.toMatch(/PELLEGRINI|COSSOLO|SEGRETARIO|Cordiali/);
+  });
+  it('toglie intestazione (data, protocollo, destinatari)', () => {
+    expect(e.tx).not.toMatch(/ALLE ASSOCIAZIONI|Uff\.-Prot|Roma, 5 novembre/);
+  });
+});
+
+describe('circolarePdfToEntry — il numero si cerca dopo "Circolare n."', () => {
+  it('un CAP prima di "Circolare n." non viene scambiato per il numero', () => {
+    const s = 'Ufficio: Protocollo: Oggetto:\nVia Roma 1, 16121 Genova\nCircolare n.\n16140\n' +
+      'Segnalazione urgente: furto timbro\nSi informa che la scrivente Federazione ha ricevuto una segnalazione relativa al furto del timbro del Dr. X.\nSi chiede ai Presidenti';
+    expect(circolarePdfToEntry(s).n).toBe(16140);
+  });
+});
+
+describe('isFederfarmaSegnalazione — "medicinali" non esclude furti di ricettario', () => {
+  it('furto ricettario con "medicinali" nell\'oggetto → segnalazione', () => {
+    expect(isFederfarmaSegnalazione('Furto ricettario e timbro dr Rossi - prescrizioni medicinali stupefacenti')).toBe(true);
+  });
+});
+
+describe('dataPiuRecente — la data "Aggiornamento" non torna indietro', () => {
+  it('sceglie la più recente fra due dd/mm/yyyy', () => {
+    expect(dataPiuRecente('05/11/2026', '20/10/2026')).toBe('05/11/2026');
+    expect(dataPiuRecente('20/10/2026', '05/11/2026')).toBe('05/11/2026');
+  });
+  it('ignora valori vuoti/non validi', () => {
+    expect(dataPiuRecente('', '05/11/2026')).toBe('05/11/2026');
+    expect(dataPiuRecente('05/11/2026', null)).toBe('05/11/2026');
   });
 });
