@@ -406,3 +406,46 @@ describe('federfarmaEntry — ocr senza dati personali dei verbali', () => {
     expect(solo.ocr).toBeUndefined();
   });
 });
+
+// ── Code review pre-merge: i filtri non devono togliere il medico dal tx ─────
+// Il matching gira su tx: perdere nome medico/farmaco = banner che non scatta.
+describe('federfarmaEntry — il nome del medico resta nel tx (code review)', () => {
+  const ff = text => federfarmaEntry({ subject: 'Furto timbro dr Rossi', text, date: '', key: 'k' }).tx;
+
+  it('parole come Sarzana/Federfarma/Liguria nel corpo non svuotano il tx', () => {
+    expect(ff('Oggetto: furto timbro dott. Mario Rossi, P.O. di Sarzana, ASL Liguria')).toMatch(/Mario Rossi/);
+  });
+  it('"Il Dirigente Medico dott. X ha denunciato…" non è una firma', () => {
+    expect(ff('Oggetto: furto timbro\nIl Dirigente Medico dott. Mario Rossi ha denunciato il furto del timbro.')).toMatch(/Mario Rossi/);
+  });
+  it('"preghiera di massima diffusione" in un avviso normale non cancella il testo', () => {
+    expect(ff('Si comunica con preghiera di massima diffusione il furto del ricettario del dott. Mario Rossi')).toMatch(/Mario Rossi/);
+  });
+  it('righe che iniziano con un cognome Tel…/contengono email restano', () => {
+    const tx = ff('Si comunica il furto del timbro del dott.\nTellini Mario, medico di base (tellini@asl.it)');
+    expect(tx).toMatch(/Tellini Mario/);
+  });
+  it('dopo "Cordiali saluti" a pagina 1 le pagine successive (firme) restano fuori', () => {
+    const tx = ff('Oggetto: furto timbro dott. Mario Rossi\nCordiali saluti.\n\fDott. Michele PELLEGRINI CALACE Dott. Marco COSSOLO\n\f');
+    expect(tx).toMatch(/Mario Rossi/);
+    expect(tx).not.toMatch(/PELLEGRINI|COSSOLO/);
+  });
+});
+
+describe('federfarmaEntry — ocr: filtro privacy robusto agli errori OCR', () => {
+  const blocco = riga => federfarmaEntry({ subject: 's', text: '', key: 'k',
+    ocr: 'Oggetto: Smarrimento timbro di reparto\nSi trasmette copia relativa alla U.O. Cardiologia del Policlinico.\n' + riga }).ocr;
+
+  it('codice fiscale letto male (O/0, I/1) → paragrafo scartato', () => {
+    expect(blocco('denunciante RSSMRA8OA01E463X')).toBeUndefined();
+  });
+  it('telefono fisso senza "tel" → scartato', () => {
+    expect(blocco('recapito 0187 524111')).toBeUndefined();
+  });
+  it('indirizzo con numero civico → scartato', () => {
+    expect(blocco('abitante in Via Roma 5')).toBeUndefined();
+  });
+  it('paragrafo pulito → tenuto', () => {
+    expect(blocco('reparto afferente allo scrivente Policlinico.')).toMatch(/U\.O\. Cardiologia/);
+  });
+});

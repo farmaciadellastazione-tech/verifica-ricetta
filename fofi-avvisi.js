@@ -94,32 +94,31 @@ const MAX_TX_FF = 1500; // gli allegati Federfarma possono avere intestazioni lu
 // Il matching gira su tx e basta un token lungo per dare l'allarme: intestazione
 // (data, protocollo, destinatari) e firmatari Federfarma vanno tolti, altrimenti
 // un medico che si chiama come un firmatario farebbe scattare il banner.
-const FINE_CORPO_FF = /^(cordiali saluti|distinti saluti|il segretario|il presidente|il direttore|il dirigente|il responsabile)\b/i;
-const INTESTAZIONE_FF = new RegExp([
-  /^(roma,|uff\.|prot|alle? |ai |agli |a tutte|loro sedi)/.source,
-  /registro ufficiale/.source,
-  // carta intestata ATSL / destinatari delle lettere di accompagnamento
-  /^(ats liguria|azienda tutela|area sociosanitaria|s\.c\. |via |tel|associazione titolari|ordine farmacisti|provincia della spezia)/.source,
-  /@|\bpec\./.source,
-].join('|'), 'i');
+// Fine del corpo: saluti, firmatari Federfarma, oppure una riga che è SOLO un
+// titolo di firma ("Il Direttore Sanitario"). "Il Dirigente Medico dott. Rossi
+// ha denunciato…" invece è testo della segnalazione e va tenuto.
+// Il taglio vale sul testo intero (non per pagina): le firme a pagina 2 restano fuori.
+const FINE_CORPO_FF = /^(cordiali saluti|distinti saluti|il segretario|il presidente)\b|^(il direttore|il dirigente|il responsabile)(\s+(sanitario|generale|medico|f\.?\s?f\.?))?\s*$/i;
+const INTESTAZIONE_FF = /^(roma,|uff\.|prot|alle? |ai |agli |a tutte|loro sedi)|registro ufficiale/i;
 // Pagina di accompagnamento ATSL ("invio copia smarrimento/furto…"): solo
 // intestazioni e destinatari, la segnalazione vera è nelle pagine dopo.
+// Per il tx si usa solo la frase ATSL specifica: "massima diffusione" compare
+// anche negli avvisi normali e non deve far sparire il testo.
+const PAGINA_ACCOMPAGNAMENTO = /invio copia (dello? )?(smarrimento|furto)/i;
 const ACCOMPAGNAMENTO_ATSL = /invio copia (dello? )?(smarrimento|furto)|preghiera di massima diffusione/i;
-// Se dopo la pulizia restano parole di intestazione (OCR sporco), meglio tenere
-// solo l'oggetto: "Bartolomeo" (P.O. San Bartolomeo) farebbe scattare il banner
-// per qualunque medico con quel nome.
+// Residui di carta intestata ATSL/Federfarma: usati SOLO per scartare una
+// rilettura dubbia (applicaRiletture), mai per svuotare il tx di una voce nuova.
 const RESIDUI_INTESTAZIONE = /bartolomeo|sarzana|federfarma|farmacisti|liguria|massima diffusione/i;
 
 function corpoFederfarma(text) {
-  const corpo = String(text || '').split('\f')
-    .filter(p => !ACCOMPAGNAMENTO_ATSL.test(p.replace(/\s+/g, ' ')))
-    .map(p => {
-      const righe = pulisciRighe(p).split('\n');
-      const fine = righe.findIndex(r => FINE_CORPO_FF.test(r));
-      return (fine >= 0 ? righe.slice(0, fine) : righe).filter(r => !INTESTAZIONE_FF.test(r));
-    })
-    .flat().join('\n');
-  return RESIDUI_INTESTAZIONE.test(corpo) ? '' : corpo;
+  const testo = String(text || '').split('\f')
+    .filter(p => !PAGINA_ACCOMPAGNAMENTO.test(p.replace(/\s+/g, ' ')))
+    .join('\n');
+  const righe = pulisciRighe(testo).split('\n');
+  const fine = righe.findIndex(r => FINE_CORPO_FF.test(r));
+  return (fine >= 0 ? righe.slice(0, fine) : righe)
+    .filter(r => !INTESTAZIONE_FF.test(r))
+    .join('\n');
 }
 
 // Testo OCR delle scansioni -> campo `ocr`, solo da consultare (pagina Banca
@@ -137,8 +136,12 @@ const BLOCCO_OGGETTO = /oggetto\s*:[\s\S]*?(?=\n\s*(?:distinti|cordiali)\s+salut
 const DATI_PERSONALI = new RegExp([
   /denuncia (?:orale|di (?:smarrimento|furto))|verbale|sottoscritt|dichiaro|matricola/.source,
   /codice fiscale|\bnat[oa] a\b|residente|carta d.?identit|e-?mail|@|\btel\b/.source,
-  /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/.source,   // codice fiscale
-  /\b3\d{2}[\s.]?\d{6,7}\b/.source,                     // cellulare
+  // l'input è OCR rumoroso: pattern larghi, meglio scartare un paragrafo in più
+  /\b(?=[A-Z0-9]{16}\b)(?=(?:[A-Z]*[0-9]){2})[A-Z0-9]{16}\b/.source, // codice fiscale (anche O/0, I/1)
+  /\d{6,}/.source,                                      // documenti, matricole, cellulari
+  /\b3\d{2}[\s.]?\d{6,7}\b/.source,                     // cellulare con spazio
+  /\b0\d{1,3}[\s.\/-]?\d{5,8}\b/.source,                // telefono fisso
+  /\b(via|viale|piazza|corso|largo|vico|salita)\s+[^\n,]{2,40}?\s\d{1,4}\b/.source, // indirizzo con civico
 ].join('|'), 'i');
 
 function testoOcr(text) {
