@@ -155,3 +155,29 @@ describe('formatEmailDate — header mail -> dd/mm/yyyy', () => {
     expect(formatEmailDate(undefined)).toBe('');
   });
 });
+
+// ── Voci senza numero (inoltri Federfarma SP): deduplica per chiave `k` ──
+describe('mergeNewEntries — voci senza numero con chiave k', () => {
+  it('accoda una voce n:null se ha una chiave k nuova', () => {
+    const ff = { n: null, t: ['T'], tx: 'furto timbro', src: 'Federfarma SP', d: '05/11/2026', k: 'msg-1' };
+    const { added } = mergeNewEntries([{ n: 15001, t: ['F'], tx: 'x' }], [ff]);
+    expect(added).toEqual([ff]);
+  });
+  it('non riaccoda una voce la cui chiave k è già presente', () => {
+    const ff = { n: null, t: ['T'], tx: 'furto timbro', k: 'msg-1' };
+    expect(mergeNewEntries([ff], [{ ...ff }]).added).toEqual([]);
+  });
+  it('voce n:null senza k resta scartata (comportamento storico)', () => {
+    expect(mergeNewEntries([], [{ n: null, t: ['F'], tx: 'x' }]).added).toEqual([]);
+  });
+});
+
+describe('entryToJson — campi opzionali src/d/k', () => {
+  it('li emette in coda solo se presenti', () => {
+    const j = entryToJson({ n: null, t: ['T'], tx: 'x', src: 'Federfarma SP', d: '05/11/2026', k: 'm1' });
+    expect(j).toBe('{"n":null,"t":["T"],"tx":"x","m":[],"f":[],"src":"Federfarma SP","d":"05/11/2026","k":"m1"}');
+  });
+  it('voci FOFI classiche: output invariato', () => {
+    expect(entryToJson({ n: 1, t: ['F'], tx: 'x' })).toBe('{"n":1,"t":["F"],"tx":"x","m":[],"f":[]}');
+  });
+});

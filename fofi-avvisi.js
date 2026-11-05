@@ -1,0 +1,127 @@
+// fofi-avvisi.js — core puro per le segnalazioni che NON arrivano come Excel.
+//
+// Dal 3/11/2026 l'Ordine dei Farmacisti SP non invia più l'Excel cumulativo:
+// manda i PDF delle singole circolari FOFI ("Segnalazione urgente: ...") come
+// link rufblob nel corpo mail. In parallelo Federfarma La Spezia inoltra
+// segnalazioni singole (furto/smarrimento timbro, falsificazioni) senza numero
+// di circolare, con allegato PDF o docx.
+//
+// Questo modulo NON fa I/O: riceve il testo già estratto (pdftotext / docx XML)
+// e ritorna voci FOFI_DB. Estrazione deterministica, nessuna AI.
+// Esposto su globalThis (browser) e module.exports (Node), come fofi-xlsx.js.
+
+(function () {
+
+// Tipi F/T/B dalle parole chiave (stessa semantica delle colonne dell'Excel:
+// F = falsificazione/furto di ricette, T = timbro/ricettario, B = buoni acquisto).
+function tipiDaTesto(s) {
+  const x = String(s || '').toLowerCase();
+  const t = [];
+  if (/falsific|\bfals[ei]\b|\bfalso\b|dubbia autenticit|contraff/.test(x) ||
+      /(furt|smarriment)[^;\n]{0,60}\bricett[ae]\b/.test(x)) t.push('F');
+  if (/timbr|ricettari/.test(x)) t.push('T');
+  if (/buon[oi]\s+(di\s+)?acquisto/.test(x)) t.push('B');
+  return t;
+}
+
+// Righe pulite: niente bullet, spazi compressi, righe vuote rimosse.
+function pulisciRighe(s) {
+  return String(s || '').split('\n')
+    .map(r => r.replace(/[••]/g, ' ').replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean).join('\n');
+}
+
+// Testo di una circolare FOFI (output pdftotext) -> voce {n,t,tx} o null se la
+// circolare non è una segnalazione (corsi, note operative...) o se manca il numero.
+// nHint: numero ricavato dal nome file del link ("16132.pdf"), ha la precedenza.
+function circolarePdfToEntry(text, nHint) {
+  const s = String(text || '').replace(/\r/g, '');
+  if (!/Segnalazione urgente/i.test(s)) return null;
+
+  let n = Number.isInteger(nHint) ? nHint : null;
+  if (n == null) {
+    const m = s.match(/(?:^|\s)(1[5-9]\d{3})(?=\s|$)/m);
+    n = m ? parseInt(m[1], 10) : null;
+  }
+  if (n == null) return null;
+
+  const oggetti = [...s.matchAll(/Segnalazione urgente:\s*([^\n]+)/gi)].map(m => m[1]).join('\n');
+  const corpo = s.match(/segnalazione relativa\s+([\s\S]*?)\n\s*Si chiede/i);
+  let tx = corpo ? corpo[1].replace(/^(a|al|alla|allo|ai|alle|agli)\b\s*:?\s*/i, '') : oggetti;
+  tx = pulisciRighe(tx);
+
+  let t = tipiDaTesto(oggetti);
+  if (!t.length) t = tipiDaTesto(tx);
+  if (!t.length) t = ['F'];
+  return { n, t, tx };
+}
+
+// Link ai PDF rufblob nel corpo HTML della mail -> [{url, n}] (n dal nome file
+// "16132.pdf" se presente, altrimenti null). Deduplica per URL.
+function extractPdfLinks(html) {
+  const s = String(html || '').replace(/&amp;/g, '&');
+  const out = [];
+  const seen = new Set();
+  const re = /<a[^>]+href="(https?:\/\/rufblob\.blob\.core\.windows\.net\/[^"]+\.pdf)"[^>]*>([^<]*)</gi;
+  let m;
+  while ((m = re.exec(s))) {
+    if (seen.has(m[1])) continue;
+    seen.add(m[1]);
+    const num = m[2].match(/\b(1\d{4})\.pdf/i);
+    out.push({ url: m[1], n: num ? parseInt(num[1], 10) : null });
+  }
+  for (const u of s.match(/https?:\/\/rufblob\.blob\.core\.windows\.net\/[^\s"'<>)]+\.pdf/gi) || []) {
+    if (!seen.has(u)) { seen.add(u); out.push({ url: u, n: null }); }
+  }
+  return out;
+}
+
+// Oggetto mail Federfarma SP -> è una segnalazione su ricette/timbri di un medico?
+// Esclude furti di medicinali, lotti falsificati, riepiloghi.
+function isFederfarmaSegnalazione(subject) {
+  const s = String(subject || '').toLowerCase();
+  if (/lotto|medicinali|specialit|riepilogo/.test(s)) return false;
+  return /furt|smarrim|falsific|\bfals[ei]\b/.test(s) &&
+         /\bdr\b|\bdr\.|\bdott|timbr|ricett|\bmedic[oa]\b|\bu\.\s?o\./.test(s);
+}
+
+const MAX_TX_FF = 1500; // gli allegati Federfarma possono avere intestazioni lunghe
+
+// Voce senza numero FOFI per un inoltro Federfarma SP. `key` (Message-ID) serve
+// a non riaccodarla ai giri successivi; `date` (dd/mm/yyyy) è mostrata in UI.
+function federfarmaEntry({ subject, text, date, key }) {
+  const sogg = String(subject || '').trim();
+  const corpo = pulisciRighe(text).slice(0, MAX_TX_FF);
+  const tx = corpo ? sogg + '\n' + corpo : sogg;
+  let t = tipiDaTesto(sogg + '\n' + corpo);
+  if (!t.length) t = ['F'];
+  return { n: null, t, tx, m: [], f: [], src: 'Federfarma SP', d: date || '', k: key || '' };
+}
+
+// word/document.xml di un .docx -> testo semplice (un paragrafo per riga).
+function docxXmlToText(xml) {
+  const s = String(xml || '')
+    .replace(/<w:tab\/>/g, '\t').replace(/<w:br\/>/g, '\n')
+    .replace(/<\/w:p>/g, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+  return pulisciRighe(s);
+}
+
+// Giorni trascorsi da una data dd/mm/yyyy (Infinity se non valida).
+function giorniDa(dmy, now) {
+  const m = String(dmy || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return Infinity;
+  const d = Date.UTC(+m[3], +m[2] - 1, +m[1]);
+  const oggi = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.floor((oggi - d) / 86400000);
+}
+
+const _exports = {
+  tipiDaTesto, circolarePdfToEntry, extractPdfLinks,
+  isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa,
+};
+Object.assign(globalThis, _exports);
+if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
+})();
