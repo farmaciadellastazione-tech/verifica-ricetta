@@ -123,15 +123,15 @@ function allegatoToText(buf, nomeFile, tmp) {
   try {
     if (/\.pdf$/i.test(nomeFile)) {
       const testo = execFileSync('pdftotext', ['-enc', 'UTF-8', f, '-'], { encoding: 'utf8' });
-      if (!testoInsufficiente(testo)) return testo;
+      if (!testoInsufficiente(testo)) return { testo, ocr: '' };
       console.log(`  (${nomeFile}: scansione, uso OCR)`);
-      return testo + '\f' + ocrPdf(f, tmp);
+      return { testo, ocr: ocrPdf(f, tmp) }; // OCR a parte: solo consultabile, non nel tx
     }
-    if (/\.docx$/i.test(nomeFile)) return docxXmlToText(execFileSync('unzip', ['-p', f, 'word/document.xml'], { encoding: 'utf8' }));
+    if (/\.docx$/i.test(nomeFile)) return { testo: docxXmlToText(execFileSync('unzip', ['-p', f, 'word/document.xml'], { encoding: 'utf8' })), ocr: '' };
   } catch (err) {
     console.warn(`[FOFI] allegato non leggibile (${nomeFile}): ${err.message}`);
   }
-  return '';
+  return { testo: '', ocr: '' };
 }
 
 async function scaricaMail(client, uid) {
@@ -191,7 +191,7 @@ async function cercaPdfCircolari(client, known, tmp) {
     for (const l of links) {
       const r = await fetch(l.url);
       if (!r.ok) { console.warn(`[FOFI] PDF non scaricabile (${r.status}): ${l.url}`); continue; }
-      const text = allegatoToText(Buffer.from(await r.arrayBuffer()), 'c.pdf', tmp);
+      const { testo: text } = allegatoToText(Buffer.from(await r.arrayBuffer()), 'c.pdf', tmp);
       const e = circolarePdfToEntry(text, l.n ?? undefined);
       if (e && !known.numeri.has(e.n)) {
         known.numeri.add(e.n);
@@ -213,14 +213,15 @@ async function cercaFederfarma(client, known, tmp) {
     const key = parsed.messageId || '';
     const rilettura = known.daRileggere.has(key);
     if (!key || (known.chiavi.has(key) && !rilettura) || !isFederfarmaSegnalazione(subject)) continue;
-    const text = (parsed.attachments || [])
+    const letti = (parsed.attachments || [])
       .filter(a => /\.(pdf|docx)$/i.test(a.filename || ''))
-      .map(a => allegatoToText(a.content, a.filename, tmp))
-      .join('\f');
+      .map(a => allegatoToText(a.content, a.filename, tmp));
+    const text = letti.map(l => l.testo).join('\f');
+    const ocr = letti.map(l => l.ocr).filter(Boolean).join('\f');
     const date = formatEmailDate(parsed.date?.toUTCString() || '');
     known.chiavi.add(key);
     known.daRileggere.delete(key);
-    out.push({ entry: federfarmaEntry({ subject, text, date, key }), date: parsed.date, rilettura });
+    out.push({ entry: federfarmaEntry({ subject, text, ocr, date, key }), date: parsed.date, rilettura });
     console.log(`${rilettura ? '~ rilettura OCR' : '+'} Federfarma SP ${date}: ${subject}`);
   }
   return out;

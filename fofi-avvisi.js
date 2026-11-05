@@ -122,13 +122,30 @@ function corpoFederfarma(text) {
   return RESIDUI_INTESTAZIONE.test(corpo) ? '' : corpo;
 }
 
-function federfarmaEntry({ subject, text, date, key }) {
+// Testo OCR delle scansioni -> campo `ocr`, solo da consultare (pagina Banca
+// dati): NON entra nel tx perché le lettere degli ospedali contengono decine di
+// nomi estranei (amministrativi, infermieri, direttori) che farebbero scattare
+// il banner per qualunque medico omonimo. '' se l'OCR non ha prodotto nulla.
+const MAX_OCR = 3000;
+
+function testoOcr(text) {
+  const s = String(text || '').split('\f')
+    .filter(p => !ACCOMPAGNAMENTO_ATSL.test(p.replace(/\s+/g, ' ')))
+    .map(p => pulisciRighe(p).split('\n').filter(r => !/registro ufficiale/i.test(r)).join('\n'))
+    .filter(Boolean).join('\n').slice(0, MAX_OCR);
+  return testoInsufficiente(s) ? '' : s;
+}
+
+function federfarmaEntry({ subject, text, ocr, date, key }) {
   const sogg = String(subject || '').trim();
   const corpo = corpoFederfarma(text).slice(0, MAX_TX_FF);
   const tx = corpo ? sogg + '\n' + corpo : sogg;
   let t = tipiDaTesto(sogg + '\n' + corpo);
   if (!t.length) t = ['F'];
-  return { n: null, t, tx, m: [], f: [], src: 'Federfarma SP', d: date || '', k: key || '' };
+  const e = { n: null, t, tx, m: [], f: [], src: 'Federfarma SP', d: date || '', k: key || '' };
+  const o = testoOcr(ocr);
+  if (o) e.ocr = o;
+  return e;
 }
 
 // word/document.xml di un .docx -> testo semplice (un paragrafo per riga).
@@ -166,7 +183,7 @@ function testoInsufficiente(text) {
 // Voce Federfarma già in banca dati ma salvata con solo l'oggetto (allegato
 // scansionato, prima dell'OCR): va riletta per recuperare nomi e dettagli.
 function serveRilettura(e) {
-  if (e.n != null || !e.k) return false;
+  if (e.n != null || !e.k || e.ocr) return false;
   return testoInsufficiente(String(e.tx || '').split('\n').slice(1).join('\n'));
 }
 
@@ -178,11 +195,17 @@ function applicaRiletture(db, riletture) {
   const aggiornate = [];
   const out = db.map(e => {
     const r = e.k && perK.get(e.k);
-    if (!r || r.tx.length <= e.tx.length) return e;
-    const corpoNuovo = r.tx.split('\n').slice(1).join('\n');
-    if (testoInsufficiente(corpoNuovo) || RESIDUI_INTESTAZIONE.test(corpoNuovo)) return e;
-    const nuova = { ...e, tx: r.tx, t: r.t };
-    aggiornate.push(nuova);
+    if (!r) return e;
+    let nuova = e;
+    // tx: solo testo vero (pdftotext/docx), più ricco e senza intestazioni
+    const corpoNuovo = String(r.tx || '').split('\n').slice(1).join('\n');
+    if (r.tx && r.tx.length > e.tx.length &&
+        !testoInsufficiente(corpoNuovo) && !RESIDUI_INTESTAZIONE.test(corpoNuovo)) {
+      nuova = { ...nuova, tx: r.tx, t: r.t };
+    }
+    // ocr: testo delle scansioni, solo consultabile (fuori dal matching)
+    if (r.ocr && r.ocr.length > String(e.ocr || '').length) nuova = { ...nuova, ocr: r.ocr };
+    if (nuova !== e) aggiornate.push(nuova);
     return nuova;
   });
   return { db: out, aggiornate };

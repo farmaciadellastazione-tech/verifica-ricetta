@@ -335,7 +335,7 @@ function validaEntry(e) {
 // workflow le riaccodi come duplicati, src/d servono all'etichetta in UI.
 function entryToJson(e) {
   const o = { n: e.n === '' ? null : e.n, t: e.t, tx: e.tx, m: e.m, f: e.f };
-  for (const k of ['src', 'd', 'k']) if (e[k]) o[k] = e[k];
+  for (const k of ['src', 'd', 'k', 'ocr']) if (e[k]) o[k] = e[k];
   return JSON.stringify(o);
 }
 
@@ -373,7 +373,7 @@ document.getElementById('btn-copy').addEventListener('click', async () => {
 document.getElementById('btn-download').addEventListener('click', () => {
   if (!nuove.length) return;
   // Ricostruisce il file: voci esistenti (campi dati + src/d/k, niente _tok) + nuove.
-  const esistenti = FOFI_DB.map(r => entryToJson({ n: r.n, t: r.t, tx: r.tx, m: r.m || [], f: r.f || [], src: r.src, d: r.d, k: r.k }));
+  const esistenti = FOFI_DB.map(r => entryToJson({ n: r.n, t: r.t, tx: r.tx, m: r.m || [], f: r.f || [], src: r.src, d: r.d, k: r.k, ocr: r.ocr }));
   const aggiunte = nuove.map(entryToJson);
   const tutte = esistenti.concat(aggiunte);
   // Data di aggiornamento (footer): dal campo, in formato dd/mm/yyyy. Conservata

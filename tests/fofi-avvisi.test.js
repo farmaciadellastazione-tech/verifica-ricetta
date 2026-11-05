@@ -308,3 +308,54 @@ describe('applicaRiletture — scarta OCR con residui di intestazione', () => {
     expect(aggiornate).toHaveLength(0);
   });
 });
+
+// ── OCR solo consultabile (dry run #144) ─────────────────────────────────
+// Le lettere dell'ospedale lette con OCR contengono decine di nomi estranei
+// (amministrativi, infermieri, direttori, città): nel tx farebbero scattare il
+// banner per ogni medico "Roberto" o "Amato". Il testo OCR va nel campo `ocr`,
+// mostrato nella pagina Banca dati ma escluso dal matching (che gira su tx).
+const LETTERA_OSPEDALE = [
+  'PLESSO OSPEDALIERO IRCCS POLICLINICO SAN MARTINO',
+  'Responsabile del procedimento: Dott.ssa Rosa Amato',
+  'Oggetto: Smarrimento o furto timbro di reparto',
+  'Si trasmette, per opportuna conoscenza, l\'acclusa copia della denuncia riguardante lo smarrimento',
+  'di un timbro ospedaliero relativo alla U.O. EMATOLOGIA DEGENZA (Direttore Prof. ROBERTO MASSIMO LEMOLI).',
+].join('\n');
+
+describe('federfarmaEntry — testo OCR nel campo ocr, non nel tx', () => {
+  const sogg = 'U.O. EMATOLOGIA DEGENZA - Osp. S. Martino GE - smarrimento timbro';
+  const timbro = 'ATSL.REGISTRO UFFICIALE.0401016.U.16-10-2026.h.12:26';
+
+  it('tx resta l\'oggetto, ocr contiene la lettera senza la pagina di accompagnamento', () => {
+    const e = federfarmaEntry({ subject: sogg, text: timbro, ocr: ACCOMPAGNAMENTO + '\f' + LETTERA_OSPEDALE, date: '19/10/2026', key: 'k1' });
+    expect(e.tx).toBe(sogg);
+    expect(e.ocr).toMatch(/EMATOLOGIA DEGENZA/);
+    expect(e.ocr).not.toMatch(/massima diffusione|REGISTRO UFFICIALE/);
+  });
+
+  it('OCR vuoto o inutilizzabile → nessun campo ocr', () => {
+    const e = federfarmaEntry({ subject: sogg, text: timbro, ocr: ACCOMPAGNAMENTO, date: '19/10/2026', key: 'k1' });
+    expect(e.ocr).toBeUndefined();
+  });
+});
+
+describe('serveRilettura / applicaRiletture — campo ocr', () => {
+  const vecchia = { n: null, t: ['T'], tx: 'U.O. EMATOLOGIA - smarrimento timbro', m: [], f: [], src: 'Federfarma SP', d: '19/10/2026', k: 'k1' };
+
+  it('voce che ha già il testo OCR → non va riletta', () => {
+    expect(serveRilettura({ ...vecchia, ocr: LETTERA_OSPEDALE })).toBe(false);
+  });
+
+  it('la rilettura aggiunge ocr e lascia tx invariato', () => {
+    const { db, aggiornate } = applicaRiletture([vecchia], [{ ...vecchia, ocr: LETTERA_OSPEDALE }]);
+    expect(db[0].tx).toBe(vecchia.tx);
+    expect(db[0].ocr).toBe(LETTERA_OSPEDALE);
+    expect(aggiornate).toHaveLength(1);
+  });
+
+  it('i nomi del testo OCR non fanno scattare il matching (che gira su tx)', async () => {
+    const { scoreMatch, tokenize } = await import('../fofi-match.js');
+    const { db } = applicaRiletture([vecchia], [{ ...vecchia, ocr: LETTERA_OSPEDALE }]);
+    expect(scoreMatch(tokenize('Amato Roberto'), db[0]).score).toBe(0);
+  });
+});

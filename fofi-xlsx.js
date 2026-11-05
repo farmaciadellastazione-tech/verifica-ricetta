@@ -93,7 +93,7 @@ function sheetToEntries(sharedStringsXml, sheetXml) {
 }
 
 // Serializza una voce nell'ordine canonico {n,t,tx,m,f} (m/f default []).
-// Campi opzionali (src/d/k) emessi in coda solo se presenti: servono alle voci
+// Campi opzionali (src/d/k/ocr) emessi in coda solo se presenti: servono alle voci
 // senza numero FOFI (inoltri Federfarma SP), le voci classiche restano identiche.
 function entryToJson(e) {
   const o = {
@@ -103,7 +103,7 @@ function entryToJson(e) {
     m: e.m || [],
     f: e.f || []
   };
-  for (const k of ['src', 'd', 'k']) if (e[k]) o[k] = e[k];
+  for (const k of ['src', 'd', 'k', 'ocr']) if (e[k]) o[k] = e[k];
   return JSON.stringify(o);
 }
 

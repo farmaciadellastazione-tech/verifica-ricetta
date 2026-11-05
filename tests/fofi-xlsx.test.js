@@ -181,3 +181,11 @@ describe('entryToJson — campi opzionali src/d/k', () => {
     expect(entryToJson({ n: 1, t: ['F'], tx: 'x' })).toBe('{"n":1,"t":["F"],"tx":"x","m":[],"f":[]}');
   });
 });
+
+describe('entryToJson — campo ocr (testo allegato solo consultabile)', () => {
+  it('conserva ocr se presente, in coda dopo src/d/k', () => {
+    const j = entryToJson({ n: null, t: ['T'], tx: 'ogg', src: 'Federfarma SP', d: '19/10/2026', k: 'k1', ocr: 'testo letto' });
+    expect(Object.keys(JSON.parse(j))).toEqual(['n', 't', 'tx', 'm', 'f', 'src', 'd', 'k', 'ocr']);
+    expect(JSON.parse(j).ocr).toBe('testo letto');
+  });
+});
