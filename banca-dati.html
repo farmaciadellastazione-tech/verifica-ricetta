@@ -114,7 +114,7 @@ const TIPO_LABEL = { F: 'Falsificazione', T: 'Furto/smarrimento timbro', B: 'Buo
 // normalize() arriva da fofi-match.js (stessa logica del matching dell'app).
 const INDEX = FOFI_DB.map(rec => ({
   rec,
-  hay: normalize([rec.tx, (rec.m || []).join(' '), (rec.f || []).join(' '), rec.n].join(' '))
+  hay: normalize([rec.tx, (rec.m || []).join(' '), (rec.f || []).join(' '), rec.n, rec.src].join(' '))
 }));
 
 let filtroTipo = '';
@@ -144,8 +144,15 @@ function render() {
     return termini.every(t => hay.includes(t));
   }).map(x => x.rec);
 
-  // Più recenti in cima (n° circolare decrescente)
-  voci.sort((a, b) => b.n - a.n);
+  // Più recenti in cima: prima gli inoltri senza numero (Federfarma SP) per data
+  // decrescente, poi le circolari FOFI per n° decrescente.
+  const dataKey = d => (d || '').split('/').reverse().join('');
+  voci.sort((a, b) => {
+    if (a.n == null && b.n == null) return dataKey(b.d).localeCompare(dataKey(a.d));
+    if (a.n == null) return -1;
+    if (b.n == null) return 1;
+    return b.n - a.n;
+  });
 
   document.getElementById('count').textContent =
     `${voci.length} su ${FOFI_DB.length}`;
@@ -165,7 +172,7 @@ function render() {
       `<span class="chip-meta farmaco">${highlight(f, termini)}</span>`).join('');
     const meta = (medici || farmaci) ? `<div class="entry-meta">${medici}${farmaci}</div>` : '';
     return `<div class="entry">
-      <div class="entry-head">${badges}<span class="entry-n">Circ. FOFI n. ${escHtml(rec.n)}</span></div>
+      <div class="entry-head">${badges}<span class="entry-n">${escHtml(fofiRiferimento(rec))}</span></div>
       <div class="entry-tx">${highlight(rec.tx, termini)}</div>
       ${meta}
     </div>`;

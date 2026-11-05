@@ -65,9 +65,18 @@ New repository secret**. Crea i tre:
 
 ## Cosa fa, passo per passo
 
-1. `tools/fetch-fofi-email.mjs` — scarica l'allegato `.xlsx` dell'ultima mail FOFI.
-2. `tools/build-fofi-db.mjs --write` — accoda solo le circolari con numero nuovo
-   (deterministico, nessuna AI; preserva le voci esistenti).
+1. `tools/fetch-fofi-email.mjs` — legge la mail (ultimi 30 giorni) da tre fonti:
+   - Excel cumulativo dell'Ordine (formato storico, **sospeso dal 3/11/2026**);
+   - **PDF delle singole circolari FOFI** linkati (rufblob) nelle mail di
+     `ordinesp@fofiruf.it`: testo via `pdftotext`, parsing in `fofi-avvisi.js`;
+   - **inoltri di Federfarma La Spezia** (`info@federfarmalaspezia.it`) con oggetto
+     "furto/smarrimento/falsificazione…" di un medico: voci senza numero
+     (`n:null`, `src:"Federfarma SP"`, `d`=data mail, `k`=Message-ID per la deduplica).
+2. `tools/build-fofi-db.mjs --write` (Excel) e `tools/apply-fofi-entries.mjs --write`
+   (PDF/Federfarma) — accodano solo le voci nuove (deterministico, nessuna AI).
+   A mano: `node tools/apply-fofi-entries.mjs 16130.pdf 16132.pdf --date 03/11/2026 --write`.
+   Se non arriva nulla da 21 giorni, il passo "Controllo banca dati ferma" fa
+   **fallire il job** (mail di GitHub): probabile nuovo cambio di formato.
 3. `tools/bump-build.mjs` — incrementa `APP_BUILD`/data in `index.html` e allinea
    `CACHE_NAME` in `sw.js` (invalida la cache delle PWA installate).
 4. `npm test` — la suite deve passare.
@@ -85,4 +94,12 @@ New repository secret**. Crea i tre:
   refresh token (passo 2) e aggiorna il secret.
 - **Job fallito su build/test**: probabile cambio di formato dell'Excel → apri
   il log, aggiorna `fofi-xlsx.js` e i test, poi rilancia.
+- **Job fallito su "Controllo banca dati ferma"**: nessuna segnalazione da 21+
+  giorni. Controlla le ultime mail dell'Ordine/Federfarma: se il formato è cambiato
+  aggiorna `fofi-avvisi.js` (+ test in `tests/fofi-avvisi.test.js`).
+- **Prova senza deploy**: *Run workflow* con **dry_run** spuntato mostra le voci
+  che verrebbero aggiunte senza aprire PR né toccare `main`.
+- La FOFI ha anche una sezione sul suo sito (*La professione del farmacista →
+  Furti/Smarrimenti/falsificazioni*, accesso con codice fiscale): non è
+  automatizzabile, serve come consultazione manuale.
 - In ogni caso la banca dati **non** viene modificata finché la PR non è approvata.

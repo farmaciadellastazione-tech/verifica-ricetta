@@ -93,14 +93,18 @@ function sheetToEntries(sharedStringsXml, sheetXml) {
 }
 
 // Serializza una voce nell'ordine canonico {n,t,tx,m,f} (m/f default []).
+// Campi opzionali (src/d/k) emessi in coda solo se presenti: servono alle voci
+// senza numero FOFI (inoltri Federfarma SP), le voci classiche restano identiche.
 function entryToJson(e) {
-  return JSON.stringify({
+  const o = {
     n: (e.n === '' || e.n == null) ? null : e.n,
     t: e.t || [],
     tx: e.tx || '',
     m: e.m || [],
     f: e.f || []
-  });
+  };
+  for (const k of ['src', 'd', 'k']) if (e[k]) o[k] = e[k];
+  return JSON.stringify(o);
 }
 
 const DB_HEADER =
@@ -129,9 +133,14 @@ function entriesToDbFile(entries, aggiornata) {
 // Fonde voci esistenti + nuove dall'xlsx: preserva le voci già presenti (con i loro
 // m/f curati) e accoda solo le circolari il cui numero non è ancora in banca dati.
 // Ritorna { merged, added } dove added sono le nuove voci accodate.
+// Le voci senza numero (n:null) entrano solo se hanno una chiave `k` nuova
+// (es. Message-ID della mail Federfarma SP); senza `k` restano scartate.
 function mergeNewEntries(existing, fromXlsx) {
   const existingNumbers = new Set(existing.map(e => e.n).filter(n => n != null));
-  const added = fromXlsx.filter(e => e.n != null && !existingNumbers.has(e.n));
+  const existingKeys = new Set(existing.map(e => e.k).filter(Boolean));
+  const added = fromXlsx.filter(e => e.n != null
+    ? !existingNumbers.has(e.n)
+    : (!!e.k && !existingKeys.has(e.k)));
   return { merged: existing.concat(added), added };
 }
 

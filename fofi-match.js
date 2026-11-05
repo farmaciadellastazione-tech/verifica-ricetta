@@ -100,8 +100,15 @@ function calcolaScadenza(dataStr) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Etichetta della fonte di una voce: circolare FOFI numerata, oppure inoltro
+// senza numero (es. Federfarma SP) identificato da fonte + data mail.
+function fofiRiferimento(rec) {
+  if (rec.n != null) return `Circ. FOFI n. ${rec.n}`;
+  return `Segnalazione ${rec.src || 'non FOFI'}${rec.d ? ` del ${rec.d}` : ''}`;
+}
+
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza };
+const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
