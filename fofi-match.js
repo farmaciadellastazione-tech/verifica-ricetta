@@ -107,17 +107,64 @@ function fofiRiferimento(rec) {
   return `Segnalazione ${rec.src || 'non FOFI'}${rec.d ? ` del ${rec.d}` : ''}`;
 }
 
-// Ordine dell'elenco consultabile: più recenti in cima. Le circolari numerate
-// non hanno una data, quindi l'unico riferimento temporale comune a tutte le
-// voci (circolari FOFI, inoltri Federfarma, avvisi Ordine) è l'ordine di arrivo
-// in fofi-db.js, dove le nuove voci vengono sempre accodate in fondo.
-// Restituisce un nuovo array (non modifica quello in ingresso).
+// ── Ordine dell'elenco (banca-dati.html) ─────────────────────────────────
+
+// "dd/mm/yyyy" → "yyyymmdd" confrontabile; '' se assente o malformata.
+function chiaveData(d) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d || '');
+  return m ? m[3] + m[2] + m[1] : '';
+}
+
+// Più recenti in cima, per data di arrivo d (data della mail per tutte le
+// fonti: circolari FOFI, inoltri Federfarma, avvisi Ordine). A parità di data:
+// circolari per numero decrescente, altrimenti l'ultima accodata in cima.
+// Le voci senza data (la prima banca dati, maggio 2026) vanno in fondo.
+// Accetta record o oggetti indice {rec, ...}; restituisce un nuovo array.
 function ordinaRecenti(voci) {
-  return voci.slice().reverse();
+  const rec = v => v.rec || v;
+  return voci.map((v, i) => ({ v, i, d: chiaveData(rec(v).d), n: rec(v).n }))
+    .sort((a, b) => {
+      if (a.d !== b.d) return b.d.localeCompare(a.d);
+      if (a.n != null && b.n != null && a.n !== b.n) return b.n - a.n;
+      return b.i - a.i;
+    })
+    .map(x => x.v);
+}
+
+// ── Metadati m/f (chip della banca dati) ─────────────────────────────────
+
+const TITOLI_MEDICO = new Set(['dr', 'dott', 'dssa', 'ssa', 'dottor', 'dottori', 'prof', 'sig', 'sigra']);
+const RE_TITOLO = /^(dott(\.?ssa|ori|or(e|essa)?)?|dr(\.?ssa)?|prof(\.?ssa)?|sig(\.?ra)?)\.?\s+/i;
+
+// Nome del medico senza titoli in testa e senza spazi doppi.
+function pulisciNome(s) {
+  let out = String(s || '').replace(/\s+/g, ' ').trim();
+  while (RE_TITOLO.test(out)) out = out.replace(RE_TITOLO, '').trim();
+  return out;
+}
+
+// Problemi dei campi m (medici) e f (farmaci) di una voce: ogni nome deve
+// comparire per intero nel testo tx e non contenere titoli, qualifiche,
+// dosaggi o parole generiche. Il solo cognome è ammesso (alcune circolari
+// riportano solo quello). Usato dai test su fofi-db.js e da admin.html.
+function problemiMetadati(rec) {
+  const parole = new Set(normalize(rec.tx).split(' '));
+  const out = [];
+  for (const [campo, etichetta] of [['m', 'medico'], ['f', 'farmaco']]) {
+    for (const v of rec[campo] || []) {
+      const w = normalize(v).split(' ').filter(Boolean);
+      if (!w.length) out.push(`${etichetta} vuoto`);
+      else if (v !== v.trim() || /\s{2,}/.test(v)) out.push(`${etichetta} "${v}": spazi in eccesso`);
+      else if (!w.every(x => parole.has(x))) out.push(`${etichetta} "${v}": non compare per intero nel testo`);
+      else if (w.some(x => TITOLI_MEDICO.has(x) || STOPWORDS_FOFI.has(x))) out.push(`${etichetta} "${v}": contiene titoli o parole generiche`);
+      else if (campo === 'f' && w.some(x => /\d/.test(x))) out.push(`${etichetta} "${v}": contiene il dosaggio`);
+    }
+  }
+  return out;
 }
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, ordinaRecenti };
+const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, chiaveData, ordinaRecenti, pulisciNome, problemiMetadati };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;

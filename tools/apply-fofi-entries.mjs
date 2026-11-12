@@ -56,7 +56,10 @@ for (const f of inputs) {
     const text = execFileSync('pdftotext', ['-enc', 'UTF-8', f, '-'], { encoding: 'utf8' });
     const num = basename(f).match(/\b(1\d{4})\b/);
     const e = circolarePdfToEntry(text, num ? parseInt(num[1], 10) : undefined);
-    if (e) nuove.push(e); else console.log(`- ${basename(f)}: non è una segnalazione, ignorata.`);
+    // Data di arrivo (ordina l'elenco della banca dati): --date, altrimenti oggi.
+    const oggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    if (e) nuove.push({ ...e, d: e.d || (dIdx >= 0 ? args[dIdx + 1] : oggi) });
+    else console.log(`- ${basename(f)}: non è una segnalazione, ignorata.`);
   }
 }
 

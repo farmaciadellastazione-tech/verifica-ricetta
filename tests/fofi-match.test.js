@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, ordinaRecenti,
+  STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, ordinaRecenti, pulisciNome, problemiMetadati,
 } from '../fofi-match.js';
 
 describe('normalize — pulizia testo FOFI', () => {
@@ -229,23 +229,52 @@ describe('fofiRiferimento — etichetta della fonte di una voce', () => {
   });
 });
 
-describe('ordinaRecenti — elenco della banca dati in ordine di arrivo', () => {
+describe('ordinaRecenti — elenco della banca dati per data di arrivo', () => {
+  // Ordine nell'array volutamente diverso da quello temporale: un lotto della
+  // pipeline accoda prima i PDF, poi Federfarma, poi Ordine; i recuperi arretrati
+  // finiscono in coda anche se sono vecchi.
   const voci = [
-    { n: 16135, t: ['T'], tx: 'a' },
-    { n: null, t: ['T'], tx: 'b', src: 'Federfarma SP', d: '06/10/2026' },
-    { n: null, t: ['T'], tx: 'c', src: 'Federfarma SP', d: '05/11/2026' },
-    { n: 16141, t: ['F'], tx: 'd' },
-    { n: 16151, t: ['T'], tx: 'e' },
+    { n: 16092, t: ['F'], tx: 'a', d: '02/10/2026' },
+    { n: 16135, t: ['T'], tx: 'b', d: '03/11/2026' },
+    { n: 16141, t: ['F'], tx: 'c', d: '10/11/2026' },
+    { n: null, t: ['T'], tx: 'd', src: 'Federfarma SP', d: '06/10/2026' },
+    { n: null, t: ['T'], tx: 'e', src: 'Federfarma SP', d: '05/11/2026' },
     { n: null, t: ['F'], tx: 'f', src: 'Ordine SP', d: '12/11/2026' },
+    { n: 16103, t: ['F'], tx: 'g', d: '08/10/2026' },
   ];
 
-  it('le più recenti (ultime accodate) in cima, avvisi e circolari mescolati', () => {
-    expect(ordinaRecenti(voci).map(v => v.tx)).toEqual(['f', 'e', 'd', 'c', 'b', 'a']);
+  it('dalla più recente alla più vecchia per data, avvisi e circolari mescolati', () => {
+    expect(ordinaRecenti(voci).map(v => v.tx)).toEqual(['f', 'c', 'e', 'b', 'g', 'd', 'a']);
   });
 
-  it('un avviso di ottobre non sta sopra una circolare arrivata dopo', () => {
-    const out = ordinaRecenti(voci);
-    expect(out.findIndex(v => v.n === 16151)).toBeLessThan(out.findIndex(v => v.d === '06/10/2026'));
+  it('un avviso recuperato in ritardo non sale sopra circolari arrivate dopo', () => {
+    const out = ordinaRecenti(voci).map(v => v.tx);
+    expect(out.indexOf('g')).toBeLessThan(out.indexOf('d')); // 16103 (08/10) sopra FF 06/10
+  });
+
+  it('stessa data: circolari per numero decrescente', () => {
+    const stessa = [
+      { n: 16144, t: ['T'], tx: 'x', d: '12/11/2026' },
+      { n: 16151, t: ['T'], tx: 'y', d: '12/11/2026' },
+    ];
+    expect(ordinaRecenti(stessa).map(v => v.n)).toEqual([16151, 16144]);
+  });
+
+  it('stessa data, una voce senza numero: vale l\'ordine di accodamento (ultima in cima)', () => {
+    const stessa = [
+      { n: 16151, t: ['T'], tx: 'x', d: '12/11/2026' },
+      { n: null, t: ['F'], tx: 'y', src: 'Ordine SP', d: '12/11/2026' },
+    ];
+    expect(ordinaRecenti(stessa).map(v => v.tx)).toEqual(['y', 'x']);
+  });
+
+  it('voci senza data (prima banca dati) in fondo, per numero decrescente', () => {
+    const miste = [
+      { n: 15373, t: ['T'], tx: 'x' },
+      { n: 15897, t: ['T'], tx: 'y' },
+      { n: 15911, t: ['T'], tx: 'z', d: '06/06/2026' },
+    ];
+    expect(ordinaRecenti(miste).map(v => v.tx)).toEqual(['z', 'y', 'x']);
   });
 
   it('non modifica l\'array in ingresso', () => {
@@ -257,5 +286,39 @@ describe('ordinaRecenti — elenco della banca dati in ordine di arrivo', () => 
   it('funziona anche sugli oggetti indice {rec, ...} di banca-dati.html', () => {
     const indice = voci.map(rec => ({ rec, hay: rec.tx }));
     expect(ordinaRecenti(indice)[0].rec.tx).toBe('f');
+  });
+});
+
+describe('pulisciNome — nome del medico senza titoli né spazi doppi', () => {
+  it('toglie i titoli in testa', () => {
+    expect(pulisciNome('Dr. ROSSI MARIO')).toBe('ROSSI MARIO');
+    expect(pulisciNome('Dott.ssa ANNA  BIANCHI')).toBe('ANNA BIANCHI');
+    expect(pulisciNome('Dr.ssa Laura Zonta')).toBe('Laura Zonta');
+    expect(pulisciNome('dottori MANGIA GIAMPAOLO')).toBe('MANGIA GIAMPAOLO');
+    expect(pulisciNome('Prof. Dott. VERDI LUCA')).toBe('VERDI LUCA');
+  });
+  it('lascia invariati i nomi già puliti, anche se iniziano come un titolo', () => {
+    expect(pulisciNome('DRAGO MARIA')).toBe('DRAGO MARIA');
+    expect(pulisciNome('DOTTI ANNA')).toBe('DOTTI ANNA');
+  });
+});
+
+describe('problemiMetadati — controllo dei campi m/f di una voce', () => {
+  const tx = 'falsificazione ricetta di OXYCONTIN 80 mg a firma del Dott. ROSSI MARIO e della Dr.ssa BONO';
+  it('voce corretta → nessun problema (anche col solo cognome)', () => {
+    expect(problemiMetadati({ n: 1, tx, m: ['ROSSI MARIO', 'BONO'], f: ['OXYCONTIN'] })).toEqual([]);
+  });
+  it('m e f vuoti o assenti → nessun problema', () => {
+    expect(problemiMetadati({ n: 1, tx })).toEqual([]);
+  });
+  it('titolo al posto del nome', () => {
+    expect(problemiMetadati({ n: 1, tx, m: ['Dott'], f: [] })).toHaveLength(1);
+  });
+  it('nome troncato o assente dal testo', () => {
+    expect(problemiMetadati({ n: 1, tx, m: ['ROSS'], f: [] })).toHaveLength(1);
+  });
+  it('farmaco con dosaggio, forma o parole di contorno', () => {
+    expect(problemiMetadati({ n: 1, tx, m: [], f: ['OXYCONTIN 80 mg'] })).toHaveLength(1);
+    expect(problemiMetadati({ n: 1, tx: 'presso Ospedale Sacco', m: [], f: ['Ospedale Sacco'] })).toHaveLength(1);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractXlsxUrl, collectBody, decodeB64Url, findXlsxPart, scaricaMail } from '../tools/fetch-fofi-email.mjs';
+import { extractXlsxUrl, collectBody, decodeB64Url, findXlsxPart, scaricaMail, preparaIncoming } from '../tools/fetch-fofi-email.mjs';
 
 // HTML reale (semplificato) della mail "Segnalazioni urgenti" FOFI: l'Excel è
 // un link Azure blob nel corpo, non un allegato MIME.
@@ -98,5 +98,44 @@ describe('scaricaMail — download IMAP tollerante', () => {
   it('errore IMAP → null (la singola mail non blocca le altre)', async () => {
     const client = { download: async () => { throw new Error('connessione chiusa'); } };
     await expect(scaricaMail(client, 7)).resolves.toBeNull();
+  });
+});
+
+describe('preparaIncoming — voci trovate nelle mail → .fofi-incoming.json', () => {
+  const circ = (n, iso) => ({ entry: { n, t: ['F'], tx: `c${n}` }, date: new Date(iso) });
+  const ff = (d, iso) => ({ entry: { n: null, t: ['T'], tx: `ff${d}`, src: 'Federfarma SP', d }, date: new Date(iso) });
+
+  it('le circolari prendono come data d quella della mail', () => {
+    const { entries } = preparaIncoming([circ(16141, '2026-11-10T11:15:15Z')]);
+    expect(entries[0].d).toBe('10/11/2026');
+  });
+
+  it('la data già presente (Federfarma/Ordine) non viene toccata', () => {
+    const { entries } = preparaIncoming([ff('05/11/2026', '2026-11-06T08:00:00Z')]);
+    expect(entries[0].d).toBe('05/11/2026');
+  });
+
+  it('un lotto di più giorni è accodato per data crescente, non raggruppato per fonte', () => {
+    // fetch raccoglie prima tutti i PDF, poi Federfarma, poi Ordine.
+    const { entries } = preparaIncoming([
+      circ(16141, '2026-11-10T11:15:15Z'),
+      circ(16144, '2026-11-12T08:00:00Z'),
+      ff('11/11/2026', '2026-11-11T09:00:00Z'),
+    ]);
+    expect(entries.map(e => e.tx)).toEqual(['c16141', 'ff11/11/2026', 'c16144']);
+  });
+
+  it('riletture OCR separate; "aggiornata" segue solo le voci nuove', () => {
+    const rilettura = { ...ff('06/10/2026', '2026-12-01T08:00:00Z'), rilettura: true };
+    const out = preparaIncoming([circ(16141, '2026-11-10T11:15:15Z'), rilettura]);
+    expect(out.entries).toHaveLength(1);
+    expect(out.riletture).toHaveLength(1);
+    expect(out.aggiornata).toBe('10/11/2026');
+  });
+
+  it('non modifica le voci in ingresso', () => {
+    const t = circ(16141, '2026-11-10T11:15:15Z');
+    preparaIncoming([t]);
+    expect(t.entry.d).toBeUndefined();
   });
 });
