@@ -1,7 +1,7 @@
 // Service worker — Verifica Ricetta
 // Cache-first per asset statici (app + DB FOFI), bypass per API esterne.
 // Bumpare CACHE_NAME ad ogni deploy per invalidare la cache vecchia.
-const CACHE_NAME = 'verifica-ricetta-build111';
+const CACHE_NAME = 'verifica-ricetta-build112';
 const ASSETS = [
   './',
   './index.html',
@@ -16,8 +16,11 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
+  // cache: 'reload' = sempre dalla rete, mai dalla cache HTTP del browser
+  // (GitHub Pages: max-age=600). Senza, una build nuova poteva finire in cache
+  // con un fofi-match.js / fofi-db.js vecchio di qualche minuto.
   e.waitUntil(
-    caches.open(CACHE_NAME).then(c => c.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' }))))
   );
   self.skipWaiting();
 });
