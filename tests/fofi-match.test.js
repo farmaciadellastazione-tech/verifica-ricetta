@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento,
+  STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, ordinaRecenti,
 } from '../fofi-match.js';
 
 describe('normalize — pulizia testo FOFI', () => {
@@ -226,5 +226,36 @@ describe('fofiRiferimento — etichetta della fonte di una voce', () => {
   });
   it('voce senza numero né data → solo la fonte', () => {
     expect(fofiRiferimento({ n: null, t: ['T'], tx: 'x', src: 'Federfarma SP' })).toBe('Segnalazione Federfarma SP');
+  });
+});
+
+describe('ordinaRecenti — elenco della banca dati in ordine di arrivo', () => {
+  const voci = [
+    { n: 16135, t: ['T'], tx: 'a' },
+    { n: null, t: ['T'], tx: 'b', src: 'Federfarma SP', d: '06/10/2026' },
+    { n: null, t: ['T'], tx: 'c', src: 'Federfarma SP', d: '05/11/2026' },
+    { n: 16141, t: ['F'], tx: 'd' },
+    { n: 16151, t: ['T'], tx: 'e' },
+    { n: null, t: ['F'], tx: 'f', src: 'Ordine SP', d: '12/11/2026' },
+  ];
+
+  it('le più recenti (ultime accodate) in cima, avvisi e circolari mescolati', () => {
+    expect(ordinaRecenti(voci).map(v => v.tx)).toEqual(['f', 'e', 'd', 'c', 'b', 'a']);
+  });
+
+  it('un avviso di ottobre non sta sopra una circolare arrivata dopo', () => {
+    const out = ordinaRecenti(voci);
+    expect(out.findIndex(v => v.n === 16151)).toBeLessThan(out.findIndex(v => v.d === '06/10/2026'));
+  });
+
+  it('non modifica l\'array in ingresso', () => {
+    const copia = voci.slice();
+    ordinaRecenti(voci);
+    expect(voci).toEqual(copia);
+  });
+
+  it('funziona anche sugli oggetti indice {rec, ...} di banca-dati.html', () => {
+    const indice = voci.map(rec => ({ rec, hay: rec.tx }));
+    expect(ordinaRecenti(indice)[0].rec.tx).toBe('f');
   });
 });

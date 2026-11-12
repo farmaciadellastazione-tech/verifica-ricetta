@@ -107,8 +107,17 @@ function fofiRiferimento(rec) {
   return `Segnalazione ${rec.src || 'non FOFI'}${rec.d ? ` del ${rec.d}` : ''}`;
 }
 
+// Ordine dell'elenco consultabile: più recenti in cima. Le circolari numerate
+// non hanno una data, quindi l'unico riferimento temporale comune a tutte le
+// voci (circolari FOFI, inoltri Federfarma, avvisi Ordine) è l'ordine di arrivo
+// in fofi-db.js, dove le nuove voci vengono sempre accodate in fondo.
+// Restituisce un nuovo array (non modifica quello in ingresso).
+function ordinaRecenti(voci) {
+  return voci.slice().reverse();
+}
+
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento };
+const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, ordinaRecenti };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
