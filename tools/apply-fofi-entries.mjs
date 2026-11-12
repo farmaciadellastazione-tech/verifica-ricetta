@@ -74,7 +74,10 @@ if (write) {
   const data = dataPiuRecente(aggiornata, aggiornataAttuale); // mai all'indietro
   writeFileSync(resolve(ROOT, 'fofi-db.js'), entriesToDbFile(merged, data));
   console.log(`✓ Scritto fofi-db.js: ${merged.length} voci${data ? ` · aggiornamento ${data}` : ''}.`);
-  console.log('FOFI_ADDED=' + [...new Set([...added.map(etichetta), ...aggiornate.map(e => 'OCR ' + etichetta(e))])].join(','));
+  // Etichette uniche: due avvisi senza numero dello stesso giorno restano due ("OSP 12/11/2026 #2").
+  const conta = {};
+  const unica = l => (conta[l] = (conta[l] || 0) + 1) > 1 ? `${l} #${conta[l]}` : l;
+  console.log('FOFI_ADDED=' + [...added.map(etichetta), ...aggiornate.map(e => 'OCR ' + etichetta(e))].map(unica).join(','));
 } else {
   console.log('(anteprima — rilancia con --write per applicare)');
 }

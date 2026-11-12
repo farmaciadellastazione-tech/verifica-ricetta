@@ -143,14 +143,15 @@ jobs:
           API="https://api.github.com/repos/$REPO"
           AUTH="Authorization: Bearer $GH_TOKEN"
           for i in $(seq 1 10); do
-            M=$(curl -s -H "$AUTH" "$API/pulls/$PR" | jq -r '.mergeable')
+            # risposta non JSON (5xx, rate limit): si riprova, senza far cadere lo step
+            M=$(curl -s -H "$AUTH" "$API/pulls/$PR" | jq -r '.mergeable' 2>/dev/null || echo null)
             [ "$M" != "null" ] && break
             sleep 3
           done
           echo "Mergeabilità PR #$PR: $M"
           CODE=$(curl -s -o "$RUNNER_TEMP/merge.out" -w '%{http_code}' -X PUT -H "$AUTH" \
             -H "Content-Type: application/json" \
-            "$API/pulls/$PR/merge" -d '{"merge_method":"merge"}')
+            "$API/pulls/$PR/merge" -d '{"merge_method":"merge"}' || true)
           if [ "$CODE" = "200" ]; then
             echo "PR #$PR mergiata in dev."
             exit 0
@@ -159,7 +160,7 @@ jobs:
           CODE=$(curl -s -o "$RUNNER_TEMP/merge.out" -w '%{http_code}' -X POST -H "$AUTH" \
             -H "Content-Type: application/json" \
             "$API/merges" \
-            -d "{\"base\":\"dev\",\"head\":\"auto/fofi-update\",\"commit_message\":\"Merge PR #$PR: FOFI nuove segnalazioni [auto]\"}")
+            -d "{\"base\":\"dev\",\"head\":\"auto/fofi-update\",\"commit_message\":\"Merge PR #$PR: FOFI nuove segnalazioni [auto]\"}" || true)
           case "$CODE" in
             201) echo "auto/fofi-update mergiato direttamente in dev (PR #$PR)." ;;
             204) echo "dev contiene già auto/fofi-update." ;;

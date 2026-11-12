@@ -42,8 +42,12 @@ function appiattisci(s) {
 }
 
 // Oggetto della circolare: dopo "Segnalazione urgente:" fino al numero di
-// circolare, all'inizio del corpo ("Si informa"), alla data o a fine blocco.
-const FINE_OGGETTO = /(?=\s+(?:1[5-9]\d{3}(?!\d)|Si informa|Roma,|Circolare n\.|e p\.c\.)|\n\n|$)/;
+// circolare (solo se chiude la riga: un CAP come 16121 nel testo non conta),
+// all'inizio del corpo ("Si informa"), alla data "Roma, gg/mm/aaaa" o a fine blocco.
+const FINE_OGGETTO = /(?=\s+(?:1[5-9]\d{3}[ \t]*(?:\n|$)|Si informa|Roma,\s*\d{1,2}\/\d{1,2}\/\d{4}|Circolare n\.|e p\.c\.)|\n\n|$)/;
+// Fine del corpo: "Si chiede" maiuscolo a inizio frase (dopo un punto o a capo);
+// un "si chiede" minuscolo dentro il testo della segnalazione non conta.
+const FINE_CORPO = /(?<=\.)\s+Si chiede\b|\n\s*Si chiede\b/;
 
 // Testo di una circolare FOFI (output pdftotext) -> voce {n,t,tx} o null se la
 // circolare non è una segnalazione (corsi, note operative...) o se manca il numero.
@@ -72,14 +76,20 @@ function circolarePdfToEntry(text, nHint) {
       return true;
     }).join('\n');
 
-  // Corpo: da "Si informa che" a "Si chiede"; se c'è "segnalazione relativa"
-  // si parte da lì (toglie il preambolo "la scrivente Federazione ha ricevuto...").
+  // Corpo: da "segnalazione relativa" (toglie il preambolo "la scrivente
+  // Federazione ha ricevuto...") oppure, se manca, da "Si informa che"; fino a
+  // "Si chiede". Senza fine riconoscibile si resta sull'oggetto.
   let tx = oggetti;
-  const corpo = flat.match(/Si informa che\s+([\s\S]*?)\s*Si chiede/i);
-  if (corpo) {
-    tx = corpo[1];
-    const rel = tx.match(/segnalazione relativa\s+([\s\S]*)/i);
-    if (rel) tx = rel[1].replace(/^(a|al|alla|allo|ai|alle|agli)\b\s*:?\s*/i, '');
+  const rel = flat.match(/segnalazione relativa\s+/i);
+  const inf = flat.match(/Si informa che\s+/i);
+  const inizio = rel || inf;
+  if (inizio) {
+    const resto = flat.slice(inizio.index + inizio[0].length);
+    const fine = resto.search(FINE_CORPO);
+    if (fine >= 0) {
+      tx = resto.slice(0, fine);
+      if (rel) tx = tx.replace(/^(a|al|alla|allo|ai|alle|agli)\b\s*:?\s*/i, '');
+    }
   }
   tx = pulisciRighe(tx);
 
@@ -211,8 +221,17 @@ function isAvvisoOrdine(subject) {
 }
 
 const MAX_TX_ORDINE = 1500;
-// Fine del testo utile: saluti / ringraziamenti, poi vengono firma, recapiti e disclaimer.
-const FINE_AVVISO_ORDINE = /[;,.]?\s*(?:ringrazi|cordiali saluti|distinti saluti|si porgono)/i;
+// Fine del testo utile: saluti / ringraziamenti oppure, se mancano, firma,
+// recapiti e disclaimer dell'Ordine.
+const FINE_AVVISO_ORDINE = /[;,.]?\s*(?:ringrazi|cordiali saluti|distinti saluti|si porgono|funzionario|\b(?:tel|cell|pec|mail)\b\s*[:.]?\s*[\w\d]|avvertenza di riservatezza)/i;
+// Preambolo dell'Ordine fino ai due punti ("…avviso da parte della Dott.ssa X,
+// della Farmacia Y, del quale si prega di prendere buona nota :").
+const PREAMBOLO_ORDINE = /^[\s\S]{0,400}?(?:buona nota|seguente avviso|si trasmette[^:]{0,200}|si riceve[^:]{0,200})\s*:\s*/i;
+// Testo tra virgolette ("", “”, «»): matchAll scorre le coppie in ordine, così
+// non si cattura mai il testo tra la chiusura di una coppia e l'apertura della successiva.
+const VIRGOLETTE = /"([^"]*)"|“([^”]*)”|«([^»]*)»/g;
+// PRIVACY: iniziali del paziente ("iniziali X. Y.", "Iniziali: X.Y.", "(X. Y.)").
+const INIZIALI = /\s*\(?\s*\binizial[ei]\b\s*:?\s*(?:[A-Za-z]\s*\.\s*){1,3}\)?|\s*\(\s*(?:[A-Z]\s*\.\s*){1,3}\)/gi;
 
 // Voce senza numero per un avviso dell'Ordine. `text` è il corpo in testo
 // semplice. Si tiene SOLO il testo tra virgolette (l'avviso vero): fuori ci
@@ -222,17 +241,21 @@ const FINE_AVVISO_ORDINE = /[;,.]?\s*(?:ringrazi|cordiali saluti|distinti saluti
 function ordineAvvisoEntry({ subject, text, date, key }) {
   const sogg = String(subject || '').replace(/\s+/g, ' ').trim();
   const corpo = String(text || '').replace(/\|/g, ' ').replace(/\s+/g, ' ').trim();
-  const virgolette = corpo.match(/["“]\s*([^"”]{40,}?)\s*["”]/);
-  let avviso = virgolette ? virgolette[1] : corpo;
-  if (!virgolette) {
+  // Il passaggio tra virgolette più lungo è l'avviso (quelli brevi sono nomi
+  // di farmacie, titoli...). Se è troppo corto si ricade sul corpo.
+  const citati = [...corpo.matchAll(VIRGOLETTE)].map(m => (m[1] ?? m[2] ?? m[3]).trim());
+  let avviso = citati.sort((a, b) => b.length - a.length)[0] || '';
+  if (avviso.length < 40) {
+    avviso = corpo.replace(PREAMBOLO_ORDINE, '').replace(/^gent\.?\w*\s*,?\s*/i, '');
     const fine = avviso.search(FINE_AVVISO_ORDINE);
-    if (fine >= 0) avviso = avviso.slice(0, fine);
-    avviso = avviso.replace(/^gent\.?\w*\s*,?\s*/i, '');
+    if (fine >= 0) {
+      // senza saluti, prima di "Funzionario"/recapiti c'è il nome del firmatario:
+      // via le parole maiuscole dopo l'ultima fine frase (mai dentro una frase,
+      // per non togliere il nome di un medico)
+      avviso = avviso.slice(0, fine).replace(/([.;:!?])(?:\s+[A-ZÀ-Ý][\wà-ÿ'’]*){1,3}\s*$/, '$1');
+    }
   }
-  avviso = avviso
-    .replace(/\s*\(\s*iniziali[^)]*\)/gi, '')
-    .replace(/\binizial[ei]\s+(?:[A-Z]\.\s*){1,3}/g, '')
-    .trim().slice(0, MAX_TX_ORDINE);
+  avviso = avviso.replace(INIZIALI, '').trim().slice(0, MAX_TX_ORDINE);
   const tx = avviso ? sogg + '\n' + avviso : sogg;
   let t = tipiDaTesto(tx);
   if (!t.length) t = ['F'];

@@ -110,6 +110,25 @@ describe('circolarePdfToEntry — righe spezzate (output poppler, come in CI)', 
     }
   });
 
+  it('corpo con "segnalazione relativa" anche senza "Si informa che"', () => {
+    const s = 'Circolare n.\n16200\nSegnalazione urgente: falsificazione ricette Dr. MARIO ROSSI.\n\nSi comunica che è pervenuta segnalazione relativa al Dr. MARIO ROSSI per le specialità OXYCONTIN.\nSi chiede ai Presidenti di Ordine';
+    expect(circolarePdfToEntry(s, 16200).tx).toMatch(/OXYCONTIN/);
+  });
+
+  it('"si chiede" minuscolo dentro il corpo non lo tronca', () => {
+    const s = 'Circolare n.\n16201\nSegnalazione urgente: ricette\n\nSi informa che la scrivente Federazione ha ricevuto una segnalazione relativa al Dr. MARIO ROSSI, per cui si chiede attenzione, per le specialità OXYCONTIN e LYRICA.\nSi chiede ai Presidenti di Ordine';
+    const tx = circolarePdfToEntry(s, 16201).tx;
+    expect(tx).toMatch(/OXYCONTIN/);
+    expect(tx).toMatch(/LYRICA/);
+  });
+
+  it('oggetto: "Roma," o un CAP nel testo non lo troncano', () => {
+    const a = circolarePdfToEntry('Circolare n.\n16202\nSegnalazione urgente: furto ricettario ASL Roma, Dr. MARIO ROSSI.\n\ne p.c.', 16202);
+    expect(a.tx).toMatch(/MARIO ROSSI/);
+    const b = circolarePdfToEntry('Circolare n.\n16203\nSegnalazione urgente: furto timbro Dr. MARIO ROSSI via Roma 1 16121 Genova e Dr. LUCA BIANCHI.\n\ne p.c.', 16203);
+    expect(b.tx).toMatch(/LUCA BIANCHI/);
+  });
+
   it('oggetto spezzato a fine riga: il cognome non si perde (caso 16144)', () => {
     const s = 'Circolare n.\n16144\nSegnalazione urgente: falsificazione ricette a nome del Dr. VINCENZO\nROSSI.\n\nSi chiede ai Presidenti di Ordine';
     const e = circolarePdfToEntry(s, 16144);
@@ -235,6 +254,45 @@ describe('ordineAvvisoEntry — voce senza numero dal corpo mail', () => {
     // nomi fuori dalle virgolette: farmacista segnalante e funzionario dell'Ordine
     expect(e.tx).not.toMatch(/Rossi|Bianchi|Farmacia Esempio/);
     expect(e.tx).not.toMatch(/Cordiali|AVVERTENZA|@|0187/);
+  });
+
+  it('virgolette brevi prima dell\'avviso: si prende il passaggio tra virgolette, non il testo in mezzo', () => {
+    const s = ordineAvvisoEntry({
+      subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k3>',
+      text: 'avviso della "Farmacia Esempio" della Dottoressa Rossi Maria del quale si prega di prendere buona nota : "Con la presente si segnala una ricetta falsa di Rivotril gocce a nome del Dr. Verdi Luca." Cordiali saluti',
+    });
+    expect(s.tx).toMatch(/Rivotril/);
+    expect(s.tx).not.toMatch(/Rossi Maria/);
+  });
+
+  it('virgolette italiane «»: niente preambolo né firma/recapiti', () => {
+    const s = ordineAvvisoEntry({
+      subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k4>',
+      text: 'si trasmette avviso della Dottoressa Rossi Maria: «Ricetta falsa di Rivotril gocce a nome del Dr. Verdi Luca, ASL 5.» Mario Bianchi tel 0187 000000 mail a@b.it',
+    });
+    expect(s.tx).toMatch(/Rivotril/);
+    expect(s.tx).not.toMatch(/Rossi Maria|Bianchi|0187|@/);
+  });
+
+  it('senza virgolette e senza saluti: niente firma, recapiti, disclaimer', () => {
+    const s = ordineAvvisoEntry({
+      subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k5>',
+      text: 'si trasmette il seguente avviso, del quale si prega di prendere buona nota : ricetta falsa di Rivotril gocce a nome del Dr. Verdi Luca. Mario Bianchi Funzionario giuridico amministrativo tel 0187 000000 AVVERTENZA DI RISERVATEZZA',
+    });
+    expect(s.tx).toMatch(/Rivotril/);
+    expect(s.tx).toMatch(/Verdi Luca/);
+    expect(s.tx).not.toMatch(/Bianchi|0187|AVVERTENZA/);
+  });
+
+  it('iniziali del paziente in ogni forma → tolte', () => {
+    for (const forma of ['Iniziali X. Y.', 'iniziali: X.Y.', '(X. Y.)', '(iniziali X.Y.)']) {
+      const s = ordineAvvisoEntry({
+        subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k6>',
+        text: `"Si è presentata una paziente ${forma} con ricetta falsa di Rivotril gocce."`,
+      });
+      expect(s.tx).toMatch(/Rivotril/);
+      expect(s.tx).not.toMatch(/X\.\s?Y\./);
+    }
   });
 
   it('senza testo tra virgolette: corpo fino ai saluti, senza recapiti', () => {

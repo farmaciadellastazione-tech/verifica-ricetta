@@ -237,8 +237,11 @@ async function cercaAvvisiOrdine(client, known) {
     const subject = (parsed.subject || '').trim();
     const key = parsed.messageId || '';
     if (!key || known.chiavi.has(key) || !isAvvisoOrdine(subject)) continue;
-    // con link a PDF è una circolare: la gestisce cercaPdfCircolari
-    if (extractPdfLinks(parsed.html || parsed.textAsHtml || '').length) continue;
+    // Con link a PDF e nessun testo tra virgolette è un inoltro di circolari
+    // (lo gestisce cercaPdfCircolari); con l'avviso nel corpo si prende comunque,
+    // anche se in allegato c'è un PDF (es. la denuncia).
+    if (extractPdfLinks(parsed.html || parsed.textAsHtml || '').length &&
+        !/"[^"]{40,}"|“[^”]{40,}”|«[^»]{40,}»/.test(parsed.text || '')) continue;
     const date = formatEmailDate(parsed.date?.toUTCString() || '');
     known.chiavi.add(key);
     out.push({ entry: ordineAvvisoEntry({ subject, text: parsed.text || '', date, key }), date: parsed.date });
