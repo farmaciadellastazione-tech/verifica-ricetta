@@ -486,7 +486,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 109;
+const APP_BUILD = 110;
 const APP_BUILD_DATE = '12/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -824,14 +824,14 @@ function cercaFOFI() {
   const lm = document.getElementById('fofi-live-medico');
   if (tokMedico.length > 0 && medico.length > 3) {
     lm.innerHTML = medicoCount > 0
-      ? `<span class="fofi-live-warn">⚠ ${medicoCount} segnalazione${medicoCount>1?'i':''} FOFI per questo medico</span>`
+      ? `<span class="fofi-live-warn">⚠ ${medicoCount} ${plurale(medicoCount, 'segnalazione', 'segnalazioni')} FOFI per questo medico</span>`
       : `<span class="fofi-live-ok">✓ Nessuna segnalazione FOFI per questo medico</span>`;
   } else { lm.innerHTML = ''; }
 
   const lf = document.getElementById('fofi-live-farmaco');
   if (tokFarmaco.length > 0 && farmaco.length > 3) {
     lf.innerHTML = farmacoCount > 0
-      ? `<span class="fofi-live-warn">⚠ ${farmacoCount} segnalazione${farmacoCount>1?'i':''} FOFI per questo farmaco</span>`
+      ? `<span class="fofi-live-warn">⚠ ${farmacoCount} ${plurale(farmacoCount, 'segnalazione', 'segnalazioni')} FOFI per questo farmaco</span>`
       : `<span class="fofi-live-ok">✓ Nessuna segnalazione FOFI per questo farmaco</span>`;
   } else { lf.innerHTML = ''; }
 
@@ -841,7 +841,7 @@ function cercaFOFI() {
   if (fofiHits.length > 0) {
     alertDiv.classList.add('show');
     const tipoLabel = { F: 'FALSIFICAZIONE RICETTE', T: 'FURTO/SMARRIMENTO TIMBRO O RICETTARIO', B: 'BUONI ACQUISTO' };
-    alertBody.innerHTML = `Trovate <strong>${fofiHits.length}</strong> segnalazioni corrispondenti nella banca dati circolari FOFI 2025-2026. <strong>Non erogare prima di verifica approfondita.</strong>` +
+    alertBody.innerHTML = `${plurale(fofiHits.length, 'Trovata', 'Trovate')} <strong>${fofiHits.length}</strong> ${plurale(fofiHits.length, 'segnalazione corrispondente', 'segnalazioni corrispondenti')} nella banca dati circolari FOFI 2025-2026. <strong>Non erogare prima di verifica approfondita.</strong>` +
       fofiHits.slice(0, 3).map(h => {
         const tipoBadges = h.rec.t.map(t => `<span class="fofi-match-tipo ${t}">${tipoLabel[t]||t}</span>`).join('');
         return `<div class="fofi-match">
@@ -1049,7 +1049,7 @@ function buildPrompt() {
   const modalitaLabel = isPre ? 'PRE-DISPENSAZIONE (ricetta non ancora spedita)' : 'POST-DISPENSAZIONE (ricetta gia\' spedita)';
 
   const fofiBriefing = fofiHits.length > 0
-    ? `\n\nALLERTA FOFI: Il sistema ha trovato ${fofiHits.length} segnalazioni nella banca dati circolari FOFI 2025-2026 corrispondenti ai dati inseriti:\n` +
+    ? `\n\nALLERTA FOFI: Il sistema ha trovato ${fofiHits.length} ${plurale(fofiHits.length, 'segnalazione', 'segnalazioni')} nella banca dati circolari FOFI 2025-2026 ${plurale(fofiHits.length, 'corrispondente', 'corrispondenti')} ai dati inseriti:\n` +
       fofiHits.map(h => `- ${fofiRiferimento(h.rec)} [${h.rec.t.join(',')}]: ${h.rec.tx.substring(0,200)}`).join('\n') +
       `\nTieni conto di queste segnalazioni nella tua valutazione e AGGIUNGI un controllo specifico "Verifica FOFI" con stato errore e le segnalazioni trovate.`
     : '\n\nVerifica FOFI: nessuna corrispondenza trovata nella banca dati FOFI per i dati inseriti.';
@@ -1392,7 +1392,7 @@ function mostraRisultati(r) {
   </div>` : '';
 
   const fofiBanner = fofiHits.length > 0 ? `<div style="margin:0 16px 14px;padding:10px 14px;background:#FFF0F0;border:1px solid #F7C1C1;border-radius:8px;font-size:14px;color:#791F1F;">
-    <strong>🚨 ${fofiHits.length} corrispondenza${fofiHits.length>1?'e':''} nella banca dati FOFI 2025-2026</strong> — ${fofiHits.map(h=>escHtml(fofiRiferimento(h.rec))).join(', ')}
+    <strong>🚨 ${fofiHits.length} ${plurale(fofiHits.length, 'corrispondenza', 'corrispondenze')} nella banca dati FOFI 2025-2026</strong> — ${fofiHits.map(h=>escHtml(fofiRiferimento(h.rec))).join(', ')}
   </div>` : '';
 
   // Intestazione stampa: dati farmacia + contesto ricetta (medico/farmaco/data/tipo)
