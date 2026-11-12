@@ -24,6 +24,7 @@ const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { entriesToDbFile, mergeNewEntries } = require(resolve(ROOT, 'fofi-xlsx.js'));
 const { circolarePdfToEntry, dataPiuRecente, applicaRiletture } = require(resolve(ROOT, 'fofi-avvisi.js'));
+const { chiaveData } = require(resolve(ROOT, 'fofi-match.js'));
 
 function loadCurrentDb() {
   const src = readFileSync(resolve(ROOT, 'fofi-db.js'), 'utf8');
@@ -43,6 +44,18 @@ if (!inputs.length) {
   console.error('Uso: node tools/apply-fofi-entries.mjs <file.json | circolare.pdf ...> [--write] [--date dd/mm/yyyy]');
   process.exit(1);
 }
+// La data finisce in fofi-db.js (d e "Aggiornamento"): un formato sbagliato
+// farebbe fallire i test e bloccherebbe la pipeline.
+if (dIdx >= 0 && !chiaveData(aggiornata)) {
+  console.error(`--date deve essere dd/mm/yyyy (ricevuto: ${aggiornata}).`);
+  process.exit(1);
+}
+// Per i PDF a mano la data della mail non si conosce: va data esplicitamente,
+// altrimenti una circolare recuperata in ritardo salirebbe in cima all'elenco.
+if (inputs.some(f => /\.pdf$/i.test(f)) && dIdx < 0) {
+  console.error('Per i PDF serve --date dd/mm/yyyy (data della mail con cui è arrivata la circolare).');
+  process.exit(1);
+}
 
 const nuove = [];
 const riletture = []; // voci Federfarma già presenti, rilette con OCR
@@ -56,8 +69,21 @@ for (const f of inputs) {
     const text = execFileSync('pdftotext', ['-enc', 'UTF-8', f, '-'], { encoding: 'utf8' });
     const num = basename(f).match(/\b(1\d{4})\b/);
     const e = circolarePdfToEntry(text, num ? parseInt(num[1], 10) : undefined);
-    if (e) nuove.push(e); else console.log(`- ${basename(f)}: non è una segnalazione, ignorata.`);
+    // Data di arrivo (ordina l'elenco della banca dati): quella di --date.
+    if (e) nuove.push({ ...e, d: e.d || aggiornata });
+    else console.log(`- ${basename(f)}: non è una segnalazione, ignorata.`);
   }
+}
+
+// Ogni voce nuova deve avere la data di arrivo d (ordina l'elenco; un test la
+// richiede): il JSON della pipeline ce l'ha già, uno scritto a mano no.
+const senzaData = nuove.filter(e => !chiaveData(e.d));
+if (senzaData.length) {
+  if (dIdx < 0) {
+    console.error(`Voci senza data d (${senzaData.map(e => e.n ?? e.src).join(', ')}): rilancia con --date dd/mm/yyyy.`);
+    process.exit(1);
+  }
+  senzaData.forEach(e => { e.d = aggiornata; });
 }
 
 const { db, aggiornata: aggiornataAttuale } = loadCurrentDb();

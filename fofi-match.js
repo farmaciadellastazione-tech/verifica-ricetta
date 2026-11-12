@@ -107,8 +107,89 @@ function fofiRiferimento(rec) {
   return `Segnalazione ${rec.src || 'non FOFI'}${rec.d ? ` del ${rec.d}` : ''}`;
 }
 
+// ── Ordine dell'elenco (banca-dati.html) ─────────────────────────────────
+
+// Date → "dd/mm/yyyy" nel fuso italiano: unico formattatore per la data d
+// (pipeline, apply-fofi-entries, admin.html). Una mail delle 00:40 italiane
+// è del giorno dopo rispetto all'UTC.
+function dataDMY(date) {
+  return date.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+// "dd/mm/yyyy" → "yyyymmdd" confrontabile; '' se assente o malformata.
+function chiaveData(d) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d || '');
+  return m ? m[3] + m[2] + m[1] : '';
+}
+
+// Più recenti in cima, per data di arrivo d (data della mail per tutte le
+// fonti: circolari FOFI, inoltri Federfarma, avvisi Ordine). A parità di data:
+// prima gli avvisi senza numero (l'ultimo accodato in cima), poi le circolari
+// per numero decrescente. Ordine totale: il risultato non dipende dall'ordine
+// in ingresso. Le voci senza data (la prima banca dati, maggio 2026) in fondo.
+// Accetta record o oggetti indice {rec, ...}; restituisce un nuovo array.
+function ordinaRecenti(voci) {
+  const rec = v => v.rec || v;
+  return voci.map((v, i) => ({ v, i, d: chiaveData(rec(v).d), n: rec(v).n }))
+    .sort((a, b) => {
+      if (a.d !== b.d) return b.d.localeCompare(a.d);
+      if ((a.n == null) !== (b.n == null)) return a.n == null ? -1 : 1;
+      if (a.n != null && a.n !== b.n) return b.n - a.n;
+      return b.i - a.i;
+    })
+    .map(x => x.v);
+}
+
+// ── Metadati m/f (chip della banca dati) ─────────────────────────────────
+
+// Niente parole che possono essere cognomi (es. "RE": il "Dott.re" lo toglie già pulisciNome).
+const TITOLI_MEDICO = new Set(['dr', 'dott', 'dssa', 'ssa', 'dottor', 'dottore', 'dottoressa', 'dottori', 'prof', 'sig', 'sigra']);
+// Parole di qualifica/contesto che non fanno parte di un nome. Volutamente NON
+// tutte le STOPWORDS_FOFI: particelle e parole comuni (DEL, DELLA, CORSO, VIA…)
+// possono essere cognomi veri.
+const QUALIFICHE_MEDICO = new Set([
+  'medico', 'medici', 'chirurgo', 'dirigente', 'direttore', 'specialista', 'specializzato',
+  'specializzata', 'pediatra', 'psichiatra', 'psicologo', 'geriatra', 'odontoiatra', 'mmg',
+  'asl', 'asst', 'ats', 'usl', 'ospedale', 'dipartimento', 'servizio', 'reparto', 'presso',
+  'medesimo', 'medesima', 'ricetta', 'ricette', 'timbro', 'firma'
+]);
+// Unità di misura: segnalano un dosaggio attaccato al nome del farmaco. Un
+// numero da solo no: fa parte di nomi commerciali (EUTIROX 100, VITAMINA B12).
+const UNITA_DOSAGGIO = new Set(['mg', 'mcg', 'ml', 'g', 'gr', 'ui', 'mcgh', 'h']);
+// Titolo in testa: "Dr.", "Dr.ssa", "D.ssa", "Dott.re", "Dott.ROSSI" (senza spazio), "Prof."…
+const RE_TITOLO = /^(dott(?:\.?ssa|\.?re|ori|oressa|ore|or)?|d\.?ssa|dr(?:\.?ssa)?|prof(?:\.?ssa)?|sig(?:\.?ra)?)(?:\.\s*|\s+)/i;
+
+// Nome del medico senza titoli in testa e senza spazi doppi.
+function pulisciNome(s) {
+  let out = String(s || '').replace(/\s+/g, ' ').trim();
+  while (RE_TITOLO.test(out)) out = out.replace(RE_TITOLO, '').trim();
+  return out;
+}
+
+// Problemi dei campi m (medici) e f (farmaci) di una voce: ogni nome deve
+// comparire per intero nel testo tx e non contenere titoli, qualifiche,
+// dosaggi o parole generiche. Il solo cognome è ammesso (alcune circolari
+// riportano solo quello). Usato dai test su fofi-db.js e da admin.html.
+function problemiMetadati(rec) {
+  const testo = ` ${normalize(rec.tx)} `;
+  const out = [];
+  for (const [campo, etichetta, vietate] of [['m', 'medico', QUALIFICHE_MEDICO], ['f', 'farmaco', STOPWORDS_FOFI]]) {
+    for (const v of rec[campo] || []) {
+      const w = normalize(v).split(' ').filter(Boolean);
+      if (!w.length) out.push(`${etichetta} vuoto`);
+      else if (v !== v.trim() || /\s{2,}/.test(v)) out.push(`${etichetta} "${v}": spazi in eccesso`);
+      // Frase contigua, non parole sparse: "MARIO BIANCHI" non deve passare se nel
+      // testo ci sono "ROSSI MARIO" e un paziente "BIANCHI".
+      else if (!testo.includes(` ${w.join(' ')} `)) out.push(`${etichetta} "${v}": non compare per intero nel testo`);
+      else if (w.some(x => TITOLI_MEDICO.has(x) || vietate.has(x))) out.push(`${etichetta} "${v}": contiene titoli o parole generiche`);
+      else if (campo === 'f' && w.some(x => UNITA_DOSAGGIO.has(x))) out.push(`${etichetta} "${v}": contiene il dosaggio`);
+    }
+  }
+  return out;
+}
+
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento };
+const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, dataDMY, chiaveData, ordinaRecenti, pulisciNome, problemiMetadati };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;

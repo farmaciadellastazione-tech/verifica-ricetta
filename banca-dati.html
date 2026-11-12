@@ -103,7 +103,7 @@
 <script src="fofi-match.js"></script>
 <script>
 // ─── Versioning (allineato a index.html) ──────────────────────────────
-const APP_BUILD = 112;
+const APP_BUILD = 117;
 const APP_BUILD_DATE = '12/11/2026';
 document.getElementById('app-version').textContent =
   `Build ${APP_BUILD} · ${APP_BUILD_DATE} · ${FOFI_DB.length} segnalazioni`;
@@ -115,7 +115,9 @@ const TIPO_LABEL = { F: 'Falsificazione', T: 'Furto/smarrimento timbro', B: 'Buo
 
 // Indice di ricerca: testo normalizzato per voce (tx + medici + farmaci + n° + OCR).
 // normalize() arriva da fofi-match.js (stessa logica del matching dell'app).
-const INDEX = FOFI_DB.map(rec => ({
+// Ordinato una volta sola, più recenti in cima per data di arrivo (vedi
+// ordinaRecenti in fofi-match.js): il filtro della ricerca conserva l'ordine.
+const INDEX = ordinaRecenti(FOFI_DB).map(rec => ({
   rec,
   // base = campi principali; hay = base + testo OCR (per aprire il riquadro OCR
   // solo quando un termine si trova soltanto lì).
@@ -145,19 +147,9 @@ function render() {
   const q = document.getElementById('q').value.trim();
   const termini = normalize(q).split(' ').filter(w => w.length > 0);
 
-  let voci = INDEX.filter(({ rec, hay }) => {
+  const voci = INDEX.filter(({ rec, hay }) => {
     if (filtroTipo && !(rec.t || []).includes(filtroTipo)) return false;
     return termini.every(t => hay.includes(t));
-  });
-
-  // Più recenti in cima: prima gli inoltri senza numero (Federfarma SP) per data
-  // decrescente, poi le circolari FOFI per n° decrescente.
-  const dataKey = d => (d || '').split('/').reverse().join('');
-  voci.sort(({ rec: a }, { rec: b }) => {
-    if (a.n == null && b.n == null) return dataKey(b.d).localeCompare(dataKey(a.d));
-    if (a.n == null) return -1;
-    if (b.n == null) return 1;
-    return b.n - a.n;
   });
 
   document.getElementById('count').textContent =

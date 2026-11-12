@@ -31,7 +31,7 @@ import { simpleParser } from 'mailparser';
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const { formatEmailDate } = require(resolve(ROOT, 'fofi-xlsx.js'));
+const { dataDMY } = require(resolve(ROOT, 'fofi-match.js'));
 const {
   extractPdfLinks, circolarePdfToEntry, isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText,
   testoInsufficiente, serveRilettura, isAvvisoOrdine, ordineAvvisoEntry,
@@ -185,7 +185,7 @@ async function cercaXlsx(client, OUT) {
     }
     writeFileSync(OUT, buf);
     const rawDate = parsed.date?.toUTCString() || '';
-    const dataMail = formatEmailDate(rawDate);
+    const dataMail = parsed.date ? dataDMY(parsed.date) : ''; // fuso italiano, come la data d
     if (dataMail) writeFileSync(OUT + '.date', dataMail);
     console.log(`Scaricato xlsx (${buf.length} byte) da ${sorgente} — mail del ${rawDate} -> ${OUT}`);
     return true;
@@ -237,7 +237,7 @@ async function cercaFederfarma(client, known, tmp) {
       .map(a => allegatoToText(a.content, a.filename, tmp));
     const text = letti.map(l => l.testo).join('\f');
     const ocr = letti.map(l => l.ocr).filter(Boolean).join('\f');
-    const date = formatEmailDate(parsed.date?.toUTCString() || '');
+    const date = parsed.date ? dataDMY(parsed.date) : ''; // fuso italiano
     known.chiavi.add(key);
     known.daRileggere.delete(key);
     out.push({ entry: federfarmaEntry({ subject, text, ocr, date, key }), date: parsed.date, rilettura });
@@ -261,12 +261,33 @@ async function cercaAvvisiOrdine(client, known) {
     // anche se in allegato c'è un PDF (es. la denuncia).
     if (extractPdfLinks(parsed.html || parsed.textAsHtml || '').length &&
         !/"[^"]{40,}"|“[^”]{40,}”|«[^»]{40,}»/.test(parsed.text || '')) continue;
-    const date = formatEmailDate(parsed.date?.toUTCString() || '');
+    const date = parsed.date ? dataDMY(parsed.date) : ''; // fuso italiano
     known.chiavi.add(key);
     out.push({ entry: ordineAvvisoEntry({ subject, text: parsed.text || '', date, key }), date: parsed.date });
     console.log(`+ Ordine SP ${date}: ${subject}`);
   }
   return out;
+}
+
+// Voci trovate [{entry, date, rilettura?}] → contenuto di .fofi-incoming.json.
+// Ogni voce nuova riceve come d la data della mail (se non ce l'ha già, come
+// Federfarma/Ordine) e il lotto è ordinato per data crescente: una corsa che
+// copre più giorni non deve accodare le voci raggruppate per fonte, perché
+// l'elenco della banca dati è ordinato per d e poi per ordine di accodamento.
+export function preparaIncoming(trovate) {
+  const conData = t => (t.entry.d || !t.date) ? t.entry
+    : { ...t.entry, d: dataDMY(t.date) };
+  const nuove = trovate.filter(t => !t.rilettura)
+    .map((t, i) => ({ t, i, ms: t.date ? t.date.getTime() : Infinity }))
+    .sort((a, b) => (a.ms - b.ms) || (a.i - b.i))
+    .map(x => x.t);
+  // La data "Aggiornamento" segue solo le segnalazioni nuove, non le riletture OCR.
+  const piuRecente = nuove.map(t => t.date).filter(Boolean).sort((a, b) => b - a)[0];
+  return {
+    aggiornata: piuRecente ? dataDMY(piuRecente) : '',
+    entries: nuove.map(conData),
+    riletture: trovate.filter(t => t.rilettura).map(t => t.entry),
+  };
 }
 
 async function main() {
@@ -304,16 +325,8 @@ async function main() {
         ...await cercaAvvisiOrdine(client, known),
       ];
       if (trovate.length) {
-        const nuove = trovate.filter(t => !t.rilettura);
-        // La data "Aggiornamento" segue solo le segnalazioni nuove, non le riletture OCR.
-        const piuRecente = nuove.map(t => t.date).filter(Boolean).sort((a, b) => b - a)[0];
-        const aggiornata = piuRecente ? formatEmailDate(piuRecente.toUTCString()) : '';
-        writeFileSync(JSON_OUT, JSON.stringify({
-          aggiornata,
-          entries: nuove.map(t => t.entry),
-          riletture: trovate.filter(t => t.rilettura).map(t => t.entry),
-        }, null, 1));
-        console.log(`${trovate.length} voci da PDF/Federfarma/Ordine (di cui riletture OCR: ${trovate.length - nuove.length}) -> ${JSON_OUT}`);
+        writeFileSync(JSON_OUT, JSON.stringify(preparaIncoming(trovate), null, 1));
+        console.log(`${trovate.length} voci da PDF/Federfarma/Ordine (di cui riletture OCR: ${trovate.filter(t => t.rilettura).length}) -> ${JSON_OUT}`);
       } else {
         console.log('Nessuna circolare PDF o inoltro Federfarma nuovo.');
       }

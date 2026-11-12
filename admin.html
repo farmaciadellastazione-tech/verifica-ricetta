@@ -289,8 +289,11 @@ function renderCandCard(c, i) {
     n: div.querySelector('[data-f=n]').value.trim() ? parseInt(div.querySelector('[data-f=n]').value, 10) : '',
     t: [...div.querySelectorAll('[data-f=t]:checked')].map(x => x.value),
     tx: div.querySelector('[data-f=tx]').value.trim(),
-    m: div.querySelector('[data-f=m]').value.split('\n').map(s=>s.trim()).filter(Boolean),
-    f: div.querySelector('[data-f=f]').value.split('\n').map(s=>s.trim()).filter(Boolean)
+    // Titoli tolti in automatico ("Dr.ssa ROSSI ANNA" → "ROSSI ANNA"): i nomi diventano
+    // i chip della banca dati e devono passare problemiMetadati (vedi validaEntry).
+    m: div.querySelector('[data-f=m]').value.split('\n').map(pulisciNome).filter(Boolean),
+    f: div.querySelector('[data-f=f]').value.split('\n').map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean),
+    d: oggiDMY()
   });
 
   div.querySelector('.btn-add').addEventListener('click', () => {
@@ -309,11 +312,19 @@ function renderCandCard(c, i) {
   return div;
 }
 
+// Data di arrivo delle voci inserite a mano (ordina l'elenco della banca dati).
+function oggiDMY() {
+  return dataDMY(new Date()); // da fofi-match.js, stesso formato della pipeline
+}
+
 // ── Validazione ──────────────────────────────────────────────────────────
 function validaEntry(e) {
   const bloccanti = [], avvisi = [];
   if (!e.tx) bloccanti.push('Il testo (tx) non può essere vuoto.');
   if (!e.t.length) bloccanti.push('Seleziona almeno un tipo (F/T/B).');
+  // Stesso controllo di tests/fofi-db.test.js: una voce che non lo passa farebbe
+  // fallire i test della pipeline FOFI e bloccherebbe gli aggiornamenti automatici.
+  bloccanti.push(...problemiMetadati(e));
   if (e.n !== '' && FOFI_DB.some(r => r.n === e.n) && !nuove.some(x => x.n === e.n)) {
     avvisi.push(`Attenzione: la circolare n. ${e.n} è già presente in banca dati.`);
   }
@@ -453,7 +464,7 @@ document.getElementById('xlsx-input').addEventListener('change', async (ev) => {
     // Evita di accodare due volte se l'utente ricarica lo stesso file.
     const giaInCoda = new Set(nuove.map(e => e.n));
     const daAggiungere = added.filter(e => !giaInCoda.has(e.n));
-    daAggiungere.forEach(e => nuove.push({ n: e.n, t: e.t, tx: e.tx, m: [], f: [] }));
+    daAggiungere.forEach(e => nuove.push({ n: e.n, t: e.t, tx: e.tx, m: [], f: [], d: oggiDMY() }));
     renderStaged();
     const nums = [...new Set(added.map(e => e.n))];
     status.innerHTML = added.length
