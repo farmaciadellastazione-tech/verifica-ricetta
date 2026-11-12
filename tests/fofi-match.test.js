@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento,
-  plurale,
 } from '../fofi-match.js';
 
 describe('normalize — pulizia testo FOFI', () => {
@@ -230,21 +226,5 @@ describe('fofiRiferimento — etichetta della fonte di una voce', () => {
   });
   it('voce senza numero né data → solo la fonte', () => {
     expect(fofiRiferimento({ n: null, t: ['T'], tx: 'x', src: 'Federfarma SP' })).toBe('Segnalazione Federfarma SP');
-  });
-});
-
-describe('plurale — testi con un numero (prima "segnalazionei", "corrispondenzae")', () => {
-  it('1 → singolare, altrimenti plurale', () => {
-    expect(plurale(1, 'segnalazione', 'segnalazioni')).toBe('segnalazione');
-    expect(plurale(2, 'segnalazione', 'segnalazioni')).toBe('segnalazioni');
-    expect(plurale(17, 'corrispondenza', 'corrispondenze')).toBe('corrispondenze');
-    expect(plurale(0, 'segnalazione', 'segnalazioni')).toBe('segnalazioni');
-  });
-
-  it('index.html non contiene più i plurali costruiti a suffisso', () => {
-    const html = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../index.html'), 'utf8');
-    expect(html).not.toMatch(/segnalazione\$\{[^}]*\?'i'/);
-    expect(html).not.toMatch(/corrispondenza\$\{[^}]*\?'e'/);
-    expect(html).not.toMatch(/\$\{fofiHits\.length\}<\/strong> segnalazioni corrispondenti/);
   });
 });

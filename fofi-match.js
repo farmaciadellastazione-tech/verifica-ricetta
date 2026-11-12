@@ -80,12 +80,6 @@ function scoreMatch(tokens, record) {
   return { score, matchedTokens };
 }
 
-// Singolare se n è 1, altrimenti plurale ("1 segnalazione", "2 segnalazioni").
-// Prima i plurali erano costruiti a suffisso: "segnalazionei", "corrispondenzae".
-function plurale(n, singolare, plur) {
-  return n === 1 ? singolare : plur;
-}
-
 // ── Scadenza ricetta ─────────────────────────────────────────────────────
 
 // Default conservativo 30 giorni (SSN non ripetibile, bianca non ripetibile,
@@ -115,6 +109,6 @@ function fofiRiferimento(rec) {
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, plurale };
+const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;

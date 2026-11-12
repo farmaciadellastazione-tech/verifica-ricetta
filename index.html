@@ -486,7 +486,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 110;
+const APP_BUILD = 111;
 const APP_BUILD_DATE = '12/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -494,6 +494,14 @@ let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedit
 let images = []; // [{base64, mime}, ...] - supporta fronte/retro o piu' allegati; miniatura ricostruita al volo
 const MAX_IMAGES = 4;
 let fofiHits = [];
+
+// Singolare se n è 1, altrimenti plurale ("1 segnalazione", "2 segnalazioni").
+// Locale a index.html apposta: il banner FOFI non deve dipendere da una funzione
+// nuova in fofi-match.js (il service worker può servire una copia vecchia di
+// quel file insieme alla pagina nuova → ReferenceError e banner che non compare).
+function plurale(n, singolare, plur) {
+  return n === 1 ? singolare : plur;
+}
 let ultimoRisultato = null;   // usato da correggiERiverifica per limitare i campi a quelli non conformi
 
 document.getElementById('app-version').textContent = `Build ${APP_BUILD} · ${APP_BUILD_DATE}`;
@@ -634,13 +642,13 @@ function aggiornaScadenza() {
   const scad = new Date(scadInp.value + 'T00:00:00');
   const diff = Math.ceil((scad - oggi) / 86400000);
   if (diff < 0) {
-    hint.innerHTML = `<span style="color:var(--red-600);font-weight:600;">⛔ Scaduta da ${-diff} giorn${-diff===1?'o':'i'} — non erogabile</span>`;
+    hint.innerHTML = `<span style="color:var(--red-600);font-weight:600;">⛔ Scaduta da ${-diff} ${plurale(-diff, 'giorno', 'giorni')} — non erogabile</span>`;
   } else if (diff === 0) {
     hint.innerHTML = `<span style="color:var(--amber-600);font-weight:600;">⏰ Scade oggi — ultimo giorno utile</span>`;
   } else if (diff <= 3) {
-    hint.innerHTML = `<span style="color:var(--amber-600);">⚠ In scadenza tra ${diff} giorni</span>`;
+    hint.innerHTML = `<span style="color:var(--amber-600);">⚠ In scadenza tra ${diff} ${plurale(diff, 'giorno', 'giorni')}</span>`;
   } else {
-    hint.innerHTML = `<span style="color:var(--green-600);">✓ Valida ancora ${diff} giorni</span>`;
+    hint.innerHTML = `<span style="color:var(--green-600);">✓ Valida ancora ${diff} ${plurale(diff, 'giorno', 'giorni')}</span>`;
   }
 }
 
