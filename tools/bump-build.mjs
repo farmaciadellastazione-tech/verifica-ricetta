@@ -3,7 +3,7 @@
 //  causando "Invalid or unexpected token". Si lancia come `node tools/bump-build.mjs`.)
 //
 // Tiene allineati i due marcatori (vedi CLAUDE.md → Versioning):
-//   • index.html : APP_BUILD (intero) + APP_BUILD_DATE ('DD/MM/YYYY')
+//   • index.html e banca-dati.html : APP_BUILD (intero) + APP_BUILD_DATE ('DD/MM/YYYY')
 //   • sw.js      : CACHE_NAME = 'verifica-ricetta-build<N>'
 // Il nuovo numero = APP_BUILD attuale + 1; CACHE_NAME viene allineato a quel numero.
 //
@@ -36,6 +36,11 @@ export function setCacheName(swText, n) {
     `const CACHE_NAME = 'verifica-ricetta-build${n}';`);
 }
 
+// Pagine con un proprio footer "Build N · data" (APP_BUILD/APP_BUILD_DATE):
+// vanno bumpate tutte insieme, altrimenti restano indietro (banca-dati.html era
+// ferma alla build 60 del 06/06/2026). Il numero di riferimento è quello di index.html.
+export const FILE_CON_BUILD = ['index.html', 'banca-dati.html'];
+
 export function formatDateIt(d) {
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -45,16 +50,17 @@ export function formatDateIt(d) {
 function main() {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const dateArg = (() => { const i = process.argv.indexOf('--date'); return i >= 0 ? process.argv[i + 1] : null; })();
-  const indexPath = resolve(root, 'index.html');
   const swPath = resolve(root, 'sw.js');
 
-  const indexText = readFileSync(indexPath, 'utf8');
   const swText = readFileSync(swPath, 'utf8');
-  const current = currentAppBuild(indexText);
+  const current = currentAppBuild(readFileSync(resolve(root, 'index.html'), 'utf8'));
   const next = current + 1;
   const date = dateArg || formatDateIt(new Date());
 
-  writeFileSync(indexPath, setAppBuild(indexText, next, date));
+  for (const f of FILE_CON_BUILD) {
+    const p = resolve(root, f);
+    writeFileSync(p, setAppBuild(readFileSync(p, 'utf8'), next, date));
+  }
   writeFileSync(swPath, setCacheName(swText, next));
   console.log(`Build ${current} -> ${next} (${date}); CACHE_NAME -> verifica-ricetta-build${next}`);
 }

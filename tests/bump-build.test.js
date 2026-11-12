@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { currentAppBuild, setAppBuild, setCacheName, formatDateIt } from '../tools/bump-build.mjs';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { currentAppBuild, setAppBuild, setCacheName, formatDateIt, FILE_CON_BUILD } from '../tools/bump-build.mjs';
 
 const INDEX = `...\nconst APP_BUILD = 57;\nconst APP_BUILD_DATE = '25/05/2026';\n...`;
 const SW = `const CACHE_NAME = 'verifica-ricetta-build57';\nconst ASSETS = [];`;
@@ -37,5 +40,27 @@ describe('bump-build — funzioni pure', () => {
     const sw = setCacheName(SW, n);
     expect(idx).toContain(`APP_BUILD = ${n};`);
     expect(sw).toContain(`build${n}'`);
+  });
+});
+
+describe('bump-build — file reali allineati', () => {
+  // banca-dati.html ha un suo footer "Build N · data": era rimasto a 60 (06/06/2026)
+  // perché bump-build aggiornava solo index.html e sw.js.
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const leggi = f => readFileSync(resolve(root, f), 'utf8');
+
+  it('index.html, banca-dati.html e sw.js hanno lo stesso numero di build', () => {
+    const n = currentAppBuild(leggi('index.html'));
+    expect(currentAppBuild(leggi('banca-dati.html'))).toBe(n);
+    expect(leggi('sw.js')).toContain(`verifica-ricetta-build${n}'`);
+  });
+
+  it('stessa data di build in index.html e banca-dati.html', () => {
+    const data = f => leggi(f).match(/const APP_BUILD_DATE = '([^']*)';/)[1];
+    expect(data('banca-dati.html')).toBe(data('index.html'));
+  });
+
+  it('FILE_CON_BUILD comprende banca-dati.html', () => {
+    expect(FILE_CON_BUILD).toEqual(expect.arrayContaining(['index.html', 'banca-dati.html']));
   });
 });
