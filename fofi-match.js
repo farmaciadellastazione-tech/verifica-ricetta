@@ -80,83 +80,6 @@ function scoreMatch(tokens, record) {
   return { score, matchedTokens };
 }
 
-// Nomi di battesimo italiani comuni (normalizzati). Nel campo medico un match
-// SOLO su questi non conta: "Giuseppe Verdiani" faceva scattare il banner sulla
-// circolare del "Dr. BURASCHI GIUSEPPE". Esclusi apposta i nomi che sono anche
-// cognomi diffusi (Bruno, Leone, Martino, Marino, Fiore, Pace, Vitale, Gentile,
-// Santo, Rocco, Romano, Giordano, Valentino…): un cognome non deve mai finire qui,
-// altrimenti una circolare col solo cognome non verrebbe più trovata.
-// Il test di regressione su fofi-db.js verifica che nessun medico si perda.
-const NOMI_PROPRI = new Set([
-  // maschili
-  'giuseppe','giovanni','antonio','mario','francesco','luigi','angelo','vincenzo','pietro',
-  'salvatore','carlo','franco','domenico','paolo','michele','giorgio','roberto','stefano',
-  'alessandro','andrea','marco','luca','matteo','lorenzo','davide','simone','federico',
-  'riccardo','gabriele','emanuele','daniele','fabio','massimo','maurizio','claudio','sergio',
-  'enrico','alberto','alfredo','raffaele','nicola','gianni','giancarlo','gianluca',
-  'gianfranco','giampaolo','gianpaolo','pierluigi','piero','renato','sandro','silvio',
-  'tommaso','umberto','valerio','vittorio','walter','aldo','alessio','antonino','armando',
-  'arturo','attilio','cesare','ciro','cristian','christian','dario','diego','edoardo','elia',
-  'emilio','enzo','ernesto','ettore','fabrizio','filippo','flavio','gaetano','giacomo','gino',
-  'giulio','giuliano','guido','ivan','jacopo','leonardo','lucio','luciano','manuel',
-  'marcello','mattia','mauro','michelangelo','mirko','nicolo','nino','oreste','orazio',
-  'osvaldo','pasquale','patrizio','raimondo','rosario','ruggero','samuele','sebastiano',
-  'silvano','tiziano','tullio','vito','carmelo','calogero','gennaro','girolamo','ignazio',
-  'nunzio','saverio','teodoro','adriano','agostino','alfonso','amedeo','beniamino','corrado',
-  'cosimo','damiano','donato','eugenio','fausto','ferdinando','fulvio','graziano','livio',
-  'massimiliano','nazario','ottavio','rodolfo','romeo','severino','virgilio',
-  // femminili
-  'maria','anna','giuseppina','rosa','angela','giovanna','teresa','lucia','carmela',
-  'caterina','francesca','antonietta','carla','elena','rita','paola','laura','sara','giulia',
-  'chiara','martina','valentina','alessandra','federica','silvia','simona','elisa','claudia',
-  'cristina','roberta','barbara','monica','daniela','patrizia','stefania','sabrina',
-  'manuela','emanuela','michela','raffaella','serena','veronica','alice','giorgia','ilaria',
-  'irene','marta','beatrice','eleonora','aurora','sofia','gaia','noemi','arianna','camilla',
-  'debora','deborah','erica','erika','fabiola','gabriella','graziella','lorena','loredana',
-  'luisa','marisa','mirella','nadia','nicoletta','ornella','rossana','sonia','tiziana',
-  'vanessa','viviana','adele','agnese','annalisa','antonella','assunta','benedetta',
-  'carolina','cinzia','concetta','donatella','emma','enrica','filomena','franca','grazia',
-  'immacolata','ivana','lidia','luciana','margherita','mariangela','mariella','matilde',
-  'nunzia','rachele','rebecca','rosanna','rosaria','rossella','sandra','silvana','susanna',
-  'vincenza','verdiana','carmen','lucrezia','annamaria',
-]);
-
-// Punteggio FOFI con medico e farmaco separati.
-// Medico: conta se combacia almeno un token che NON è un nome proprio (il
-// cognome), oppure almeno due token del nome ("Carlo Leone" vs "Dr. LEONE CARLO"),
-// oppure se l'input contiene solo nomi propri (vedi sotto).
-// Farmaco: come scoreMatch (il solo farmaco basta). Stessi punti di scoreMatch:
-// +3 per token ≥5 caratteri, +1 altrimenti; la soglia del banner resta in index.html.
-// medicoHit/farmacoHit: per i contatori live (token ≥4 caratteri, parola intera).
-function scoreFofi(tokMedico, tokFarmaco, record) {
-  const ht = haystackTokens(record);
-  const punti = toks => toks.reduce((s, t) => s + (t.length >= 5 ? 3 : 1), 0);
-
-  // Il solo nome proprio si scarta SOLO se è stato digitato anche un cognome
-  // (token non-nome) che qui non c'è. Se l'input è fatto solo di nomi propri
-  // ("Giuseppe", o "Calogero Piazza" dove "piazza" è stopword) vale come prima:
-  // meglio un falso allarme che un medico segnalato non trovato.
-  const medTrovati = [...new Set(tokMedico)].filter(t => ht.has(t));
-  const soloNomiDigitati = tokMedico.every(t => NOMI_PROPRI.has(t));
-  const medicoValido = medTrovati.some(t => !NOMI_PROPRI.has(t)) || medTrovati.length >= 2 ||
-    (medTrovati.length > 0 && soloNomiDigitati);
-  const medicoOk = medicoValido ? medTrovati : [];
-
-  const farmTrovati = [...new Set(tokFarmaco)].filter(t => ht.has(t));
-
-  return {
-    score: punti(medicoOk) + punti(farmTrovati),
-    matchedTokens: [...medicoOk, ...farmTrovati],
-    medicoHit: medicoOk.some(t => t.length >= 4),
-    farmacoHit: farmTrovati.some(t => t.length >= 4),
-  };
-}
-
-// "1 segnalazione" / "N segnalazioni" (prima: "segnalazionei").
-function etichettaSegnalazioni(n) {
-  return `${n} ${n === 1 ? 'segnalazione' : 'segnalazioni'}`;
-}
-
 // ── Scadenza ricetta ─────────────────────────────────────────────────────
 
 // Default conservativo 30 giorni (SSN non ripetibile, bianca non ripetibile,
@@ -186,9 +109,6 @@ function fofiRiferimento(rec) {
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _exports = {
-  STOPWORDS_FOFI, NOMI_PROPRI, normalize, tokenize, haystackTokens, scoreMatch, scoreFofi,
-  etichettaSegnalazioni, calcolaScadenza, fofiRiferimento,
-};
+const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;

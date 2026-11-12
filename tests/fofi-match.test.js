@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
 import {
   STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento,
-  NOMI_PROPRI, scoreFofi, etichettaSegnalazioni,
 } from '../fofi-match.js';
 
 describe('normalize — pulizia testo FOFI', () => {
@@ -231,111 +226,5 @@ describe('fofiRiferimento — etichetta della fonte di una voce', () => {
   });
   it('voce senza numero né data → solo la fonte', () => {
     expect(fofiRiferimento({ n: null, t: ['T'], tx: 'x', src: 'Federfarma SP' })).toBe('Segnalazione Federfarma SP');
-  });
-});
-
-// ── Nome di battesimo da solo non basta (12/11/2026) ─────────────────────
-// "Giuseppe Verdiani" faceva scattare il banner sulla circ. 15927 (Dr. BURASCHI
-// GIUSEPPE): il solo nome proprio dava 3 punti, la soglia del banner.
-describe('scoreFofi — medico: il solo nome proprio non è una corrispondenza', () => {
-  const rec = tx => ({ tx });
-  const c15927 = rec('circolazione di ricette false riportanti quale medico titolare il Dr.LEONE CARLO e con timbro e firma dei medici sostituti Dr. STRANIERI FRANCESCO e Dr. BURASCHI GIUSEPPE');
-
-  it('nome proprio + cognome diverso → nessun match (caso Giuseppe Verdiani)', () => {
-    const r = scoreFofi(tokenize('Giuseppe Verdiani'), tokenize('Tachipirina'), c15927);
-    expect(r.medicoHit).toBe(false);
-    expect(r.score).toBeLessThan(3);
-  });
-
-  it('solo nomi propri digitati → match come prima (prudenza: niente falsi negativi)', () => {
-    expect(scoreFofi(tokenize('Giuseppe'), [], c15927).medicoHit).toBe(true);
-    // "piazza" è stopword: di "Calogero Piazza" resta solo il nome (circ. 15599)
-    const c15599 = rec('FURTO del ricettario SSN del Dr. PIAZZA CALOGERO, medico di medicina generale.');
-    expect(scoreFofi(tokenize('Calogero Piazza'), [], c15599).score).toBeGreaterThanOrEqual(3);
-  });
-
-  it('mentre si digita il cognome ("Giuseppe Ver") il nome da solo non basta', () => {
-    expect(scoreFofi(tokenize('Giuseppe Ver'), [], c15927).medicoHit).toBe(false);
-  });
-
-  it('cognome che coincide → match (in qualunque ordine)', () => {
-    expect(scoreFofi(tokenize('Giuseppe Buraschi'), [], c15927).medicoHit).toBe(true);
-    expect(scoreFofi(tokenize('Buraschi Giuseppe'), [], c15927).score).toBeGreaterThanOrEqual(3);
-  });
-
-  it('nome e cognome entrambi nomi propri ma entrambi presenti → match ("Carlo Leone")', () => {
-    expect(scoreFofi(tokenize('Carlo Leone'), [], c15927).medicoHit).toBe(true);
-  });
-
-  it('circolare col solo cognome, digitato nome + cognome → match', () => {
-    const r = scoreFofi(tokenize('Mario Scalini'), [], rec('FURTO del RICETTARIO del Dott. SCALINI, ASL TO4.'));
-    expect(r.medicoHit).toBe(true);
-    expect(r.score).toBeGreaterThanOrEqual(3);
-  });
-
-  it('cognomi che sono anche nomi propri non sono nella lista ("Luca Bruno" vs Dr. BRUNO Mario)', () => {
-    for (const cognome of ['bruno', 'leone', 'martino', 'marino', 'fiore', 'pace', 'vitale', 'gentile', 'santo']) {
-      expect(NOMI_PROPRI.has(cognome)).toBe(false);
-    }
-    expect(scoreFofi(tokenize('Luca Bruno'), [], rec('furto timbro del Dr. BRUNO Mario')).medicoHit).toBe(true);
-  });
-
-  it('farmaco invariato: il solo farmaco basta (Minias)', () => {
-    const r = scoreFofi([], tokenize('Minias gocce'), rec('prescrizione di “MINIAS gocce”'));
-    expect(r.farmacoHit).toBe(true);
-    expect(r.score).toBeGreaterThanOrEqual(3);
-  });
-
-  it('lista nomi: minuscola, senza accenti, niente stopword', () => {
-    for (const n of NOMI_PROPRI) {
-      expect(n).toBe(normalize(n));
-      expect(STOPWORDS_FOFI.has(n)).toBe(false);
-    }
-    expect(NOMI_PROPRI.has('giuseppe')).toBe(true);
-    expect(NOMI_PROPRI.has('francesca')).toBe(true);
-  });
-});
-
-// Regressione sulla banca dati reale: nessun allarme esistente deve sparire.
-describe('scoreFofi — regressione su fofi-db.js', () => {
-  const ctx = {};
-  vm.createContext(ctx);
-  vm.runInContext(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../fofi-db.js'), 'utf8') + ';globalThis.D=FOFI_DB;', ctx);
-  const DB = ctx.D;
-
-  // Nomi dal testo: "Dr./Dott./Dott.ssa/Dr.ssa COGNOME NOME" in maiuscolo.
-  const RE_NOME = /\b(?:Dr|Dott)\.?(?:ssa|\.ssa)?\.?\s*((?:[A-ZÀ-Ý][A-ZÀ-Ý'’]+\s*){1,3})/g;
-  const casi = [];
-  for (const r of DB) {
-    for (const m of r.tx.matchAll(RE_NOME)) casi.push([r, m[1].trim()]);
-    for (const m of r.m || []) casi.push([r, m]);
-  }
-
-  it('estrae abbastanza nomi da essere significativa', () => {
-    expect(casi.length).toBeGreaterThan(100);
-  });
-
-  // Confronto con la logica precedente (scoreMatch): ogni medico che col vecchio
-  // calcolo faceva scattare il banner sulla propria voce deve farlo ancora.
-  // Si considerano solo i nomi interamente presenti nella voce: l'estrazione via
-  // regex a volte tronca i nomi in maiuscolo/minuscolo ("Federica Sar").
-  it('ogni medico che prima trovava la propria voce la trova ancora (con banner)', () => {
-    const persi = casi.filter(([r, nome]) => {
-      const tok = tokenize(nome);
-      if (!tok.length) return false; // "DOTT", "dottori": nessun token cercabile
-      if (!tok.every(t => haystackTokens(r).has(t))) return false; // nome troncato dall'estrazione
-      if (scoreMatch(tok, r).score < 3) return false; // non scattava nemmeno prima (es. ANNA GINI)
-      const s = scoreFofi(tok, [], r);
-      return !(s.medicoHit && s.score >= 3);
-    }).map(([r, nome]) => `${r.n ?? r.src}: ${nome}`);
-    expect(persi).toEqual([]);
-  });
-});
-
-describe('etichettaSegnalazioni — singolare/plurale', () => {
-  it('1 → segnalazione, N → segnalazioni (non "segnalazionei")', () => {
-    expect(etichettaSegnalazioni(1)).toBe('1 segnalazione');
-    expect(etichettaSegnalazioni(2)).toBe('2 segnalazioni');
-    expect(etichettaSegnalazioni(17)).toBe('17 segnalazioni');
   });
 });
