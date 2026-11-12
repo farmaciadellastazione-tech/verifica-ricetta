@@ -31,12 +31,26 @@ function pulisciRighe(s) {
     .filter(Boolean).join('\n');
 }
 
+// Testo "piatto": gli a capo dentro un paragrafo diventano spazi. Serve perché
+// pdftotext di poppler (in CI) spezza le righe come sulla pagina, mentre Xpdf
+// (in locale) mette ogni paragrafo su una riga: le regex non devono dipendere
+// dall'impaginazione. Restano gli a capo doppi (fine blocco) e quelli prima di
+// un bullet, così gli elenchi puntati restano una voce per riga.
+function appiattisci(s) {
+  return String(s || '').replace(/\f/g, '\n\n')
+    .replace(/(?<!\n)[ \t]*\n(?![ \t]*\n)(?![ \t]*[•])[ \t]*/g, ' ');
+}
+
+// Oggetto della circolare: dopo "Segnalazione urgente:" fino al numero di
+// circolare, all'inizio del corpo ("Si informa"), alla data o a fine blocco.
+const FINE_OGGETTO = /(?=\s+(?:1[5-9]\d{3}(?!\d)|Si informa|Roma,|Circolare n\.|e p\.c\.)|\n\n|$)/;
+
 // Testo di una circolare FOFI (output pdftotext) -> voce {n,t,tx} o null se la
 // circolare non è una segnalazione (corsi, note operative...) o se manca il numero.
 // nHint: numero ricavato dal nome file del link ("16132.pdf"), ha la precedenza.
 function circolarePdfToEntry(text, nHint) {
   const s = String(text || '').replace(/\r/g, '');
-  if (!/Segnalazione urgente/i.test(s)) return null;
+  if (!/Segnalazione\s+urgente/i.test(s)) return null;
 
   let n = Number.isInteger(nHint) ? nHint : null;
   if (n == null) {
@@ -47,9 +61,26 @@ function circolarePdfToEntry(text, nHint) {
   }
   if (n == null) return null;
 
-  const oggetti = [...s.matchAll(/Segnalazione urgente:\s*([^\n]+)/gi)].map(m => m[1]).join('\n');
-  const corpo = s.match(/segnalazione relativa\s+([\s\S]*?)\n\s*Si chiede/i);
-  let tx = corpo ? corpo[1].replace(/^(a|al|alla|allo|ai|alle|agli)\b\s*:?\s*/i, '') : oggetti;
+  const flat = appiattisci(s);
+  const reOggetto = new RegExp('Segnalazione urgente:\\s*([\\s\\S]*?)' + FINE_OGGETTO.source, 'gi');
+  const visti = new Set();
+  const oggetti = [...flat.matchAll(reOggetto)].map(m => m[1].trim())
+    .filter(o => {
+      const k = o.replace(/\.$/, '').toLowerCase();
+      if (!o || visti.has(k)) return false;
+      visti.add(k);
+      return true;
+    }).join('\n');
+
+  // Corpo: da "Si informa che" a "Si chiede"; se c'è "segnalazione relativa"
+  // si parte da lì (toglie il preambolo "la scrivente Federazione ha ricevuto...").
+  let tx = oggetti;
+  const corpo = flat.match(/Si informa che\s+([\s\S]*?)\s*Si chiede/i);
+  if (corpo) {
+    tx = corpo[1];
+    const rel = tx.match(/segnalazione relativa\s+([\s\S]*)/i);
+    if (rel) tx = rel[1].replace(/^(a|al|alla|allo|ai|alle|agli)\b\s*:?\s*/i, '');
+  }
   tx = pulisciRighe(tx);
 
   let t = tipiDaTesto(oggetti);

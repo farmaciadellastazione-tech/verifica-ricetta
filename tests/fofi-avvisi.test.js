@@ -41,6 +41,23 @@ describe('circolarePdfToEntry — PDF circolare FOFI → voce FOFI_DB', () => {
     expect(e.tx).not.toMatch(/•/);
   });
 
+  it('16141: corpo con medico e farmaco (non solo l\'oggetto)', () => {
+    const e = circolarePdfToEntry(txt(16141), 16141);
+    expect(e.n).toBe(16141);
+    expect(e.t).toEqual(['F', 'T']);
+    expect(e.tx).toMatch(/ANDREA CANTATORE/);
+    expect(e.tx).toMatch(/MOUNJARO/);
+    expect(e.tx).not.toMatch(/Si chiede ai Presidenti/);
+  });
+
+  it('16142: corpo senza "segnalazione relativa" → testo da "Si informa che"', () => {
+    const e = circolarePdfToEntry(txt(16142), 16142);
+    expect(e.n).toBe(16142);
+    expect(e.tx).toMatch(/ALBERTO BRUSA/);
+    for (const f of ['MOUNJARO', 'LYRICA', 'DEPALGOS']) expect(e.tx).toMatch(f);
+    expect(e.tx).not.toMatch(/Si chiede ai Presidenti/);
+  });
+
   it('il numero suggerito (nome file "16132.pdf") ha la precedenza', () => {
     expect(circolarePdfToEntry(txt(16132), 16132).n).toBe(16132);
   });
@@ -52,6 +69,50 @@ describe('circolarePdfToEntry — PDF circolare FOFI → voce FOFI_DB', () => {
 
   it('nessun numero ricavabile → null (non si inventano voci senza n)', () => {
     expect(circolarePdfToEntry('Segnalazione urgente: furto timbro del Dr. X. relativa al furto del timbro. Si chiede')).toBeNull();
+  });
+});
+
+// In CI pdftotext è poppler-utils, che spezza le righe come sulla pagina; le
+// fixture sopra sono di Xpdf (in locale), che mette ogni paragrafo su una riga.
+// Simuliamo l'a capo di poppler: il risultato non deve dipendere dall'impaginazione.
+function aCapoPoppler(s, larghezza = 70) {
+  return s.replace(/\r/g, '').split('\n').map(riga => {
+    const out = [];
+    let cur = '';
+    for (const w of riga.split(' ')) {
+      if (cur && (cur + ' ' + w).length > larghezza) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w;
+    }
+    out.push(cur);
+    return out.join('\n');
+  }).join('\n');
+}
+
+describe('circolarePdfToEntry — righe spezzate (output poppler, come in CI)', () => {
+  for (const [n, attesi] of [
+    [16132, ['STRACI EMANUELE', 'DEPALGOS']],
+    [16141, ['ANDREA CANTATORE', 'MOUNJARO']],
+    [16142, ['ALBERTO BRUSA', 'MOUNJARO', 'LYRICA', 'DEPALGOS']],
+    [16130, ['QUADRELLI VERDIANA SERENA', 'FERRARO MARGHERITA', 'ANIBAN LEO']],
+  ]) {
+    it(`${n}: stessi nomi e farmaci nel tx anche con righe spezzate`, () => {
+      const e = circolarePdfToEntry(aCapoPoppler(txt(n)), n);
+      expect(e.n).toBe(n);
+      for (const a of attesi) expect(e.tx).toMatch(a);
+      expect(e.tx).not.toMatch(/Si chiede ai Presidenti/);
+      expect(e.tx).not.toMatch(/•/);
+    });
+  }
+
+  it('stessi tipi F/T con e senza righe spezzate', () => {
+    for (const n of [16130, 16132, 16135, 16141, 16142]) {
+      expect(circolarePdfToEntry(aCapoPoppler(txt(n)), n).t).toEqual(circolarePdfToEntry(txt(n), n).t);
+    }
+  });
+
+  it('oggetto spezzato a fine riga: il cognome non si perde (caso 16144)', () => {
+    const s = 'Circolare n.\n16144\nSegnalazione urgente: falsificazione ricette a nome del Dr. VINCENZO\nROSSI.\n\nSi chiede ai Presidenti di Ordine';
+    const e = circolarePdfToEntry(s, 16144);
+    expect(e.tx).toMatch(/VINCENZO ROSSI/);
   });
 });
 
