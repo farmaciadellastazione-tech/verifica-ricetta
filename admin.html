@@ -314,8 +314,7 @@ function renderCandCard(c, i) {
 
 // Data di arrivo delle voci inserite a mano (ordina l'elenco della banca dati).
 function oggiDMY() {
-  const x = new Date();
-  return [x.getDate(), x.getMonth() + 1].map(v => String(v).padStart(2, '0')).join('/') + '/' + x.getFullYear();
+  return dataDMY(new Date()); // da fofi-match.js, stesso formato della pipeline
 }
 
 // ── Validazione ──────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, ordinaRecenti, pulisciNome, problemiMetadati,
+  STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, ordinaRecenti, pulisciNome, problemiMetadati, dataDMY,
 } from '../fofi-match.js';
 
 describe('normalize — pulizia testo FOFI', () => {
@@ -296,6 +296,9 @@ describe('pulisciNome — nome del medico senza titoli né spazi doppi', () => {
     expect(pulisciNome('Dr.ssa Laura Zonta')).toBe('Laura Zonta');
     expect(pulisciNome('dottori MANGIA GIAMPAOLO')).toBe('MANGIA GIAMPAOLO');
     expect(pulisciNome('Prof. Dott. VERDI LUCA')).toBe('VERDI LUCA');
+    expect(pulisciNome('D.ssa BIANCHI LAURA')).toBe('BIANCHI LAURA');
+    expect(pulisciNome('Dott.ROSSI MARIO')).toBe('ROSSI MARIO');
+    expect(pulisciNome('Dott.re VERDI LUCA')).toBe('VERDI LUCA');
   });
   it('lascia invariati i nomi già puliti, anche se iniziano come un titolo', () => {
     expect(pulisciNome('DRAGO MARIA')).toBe('DRAGO MARIA');
@@ -311,6 +314,17 @@ describe('problemiMetadati — controllo dei campi m/f di una voce', () => {
   it('m e f vuoti o assenti → nessun problema', () => {
     expect(problemiMetadati({ n: 1, tx })).toEqual([]);
   });
+  it('cognomi con particelle o parole comuni sono ammessi', () => {
+    const t = 'ricette a firma del Dr. DEL PRETE MARIO e della Dr.ssa DELLA VALLE ANNA e del Dr. CORSO LUCA';
+    expect(problemiMetadati({ n: 1, tx: t, m: ['DEL PRETE MARIO', 'DELLA VALLE ANNA', 'CORSO LUCA'], f: [] })).toEqual([]);
+  });
+  it('nome ricomposto da parole sparse nel testo → problema', () => {
+    const t = 'ricetta a firma di ROSSI MARIO per paziente BIANCHI';
+    expect(problemiMetadati({ n: 1, tx: t, m: ['MARIO BIANCHI'], f: [] })).toHaveLength(1);
+  });
+  it('qualifica attaccata al nome → problema', () => {
+    expect(problemiMetadati({ n: 1, tx: 'Dr.ssa PAOLA GELOSO MMG ASL CN2', m: ['PAOLA GELOSO MMG'], f: [] })).toHaveLength(1);
+  });
   it('titolo al posto del nome', () => {
     expect(problemiMetadati({ n: 1, tx, m: ['Dott'], f: [] })).toHaveLength(1);
   });
@@ -320,5 +334,17 @@ describe('problemiMetadati — controllo dei campi m/f di una voce', () => {
   it('farmaco con dosaggio, forma o parole di contorno', () => {
     expect(problemiMetadati({ n: 1, tx, m: [], f: ['OXYCONTIN 80 mg'] })).toHaveLength(1);
     expect(problemiMetadati({ n: 1, tx: 'presso Ospedale Sacco', m: [], f: ['Ospedale Sacco'] })).toHaveLength(1);
+  });
+});
+
+describe('dataDMY — data dd/mm/yyyy nel fuso italiano', () => {
+  it('formato dd/mm/yyyy', () => {
+    expect(dataDMY(new Date('2026-11-10T11:15:15Z'))).toBe('10/11/2026');
+  });
+  it('dopo mezzanotte italiana è già il giorno dopo (UTC sarebbe ancora il 12)', () => {
+    expect(dataDMY(new Date('2026-11-12T23:40:00Z'))).toBe('13/11/2026');
+  });
+  it('ora legale estiva', () => {
+    expect(dataDMY(new Date('2026-07-14T22:30:00Z'))).toBe('15/07/2026');
   });
 });

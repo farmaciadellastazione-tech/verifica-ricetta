@@ -32,6 +32,7 @@ import { simpleParser } from 'mailparser';
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { formatEmailDate } = require(resolve(ROOT, 'fofi-xlsx.js'));
+const { dataDMY } = require(resolve(ROOT, 'fofi-match.js'));
 const {
   extractPdfLinks, circolarePdfToEntry, isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText,
   testoInsufficiente, serveRilettura, isAvvisoOrdine, ordineAvvisoEntry,
@@ -276,7 +277,7 @@ async function cercaAvvisiOrdine(client, known) {
 // l'elenco della banca dati è ordinato per d e poi per ordine di accodamento.
 export function preparaIncoming(trovate) {
   const conData = t => (t.entry.d || !t.date) ? t.entry
-    : { ...t.entry, d: formatEmailDate(t.date.toUTCString()) };
+    : { ...t.entry, d: dataDMY(t.date) };
   const nuove = trovate.filter(t => !t.rilettura)
     .map((t, i) => ({ t, i, ms: t.date ? t.date.getTime() : Infinity }))
     .sort((a, b) => (a.ms - b.ms) || (a.i - b.i))

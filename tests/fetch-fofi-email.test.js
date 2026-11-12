@@ -139,3 +139,10 @@ describe('preparaIncoming — voci trovate nelle mail → .fofi-incoming.json', 
     expect(t.entry.d).toBeUndefined();
   });
 });
+
+describe('preparaIncoming — fuso orario', () => {
+  it('una mail arrivata alle 00:40 italiane prende la data italiana, non quella UTC', () => {
+    const { entries } = preparaIncoming([{ entry: { n: 16160, t: ['F'], tx: 'x' }, date: new Date('2026-11-12T23:40:00Z') }]);
+    expect(entries[0].d).toBe('13/11/2026');
+  });
+});

@@ -24,6 +24,7 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const { sheetToEntries, entriesToDbFile, mergeNewEntries } = require(resolve(ROOT, 'fofi-xlsx.js'));
+const { dataDMY, chiaveData } = require(resolve(ROOT, 'fofi-match.js'));
 
 // ── Mini-lettore ZIP (no dipendenze) ─────────────────────────────────────
 // Legge la central directory e ritorna una mappa { nomeFile: Buffer contenuto }.
@@ -131,6 +132,10 @@ added.forEach(e => console.log(`  n.${e.n} [${e.t}] ${e.tx.replace(/\n/g, ' ').s
 
 if (flags.has('--write')) {
   const aggiornata = sidecarDate || aggiornataAttuale;
+  // Data di arrivo d (ordina l'elenco della banca dati): quella della mail
+  // con l'Excel, altrimenti oggi. added sono gli stessi oggetti di merged.
+  const arrivo = chiaveData(sidecarDate) ? sidecarDate : dataDMY(new Date());
+  added.forEach(e => { if (!e.d) e.d = arrivo; });
   writeFileSync(resolve(ROOT, 'fofi-db.js'), entriesToDbFile(merged, aggiornata));
   console.log(`\n✓ Scritto fofi-db.js: ${merged.length} voci totali${aggiornata ? ` · aggiornamento ${aggiornata}` : ''}. Ricorda di bumpare CACHE_NAME in sw.js.`);
   // Riga machine-readable per la CI (lista numeri circolare accodati).
