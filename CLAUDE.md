@@ -71,7 +71,7 @@ Two version markers must stay in sync:
 - `APP_BUILD` (integer) + `APP_BUILD_DATE` near the top of the inline `<script>` in `index.html` — drives the footer "Build N · DD/MM/YYYY" label.
 - `CACHE_NAME` in `sw.js` (e.g. `verifica-ricetta-build56`) — must include the same build number, otherwise the SW won't invalidate the old cached app shell and users keep seeing the previous version.
 
-**Bump both together** on every user-visible change.
+**Bump both together** on every user-visible change. `banca-dati.html` ha lo stesso `APP_BUILD`/`APP_BUILD_DATE` nel footer: usare sempre `node tools/bump-build.mjs`, che aggiorna tutte le pagine di `FILE_CON_BUILD` + `sw.js` (un test verifica che siano allineate).
 
 ### Photo input on iOS PWA
 
