@@ -135,11 +135,26 @@ function allegatoToText(buf, nomeFile, tmp) {
   return { testo: '', ocr: '' };
 }
 
-async function scaricaMail(client, uid) {
-  const { content } = await client.download(String(uid), undefined, { uid: true });
-  const chunks = [];
-  for await (const chunk of content) chunks.push(chunk);
-  return simpleParser(Buffer.concat(chunks));
+// Scarica e analizza una mail. Ogni tanto Gmail risponde al download senza
+// contenuto (run #153 del 12/11/2026: TypeError sull'iteratore): si riprova
+// una volta, poi si salta la mail con un avviso. Ritorna null se non leggibile:
+// una singola mail non deve bloccare l'aggiornamento di tutte le altre.
+export async function scaricaMail(client, uid, tentativi = 2) {
+  for (let i = 1; i <= tentativi; i++) {
+    try {
+      const res = await client.download(String(uid), undefined, { uid: true });
+      if (!res?.content) throw new Error('download senza contenuto');
+      const chunks = [];
+      for await (const chunk of res.content) chunks.push(chunk);
+      return await simpleParser(Buffer.concat(chunks));
+    } catch (err) {
+      if (i === tentativi) {
+        console.warn(`[FOFI] mail uid ${uid} non leggibile, saltata: ${err.message}`);
+        return null;
+      }
+    }
+  }
+  return null;
 }
 
 function giorniFa(n) {
@@ -153,6 +168,7 @@ async function cercaXlsx(client, OUT) {
   const uids = await client.search({ from: 'fofiruf.it', subject: 'segnalazioni', since: giorniFa(GIORNI_XLSX) }, { uid: true });
   for (const uid of [...(uids || [])].sort((a, b) => b - a)) {
     const parsed = await scaricaMail(client, uid);
+    if (!parsed) continue;
     let buf = null;
     let sorgente = '';
     const att = parsed.attachments?.find(a => /\.xlsx$/i.test(a.filename || ''));
@@ -184,6 +200,7 @@ async function cercaPdfCircolari(client, known, tmp) {
   const uids = await client.search({ from: 'fofiruf.it', since: giorniFa(GIORNI_AVVISI) }, { uid: true });
   for (const uid of uids || []) {
     const parsed = await scaricaMail(client, uid);
+    if (!parsed) continue;
     const subject = parsed.subject || '';
     // PDF senza numero nel nome: li apriamo solo se la mail parla di segnalazioni
     // (le altre circolari sono corsi/note e non vanno in banca dati).
@@ -210,6 +227,7 @@ async function cercaFederfarma(client, known, tmp) {
   const uids = await client.search({ from: 'federfarmalaspezia.it', since: giorniFa(GIORNI_FEDERFARMA) }, { uid: true });
   for (const uid of uids || []) {
     const parsed = await scaricaMail(client, uid);
+    if (!parsed) continue;
     const subject = (parsed.subject || '').trim();
     const key = parsed.messageId || '';
     const rilettura = known.daRileggere.has(key);
@@ -234,6 +252,7 @@ async function cercaAvvisiOrdine(client, known) {
   const uids = await client.search({ from: 'fofiruf.it', since: giorniFa(GIORNI_AVVISI) }, { uid: true });
   for (const uid of uids || []) {
     const parsed = await scaricaMail(client, uid);
+    if (!parsed) continue;
     const subject = (parsed.subject || '').trim();
     const key = parsed.messageId || '';
     if (!key || known.chiavi.has(key) || !isAvvisoOrdine(subject)) continue;

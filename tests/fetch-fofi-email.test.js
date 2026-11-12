@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractXlsxUrl, collectBody, decodeB64Url, findXlsxPart } from '../tools/fetch-fofi-email.mjs';
+import { extractXlsxUrl, collectBody, decodeB64Url, findXlsxPart, scaricaMail } from '../tools/fetch-fofi-email.mjs';
 
 // HTML reale (semplificato) della mail "Segnalazioni urgenti" FOFI: l'Excel è
 // un link Azure blob nel corpo, non un allegato MIME.
@@ -74,5 +74,29 @@ describe('decodeB64Url / findXlsxPart', () => {
 
   it('findXlsxPart ritorna null senza allegati xlsx', () => {
     expect(findXlsxPart({ parts: [{ filename: 'a.pdf', body: { attachmentId: 'y' } }] })).toBeNull();
+  });
+});
+
+describe('scaricaMail — download IMAP tollerante', () => {
+  const MAIL = 'Subject: prova\r\nMessage-ID: <x@y>\r\n\r\ncorpo\r\n';
+  const stream = s => (async function* () { yield Buffer.from(s); })();
+
+  it('download senza contenuto (12/11/2026, run #153) → riprova, poi null senza eccezioni', async () => {
+    let chiamate = 0;
+    const client = { download: async () => { chiamate++; return {}; } };
+    await expect(scaricaMail(client, 7)).resolves.toBeNull();
+    expect(chiamate).toBe(2);
+  });
+
+  it('primo tentativo vuoto, secondo ok → mail letta', async () => {
+    let n = 0;
+    const client = { download: async () => (++n === 1 ? {} : { content: stream(MAIL) }) };
+    const p = await scaricaMail(client, 7);
+    expect(p.subject).toBe('prova');
+  });
+
+  it('errore IMAP → null (la singola mail non blocca le altre)', async () => {
+    const client = { download: async () => { throw new Error('connessione chiusa'); } };
+    await expect(scaricaMail(client, 7)).resolves.toBeNull();
   });
 });
