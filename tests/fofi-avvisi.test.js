@@ -6,6 +6,7 @@ import {
   circolarePdfToEntry, tipiDaTesto, extractPdfLinks,
   isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa, dataPiuRecente,
   testoInsufficiente, serveRilettura, applicaRiletture,
+  isAvvisoOrdine, ordineAvvisoEntry,
 } from '../fofi-avvisi.js';
 
 const FIX = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -189,6 +190,61 @@ describe('federfarmaEntry — voce senza numero, con chiave di deduplica', () =>
   });
   it('tipo non deducibile → F (prudenziale: mai voce senza tipo)', () => {
     expect(federfarmaEntry({ subject: 'Furto dr Rossi', text: '', date: '01/11/2026', key: 'k2' }).t.length).toBeGreaterThan(0);
+  });
+});
+
+// ── Avvisi dell'Ordine SP nel corpo mail (dal 12/11/2026): segnalazione di una
+// farmacia inoltrata dall'Ordine, senza PDF né numero di circolare. Testo
+// anonimizzato (il repo è pubblico): stessa struttura della mail reale.
+const AVVISO_ORDINE = '| |\n\n| |\n| Gent.mi, si riceve e trasmette il seguente avviso da parte della Dottoressa Rossi, della Farmacia Esempio, del quale si prega di prendere buona nota : " Con la presente si intende segnalare che, in data recente, si è presentata presso la farmacia un’utente (iniziali X. Y.) munita di una ricetta bianca per i farmaci Depalgos 20 mg + 325 mg e Minias gocce, apparentemente prescritta dal reparto di Psichiatria dell\'Ospedale di Pisa. Sul momento non è stata effettuata l\'erogazione dei medicinali richiesti dall\' utente, e si è provveduto a contattare telefonicamente la struttura ospedaliera, la quale ha confermato di avere avuto in carico la paziente ma ha smentito di aver emesso tale prescrizione " ; ringraziandovi per l\'attenzione e restando a disposizione si porgono Cordiali saluti. Mario Bianchi Funzionario giuridico amministrativo Ordine dei Farmacisti della Provincia della Spezia tel 0187 000000 – cell 300-0000000 Mail : mail@example.it AVVERTENZA DI RISERVATEZZA La presente e-mail, nonché ogni eventuale allegato, è destinata esclusivamente ai soggetti indicati |';
+
+describe('isAvvisoOrdine — avviso dell\'Ordine SP senza circolare', () => {
+  it('segnalazione di ricetta falsificata → sì', () => {
+    expect(isAvvisoOrdine('IMPORTANTE : Segnalazione possibile  ricetta falsificata')).toBe(true);
+    expect(isAvvisoOrdine('Segnalazione furto timbro Dr. Rossi')).toBe(true);
+  });
+
+  it('circolari FOFI, vecchio Excel cumulativo e altri temi → no', () => {
+    expect(isAvvisoOrdine('IMPORTANTE : Segnalazioni  urgenti FOFI- ASL 5   falsificazione ricette/smarrimento timbro/smarrimento buoni acquisto')).toBe(false);
+    expect(isAvvisoOrdine('Circolari FOFI nr. 16141-16142 :  COMUNICAZIONI FURTI/SMARRIMENTI/FALSIFICAZIONI.')).toBe(false);
+    expect(isAvvisoOrdine('Circolare FOFI nr. 16133  : Commissione Federale per la Medicina di Genere')).toBe(false);
+    expect(isAvvisoOrdine('Corso ECM: segnalazione reazioni avverse')).toBe(false);
+  });
+});
+
+describe('ordineAvvisoEntry — voce senza numero dal corpo mail', () => {
+  const e = ordineAvvisoEntry({
+    subject: 'IMPORTANTE : Segnalazione possibile  ricetta falsificata',
+    text: AVVISO_ORDINE, date: '12/11/2026', key: '<abc@fofiruf.it>',
+  });
+
+  it('n null, fonte Ordine SP, data e chiave di deduplica', () => {
+    expect(e.n).toBeNull();
+    expect(e.src).toBe('Ordine SP');
+    expect(e.d).toBe('12/11/2026');
+    expect(e.k).toBe('<abc@fofiruf.it>');
+    expect(e.t).toEqual(['F']);
+  });
+
+  it('nel tx il testo della segnalazione (farmaci, reparto, ospedale)', () => {
+    for (const s of ['Depalgos', 'Minias', 'Psichiatria', 'Ospedale di Pisa']) expect(e.tx).toMatch(s);
+  });
+
+  it('niente dati personali né firme/disclaimer (fofi-db.js è pubblico)', () => {
+    expect(e.tx).not.toMatch(/iniziali|X\. Y\./);
+    // nomi fuori dalle virgolette: farmacista segnalante e funzionario dell'Ordine
+    expect(e.tx).not.toMatch(/Rossi|Bianchi|Farmacia Esempio/);
+    expect(e.tx).not.toMatch(/Cordiali|AVVERTENZA|@|0187/);
+  });
+
+  it('senza testo tra virgolette: corpo fino ai saluti, senza recapiti', () => {
+    const s = ordineAvvisoEntry({
+      subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k2>',
+      text: 'Gent.mi, si segnala una ricetta falsificata di Rivotril gocce a nome del Dr. Verdi Luca, ASL 5. Cordiali saluti. Mario Bianchi tel 0187 000000',
+    });
+    expect(s.tx).toMatch(/Rivotril/);
+    expect(s.tx).toMatch(/Verdi Luca/);
+    expect(s.tx).not.toMatch(/Cordiali|Bianchi|0187/);
   });
 });
 

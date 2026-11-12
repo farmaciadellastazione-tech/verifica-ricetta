@@ -16,6 +16,10 @@ Italian-language single-page PWA for **Farmacia della Stazione** (La Spezia) tha
 
 - `fofi-avvisi.js` — core puro per le segnalazioni **non** in Excel: PDF delle singole circolari FOFI (`circolarePdfToEntry`, testo da `pdftotext`) e inoltri Federfarma SP (`isFederfarmaSegnalazione`/`federfarmaEntry`: voci `n:null` con campi extra `src`/`d`/`k`, deduplicate per `k`=Message-ID; campo opzionale `ocr` = testo delle scansioni, mostrato in `banca-dati.html` ma **fuori dal matching**, che gira solo su `tx`). La UI mostra la fonte con `fofiRiferimento(rec)` (in `fofi-match.js`). Testato in `tests/fofi-avvisi.test.js` su PDF reali (`tests/fixtures/`). Applicazione: `tools/apply-fofi-entries.mjs`.
 
+**Avvisi Ordine SP (dal 12/11/2026)**: l'Ordine inoltra anche segnalazioni di singole farmacie con il testo tra virgolette nel corpo mail (niente PDF né numero) → `isAvvisoOrdine`/`ordineAvvisoEntry`, voci `n:null` con `src:'Ordine SP'`; nel `tx` solo il testo tra virgolette, senza iniziali del paziente.
+
+**pdftotext**: in locale è Xpdf (un paragrafo per riga), in CI è poppler (a capo come sulla pagina). `circolarePdfToEntry` lavora su testo "appiattito" e i test coprono entrambe le forme: non scrivere regex che dipendono dagli a capo.
+
 **Cambio formato 3/11/2026**: l'Ordine non invia più l'Excel ma i PDF delle singole circolari ("Segnalazione urgente: …") come link rufblob; la FOFI ha aperto una sezione sul sito (accesso con CF, non automatizzabile). Lo script legge anche gli inoltri di `info@federfarmalaspezia.it`. Se non arriva nulla per 21 giorni il workflow fallisce (`tools/check-fofi-stale.mjs`).
 
 **Fonte aggiornamenti FOFI (storica)**: mail periodica da `ordinesp@fofiruf.it` (Ordine Farmacisti SP), oggetto "Segnalazioni urgenti FOFI…", con allegato Excel (colonne: B=numero, C=falsificazione/`F`, D=furto-smarrimento timbro/`T`, E=buoni acquisto/`B`). È la fonte canonica della banca dati; le circolari FOFI numerate su altri temi (corsi, note operative) NON vanno in `FOFI_DB`.

@@ -198,6 +198,47 @@ function federfarmaEntry({ subject, text, ocr, date, key }) {
   return e;
 }
 
+// ── Avvisi dell'Ordine SP nel corpo mail (dal 12/11/2026) ──
+// L'Ordine inoltra anche segnalazioni di singole farmacie ("Segnalazione
+// possibile ricetta falsificata"): niente PDF, niente numero di circolare, il
+// testo dell'avviso è tra virgolette nel corpo. Le circolari FOFI ("Circolare/i
+// FOFI nr. …") e la vecchia mail dell'Excel ("Segnalazioni urgenti FOFI") hanno
+// già il loro canale e vanno escluse.
+function isAvvisoOrdine(subject) {
+  const s = String(subject || '').toLowerCase().replace(/\s+/g, ' ');
+  if (/circolar|segnalazioni urgenti fofi|corso|ecm\b/.test(s)) return false;
+  return /segnalaz/.test(s) && /ricett|falsific|timbr|furt|smarrim/.test(s);
+}
+
+const MAX_TX_ORDINE = 1500;
+// Fine del testo utile: saluti / ringraziamenti, poi vengono firma, recapiti e disclaimer.
+const FINE_AVVISO_ORDINE = /[;,.]?\s*(?:ringrazi|cordiali saluti|distinti saluti|si porgono)/i;
+
+// Voce senza numero per un avviso dell'Ordine. `text` è il corpo in testo
+// semplice. Si tiene SOLO il testo tra virgolette (l'avviso vero): fuori ci
+// sono il nome della farmacista segnalante, il funzionario e i recapiti, che
+// farebbero scattare il banner per omonimia. PRIVACY: via le iniziali del
+// paziente (fofi-db.js è pubblico).
+function ordineAvvisoEntry({ subject, text, date, key }) {
+  const sogg = String(subject || '').replace(/\s+/g, ' ').trim();
+  const corpo = String(text || '').replace(/\|/g, ' ').replace(/\s+/g, ' ').trim();
+  const virgolette = corpo.match(/["“]\s*([^"”]{40,}?)\s*["”]/);
+  let avviso = virgolette ? virgolette[1] : corpo;
+  if (!virgolette) {
+    const fine = avviso.search(FINE_AVVISO_ORDINE);
+    if (fine >= 0) avviso = avviso.slice(0, fine);
+    avviso = avviso.replace(/^gent\.?\w*\s*,?\s*/i, '');
+  }
+  avviso = avviso
+    .replace(/\s*\(\s*iniziali[^)]*\)/gi, '')
+    .replace(/\binizial[ei]\s+(?:[A-Z]\.\s*){1,3}/g, '')
+    .trim().slice(0, MAX_TX_ORDINE);
+  const tx = avviso ? sogg + '\n' + avviso : sogg;
+  let t = tipiDaTesto(tx);
+  if (!t.length) t = ['F'];
+  return { n: null, t, tx, m: [], f: [], src: 'Ordine SP', d: date || '', k: key || '' };
+}
+
 // word/document.xml di un .docx -> testo semplice (un paragrafo per riga).
 function docxXmlToText(xml) {
   const s = String(xml || '')
@@ -273,6 +314,7 @@ const _exports = {
   testoInsufficiente, serveRilettura, applicaRiletture,
   dataPiuRecente, tipiDaTesto, circolarePdfToEntry, extractPdfLinks,
   isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa,
+  isAvvisoOrdine, ordineAvvisoEntry,
 };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;

@@ -66,7 +66,7 @@ const { db: merged, aggiornate } = applicaRiletture(conNuove, riletture);
 console.log(`Banca dati attuale: ${db.length} voci · candidate: ${nuove.length} · nuove: ${added.length} · rilette (OCR): ${aggiornate.length}`);
 if (!added.length && !aggiornate.length) { console.log('✓ Nessuna voce nuova.'); process.exit(0); }
 
-const etichetta = e => e.n != null ? String(e.n) : `FF ${e.d}`;
+const etichetta = e => e.n != null ? String(e.n) : `${e.src === 'Ordine SP' ? 'OSP' : 'FF'} ${e.d}`;
 added.forEach(e => console.log(`  ${etichetta(e)} [${e.t}] ${e.tx.replace(/\n/g, ' ').slice(0, 100)}`));
 aggiornate.forEach(e => console.log(`  ~ OCR ${etichetta(e)} [${e.t}] ${e.tx.replace(/\n/g, ' ').slice(0, 100)}`));
 
