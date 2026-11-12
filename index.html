@@ -486,7 +486,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 109;
+const APP_BUILD = 110;
 const APP_BUILD_DATE = '12/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -800,21 +800,16 @@ function cercaFOFI() {
     return;
   }
 
-  // Token "lunghi" (>=4) per il match a parola intera dei live indicator:
-  // pre-calcolati una volta (prima venivano rifiltrati per ogni record, 149x).
-  const tokMedicoLong = tokMedico.filter(t => t.length >= 4);
-  const tokFarmacoLong = tokFarmaco.filter(t => t.length >= 4);
-
-  // Un solo passaggio sulla banca dati: punteggio complessivo + conteggi live
-  // per campo, riusando lo stesso token-set per record (prima erano tre
-  // scansioni separate di FOFI_DB a ogni battitura).
+  // Un solo passaggio sulla banca dati: punteggio + conteggi live per campo.
+  // scoreFofi (fofi-match.js) tratta medico e farmaco separatamente: nel campo
+  // medico un nome di battesimo da solo non basta se è stato digitato anche un
+  // cognome diverso ("Giuseppe Verdiani" non aggancia il "Dr. BURASCHI GIUSEPPE").
   const scored = [];
   let medicoCount = 0, farmacoCount = 0;
   for (const rec of FOFI_DB) {
-    const ht = haystackTokens(rec);
-    if (tokMedicoLong.length && tokMedicoLong.some(t => ht.has(t))) medicoCount++;
-    if (tokFarmacoLong.length && tokFarmacoLong.some(t => ht.has(t))) farmacoCount++;
-    const { score } = scoreMatch(allToks, rec);
+    const { score, medicoHit, farmacoHit } = scoreFofi(tokMedico, tokFarmaco, rec);
+    if (medicoHit) medicoCount++;
+    if (farmacoHit) farmacoCount++;
     if (score >= 3) scored.push({ rec, score });
   }
   scored.sort((a, b) => b.score - a.score);
@@ -824,14 +819,14 @@ function cercaFOFI() {
   const lm = document.getElementById('fofi-live-medico');
   if (tokMedico.length > 0 && medico.length > 3) {
     lm.innerHTML = medicoCount > 0
-      ? `<span class="fofi-live-warn">⚠ ${medicoCount} segnalazione${medicoCount>1?'i':''} FOFI per questo medico</span>`
+      ? `<span class="fofi-live-warn">⚠ ${etichettaSegnalazioni(medicoCount)} FOFI per questo medico</span>`
       : `<span class="fofi-live-ok">✓ Nessuna segnalazione FOFI per questo medico</span>`;
   } else { lm.innerHTML = ''; }
 
   const lf = document.getElementById('fofi-live-farmaco');
   if (tokFarmaco.length > 0 && farmaco.length > 3) {
     lf.innerHTML = farmacoCount > 0
-      ? `<span class="fofi-live-warn">⚠ ${farmacoCount} segnalazione${farmacoCount>1?'i':''} FOFI per questo farmaco</span>`
+      ? `<span class="fofi-live-warn">⚠ ${etichettaSegnalazioni(farmacoCount)} FOFI per questo farmaco</span>`
       : `<span class="fofi-live-ok">✓ Nessuna segnalazione FOFI per questo farmaco</span>`;
   } else { lf.innerHTML = ''; }
 
