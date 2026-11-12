@@ -70,9 +70,20 @@ for (const f of inputs) {
     const num = basename(f).match(/\b(1\d{4})\b/);
     const e = circolarePdfToEntry(text, num ? parseInt(num[1], 10) : undefined);
     // Data di arrivo (ordina l'elenco della banca dati): quella di --date.
-    if (e) nuove.push({ ...e, d: e.d || args[dIdx + 1] });
+    if (e) nuove.push({ ...e, d: e.d || aggiornata });
     else console.log(`- ${basename(f)}: non è una segnalazione, ignorata.`);
   }
+}
+
+// Ogni voce nuova deve avere la data di arrivo d (ordina l'elenco; un test la
+// richiede): il JSON della pipeline ce l'ha già, uno scritto a mano no.
+const senzaData = nuove.filter(e => !chiaveData(e.d));
+if (senzaData.length) {
+  if (dIdx < 0) {
+    console.error(`Voci senza data d (${senzaData.map(e => e.n ?? e.src).join(', ')}): rilancia con --date dd/mm/yyyy.`);
+    process.exit(1);
+  }
+  senzaData.forEach(e => { e.d = aggiornata; });
 }
 
 const { db, aggiornata: aggiornataAttuale } = loadCurrentDb();

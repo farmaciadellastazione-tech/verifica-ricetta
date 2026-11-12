@@ -146,3 +146,10 @@ describe('preparaIncoming — fuso orario', () => {
     expect(entries[0].d).toBe('13/11/2026');
   });
 });
+
+describe('preparaIncoming — "aggiornata" nello stesso fuso della data d', () => {
+  it('mail alle 00:40 italiane: aggiornata e d coincidono', () => {
+    const out = preparaIncoming([{ entry: { n: 16160, t: ['F'], tx: 'x' }, date: new Date('2026-11-12T23:40:00Z') }]);
+    expect(out.aggiornata).toBe(out.entries[0].d);
+  });
+});

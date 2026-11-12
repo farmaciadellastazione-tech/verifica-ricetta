@@ -31,7 +31,6 @@ import { simpleParser } from 'mailparser';
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const { formatEmailDate } = require(resolve(ROOT, 'fofi-xlsx.js'));
 const { dataDMY } = require(resolve(ROOT, 'fofi-match.js'));
 const {
   extractPdfLinks, circolarePdfToEntry, isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText,
@@ -186,7 +185,7 @@ async function cercaXlsx(client, OUT) {
     }
     writeFileSync(OUT, buf);
     const rawDate = parsed.date?.toUTCString() || '';
-    const dataMail = formatEmailDate(rawDate);
+    const dataMail = parsed.date ? dataDMY(parsed.date) : ''; // fuso italiano, come la data d
     if (dataMail) writeFileSync(OUT + '.date', dataMail);
     console.log(`Scaricato xlsx (${buf.length} byte) da ${sorgente} — mail del ${rawDate} -> ${OUT}`);
     return true;
@@ -238,7 +237,7 @@ async function cercaFederfarma(client, known, tmp) {
       .map(a => allegatoToText(a.content, a.filename, tmp));
     const text = letti.map(l => l.testo).join('\f');
     const ocr = letti.map(l => l.ocr).filter(Boolean).join('\f');
-    const date = formatEmailDate(parsed.date?.toUTCString() || '');
+    const date = parsed.date ? dataDMY(parsed.date) : ''; // fuso italiano
     known.chiavi.add(key);
     known.daRileggere.delete(key);
     out.push({ entry: federfarmaEntry({ subject, text, ocr, date, key }), date: parsed.date, rilettura });
@@ -262,7 +261,7 @@ async function cercaAvvisiOrdine(client, known) {
     // anche se in allegato c'è un PDF (es. la denuncia).
     if (extractPdfLinks(parsed.html || parsed.textAsHtml || '').length &&
         !/"[^"]{40,}"|“[^”]{40,}”|«[^»]{40,}»/.test(parsed.text || '')) continue;
-    const date = formatEmailDate(parsed.date?.toUTCString() || '');
+    const date = parsed.date ? dataDMY(parsed.date) : ''; // fuso italiano
     known.chiavi.add(key);
     out.push({ entry: ordineAvvisoEntry({ subject, text: parsed.text || '', date, key }), date: parsed.date });
     console.log(`+ Ordine SP ${date}: ${subject}`);
@@ -285,7 +284,7 @@ export function preparaIncoming(trovate) {
   // La data "Aggiornamento" segue solo le segnalazioni nuove, non le riletture OCR.
   const piuRecente = nuove.map(t => t.date).filter(Boolean).sort((a, b) => b - a)[0];
   return {
-    aggiornata: piuRecente ? formatEmailDate(piuRecente.toUTCString()) : '',
+    aggiornata: piuRecente ? dataDMY(piuRecente) : '',
     entries: nuove.map(conData),
     riletture: trovate.filter(t => t.rilettura).map(t => t.entry),
   };

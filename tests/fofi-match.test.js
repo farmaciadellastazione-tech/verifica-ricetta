@@ -348,3 +348,26 @@ describe('dataDMY — data dd/mm/yyyy nel fuso italiano', () => {
     expect(dataDMY(new Date('2026-07-14T22:30:00Z'))).toBe('15/07/2026');
   });
 });
+
+describe('ordinaRecenti — ordine totale a parità di data (dalla terza review)', () => {
+  const a = { n: 16151, t: ['T'], tx: 'a', d: '12/11/2026' };
+  const o = { n: null, t: ['F'], tx: 'o', src: 'Ordine SP', d: '12/11/2026' };
+  const b = { n: 16144, t: ['T'], tx: 'b', d: '12/11/2026' };
+  it('il risultato non dipende dall\'ordine in ingresso', () => {
+    const atteso = ['o', 'a', 'b']; // avvisi senza numero, poi circolari per n° decrescente
+    expect(ordinaRecenti([a, o, b]).map(v => v.tx)).toEqual(atteso);
+    expect(ordinaRecenti([b, o, a]).map(v => v.tx)).toEqual(atteso);
+    expect(ordinaRecenti([o, b, a]).map(v => v.tx)).toEqual(atteso);
+  });
+});
+
+describe('problemiMetadati — casi dalla terza review', () => {
+  it('il cognome RE è un nome valido', () => {
+    expect(problemiMetadati({ n: 1, tx: 'ricetta a firma del Dott. RE GIUSEPPE', m: ['RE GIUSEPPE'], f: [] })).toEqual([]);
+  });
+  it('nomi commerciali con un numero sono validi, il dosaggio con unità no', () => {
+    const tx = 'ricetta di EUTIROX 100 e VITAMINA B12 e OXYCONTIN 80 mg';
+    expect(problemiMetadati({ n: 1, tx, m: [], f: ['EUTIROX 100', 'VITAMINA B12'] })).toEqual([]);
+    expect(problemiMetadati({ n: 1, tx, m: [], f: ['OXYCONTIN 80 mg'] })).toHaveLength(1);
+  });
+});

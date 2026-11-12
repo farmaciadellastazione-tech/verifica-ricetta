@@ -124,15 +124,17 @@ function chiaveData(d) {
 
 // Più recenti in cima, per data di arrivo d (data della mail per tutte le
 // fonti: circolari FOFI, inoltri Federfarma, avvisi Ordine). A parità di data:
-// circolari per numero decrescente, altrimenti l'ultima accodata in cima.
-// Le voci senza data (la prima banca dati, maggio 2026) vanno in fondo.
+// prima gli avvisi senza numero (l'ultimo accodato in cima), poi le circolari
+// per numero decrescente. Ordine totale: il risultato non dipende dall'ordine
+// in ingresso. Le voci senza data (la prima banca dati, maggio 2026) in fondo.
 // Accetta record o oggetti indice {rec, ...}; restituisce un nuovo array.
 function ordinaRecenti(voci) {
   const rec = v => v.rec || v;
   return voci.map((v, i) => ({ v, i, d: chiaveData(rec(v).d), n: rec(v).n }))
     .sort((a, b) => {
       if (a.d !== b.d) return b.d.localeCompare(a.d);
-      if (a.n != null && b.n != null && a.n !== b.n) return b.n - a.n;
+      if ((a.n == null) !== (b.n == null)) return a.n == null ? -1 : 1;
+      if (a.n != null && a.n !== b.n) return b.n - a.n;
       return b.i - a.i;
     })
     .map(x => x.v);
@@ -140,16 +142,20 @@ function ordinaRecenti(voci) {
 
 // ── Metadati m/f (chip della banca dati) ─────────────────────────────────
 
-const TITOLI_MEDICO = new Set(['dr', 'dott', 'dssa', 'ssa', 're', 'dottor', 'dottore', 'dottoressa', 'dottori', 'prof', 'sig', 'sigra']);
+// Niente parole che possono essere cognomi (es. "RE": il "Dott.re" lo toglie già pulisciNome).
+const TITOLI_MEDICO = new Set(['dr', 'dott', 'dssa', 'ssa', 'dottor', 'dottore', 'dottoressa', 'dottori', 'prof', 'sig', 'sigra']);
 // Parole di qualifica/contesto che non fanno parte di un nome. Volutamente NON
 // tutte le STOPWORDS_FOFI: particelle e parole comuni (DEL, DELLA, CORSO, VIA…)
 // possono essere cognomi veri.
 const QUALIFICHE_MEDICO = new Set([
   'medico', 'medici', 'chirurgo', 'dirigente', 'direttore', 'specialista', 'specializzato',
-  'specializzata', 'pediatra', 'psichiatra', 'psicologo', 'geriatra', 'odontoiatra', 'mmg', 'map',
+  'specializzata', 'pediatra', 'psichiatra', 'psicologo', 'geriatra', 'odontoiatra', 'mmg',
   'asl', 'asst', 'ats', 'usl', 'ospedale', 'dipartimento', 'servizio', 'reparto', 'presso',
   'medesimo', 'medesima', 'ricetta', 'ricette', 'timbro', 'firma'
 ]);
+// Unità di misura: segnalano un dosaggio attaccato al nome del farmaco. Un
+// numero da solo no: fa parte di nomi commerciali (EUTIROX 100, VITAMINA B12).
+const UNITA_DOSAGGIO = new Set(['mg', 'mcg', 'ml', 'g', 'gr', 'ui', 'mcgh', 'h']);
 // Titolo in testa: "Dr.", "Dr.ssa", "D.ssa", "Dott.re", "Dott.ROSSI" (senza spazio), "Prof."…
 const RE_TITOLO = /^(dott(?:\.?ssa|\.?re|ori|oressa|ore|or)?|d\.?ssa|dr(?:\.?ssa)?|prof(?:\.?ssa)?|sig(?:\.?ra)?)(?:\.\s*|\s+)/i;
 
@@ -176,7 +182,7 @@ function problemiMetadati(rec) {
       // testo ci sono "ROSSI MARIO" e un paziente "BIANCHI".
       else if (!testo.includes(` ${w.join(' ')} `)) out.push(`${etichetta} "${v}": non compare per intero nel testo`);
       else if (w.some(x => TITOLI_MEDICO.has(x) || vietate.has(x))) out.push(`${etichetta} "${v}": contiene titoli o parole generiche`);
-      else if (campo === 'f' && w.some(x => /\d/.test(x))) out.push(`${etichetta} "${v}": contiene il dosaggio`);
+      else if (campo === 'f' && w.some(x => UNITA_DOSAGGIO.has(x))) out.push(`${etichetta} "${v}": contiene il dosaggio`);
     }
   }
   return out;
