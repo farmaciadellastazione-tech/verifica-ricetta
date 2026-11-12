@@ -86,14 +86,6 @@
   .fofi-live-check { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 15px; color: var(--text-ter); }
   .fofi-live-ok { color: var(--green-600); font-weight: 500; }
   .fofi-live-warn { color: var(--red-600); font-weight: 600; }
-  .fofi-live-weak { color: var(--amber-600); font-weight: 600; }
-  /* Avviso giallo "possibile omonimia": solo nome di battesimo in comune (vedi classificaHit) */
-  .fofi-weak { border-radius: var(--radius-lg); border: 2px solid var(--amber-100); background: var(--amber-50); padding: 0.75rem 1.25rem; margin-bottom: 1rem; display: none; }
-  .fofi-weak.show { display: block; }
-  .fofi-weak-title { font-size: 16px; font-weight: 700; color: var(--amber-800); margin-bottom: 4px; }
-  .fofi-weak-body { font-size: 15px; color: var(--amber-800); line-height: 1.5; }
-  .fofi-weak .fofi-match { border-color: var(--amber-100); }
-  .fofi-weak .fofi-match-n { color: var(--amber-800); }
 
   .api-section { background: var(--bg-sec); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .api-help { font-size: 14px; color: var(--text-ter); margin: 0 0 1rem 0; padding: 0 12px; line-height: 1.45; }
@@ -204,7 +196,7 @@
     body { background: #fff; padding: 0; color: #000; font-size: 11pt; }
     .container { max-width: none; margin: 0; padding: 0; }
     .page-header, #api-config, #form-section, .install-btn, .footer,
-    .fofi-alert, .fofi-weak, .db-badge, .print-hide { display: none !important; }
+    .fofi-alert, .db-badge, .print-hide { display: none !important; }
     .print-only { display: block !important; }
     .results-card { border: 1.5px solid #000; border-radius: 0; box-shadow: none; margin: 0; page-break-inside: avoid; }
     .results-header { background: #fff !important; border-bottom: 1.5px solid #000; padding: 10px 14px; }
@@ -301,10 +293,6 @@
     <div class="fofi-alert" id="fofi-alert">
       <div class="fofi-alert-title">🚨 ALLERTA FOFI — Segnalazione attiva</div>
       <div class="fofi-alert-body" id="fofi-alert-body"></div>
-    </div>
-    <div class="fofi-weak" id="fofi-weak">
-      <div class="fofi-weak-title">⚠ Possibile omonimia — solo il nome di battesimo in comune</div>
-      <div class="fofi-weak-body" id="fofi-weak-body"></div>
     </div>
 
     <!-- Stato ricetta (da spedire vs già spedita) -->
@@ -498,7 +486,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 112;
+const APP_BUILD = 111;
 const APP_BUILD_DATE = '12/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -506,7 +494,6 @@ let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedit
 let images = []; // [{base64, mime}, ...] - supporta fronte/retro o piu' allegati; miniatura ricostruita al volo
 const MAX_IMAGES = 4;
 let fofiHits = [];
-let fofiDeboli = []; // corrispondenze "solo nome di battesimo" (avviso giallo)
 
 // Singolare se n è 1, altrimenti plurale ("1 segnalazione", "2 segnalazioni").
 // Locale a index.html apposta: il banner FOFI non deve dipendere da una funzione
@@ -815,11 +802,9 @@ function cercaFOFI() {
 
   if (allToks.length === 0) {
     document.getElementById('fofi-alert').classList.remove('show');
-    document.getElementById('fofi-weak').classList.remove('show');
     document.getElementById('fofi-live-medico').innerHTML = '';
     document.getElementById('fofi-live-farmaco').innerHTML = '';
     fofiHits = [];
-    fofiDeboli = [];
     return;
   }
 
@@ -831,37 +816,24 @@ function cercaFOFI() {
   // Un solo passaggio sulla banca dati: punteggio complessivo + conteggi live
   // per campo, riusando lo stesso token-set per record (prima erano tre
   // scansioni separate di FOFI_DB a ogni battitura).
-  // Colore: rosso (forte) o giallo (solo nome di battesimo in comune). Le
-  // corrispondenze sono le stesse di sempre (scoreMatch), cambia solo il colore.
-  // Se fofi-match.js fosse una copia vecchia senza classificaHit: tutto rosso.
-  const classifica = typeof classificaHit === 'function' ? classificaHit : () => 'forte';
   const scored = [];
-  let medicoCount = 0, medicoDeboli = 0, farmacoCount = 0;
+  let medicoCount = 0, farmacoCount = 0;
   for (const rec of FOFI_DB) {
     const ht = haystackTokens(rec);
-    if (tokMedicoLong.length && tokMedicoLong.some(t => ht.has(t))) {
-      if (classifica(medico, '', rec) === 'forte') medicoCount++; else medicoDeboli++;
-    }
+    if (tokMedicoLong.length && tokMedicoLong.some(t => ht.has(t))) medicoCount++;
     if (tokFarmacoLong.length && tokFarmacoLong.some(t => ht.has(t))) farmacoCount++;
     const { score } = scoreMatch(allToks, rec);
-    if (score >= 3) scored.push({ rec, score, forte: classifica(medico, farmaco, rec) === 'forte' });
+    if (score >= 3) scored.push({ rec, score });
   }
   scored.sort((a, b) => b.score - a.score);
-  fofiHits = scored.filter(h => h.forte).slice(0, 5);
-  fofiDeboli = scored.filter(h => !h.forte).slice(0, 5);
+  fofiHits = scored.slice(0, 5);
 
   // Live indicator per campo — conteggio match a parola intera
   const lm = document.getElementById('fofi-live-medico');
   if (tokMedico.length > 0 && medico.length > 3) {
-    // Niente "✓" verde se ci sono corrispondenze sul solo nome: avviso giallo.
-    if (medicoCount > 0) {
-      lm.innerHTML = `<span class="fofi-live-warn">⚠ ${medicoCount} ${plurale(medicoCount, 'segnalazione', 'segnalazioni')} FOFI per questo medico</span>` +
-        (medicoDeboli > 0 ? ` <span class="fofi-live-weak">(+${medicoDeboli} solo nome in comune)</span>` : '');
-    } else if (medicoDeboli > 0) {
-      lm.innerHTML = `<span class="fofi-live-weak">⚠ Cognome non segnalato — ${medicoDeboli} ${plurale(medicoDeboli, 'segnalazione', 'segnalazioni')} FOFI con lo stesso nome di battesimo</span>`;
-    } else {
-      lm.innerHTML = `<span class="fofi-live-ok">✓ Nessuna segnalazione FOFI per questo medico</span>`;
-    }
+    lm.innerHTML = medicoCount > 0
+      ? `<span class="fofi-live-warn">⚠ ${medicoCount} ${plurale(medicoCount, 'segnalazione', 'segnalazioni')} FOFI per questo medico</span>`
+      : `<span class="fofi-live-ok">✓ Nessuna segnalazione FOFI per questo medico</span>`;
   } else { lm.innerHTML = ''; }
 
   const lf = document.getElementById('fofi-live-farmaco');
@@ -887,20 +859,6 @@ function cercaFOFI() {
       }).join('');
   } else {
     alertDiv.classList.remove('show');
-  }
-
-  // Avviso giallo: possibile omonimia (solo nome di battesimo in comune)
-  const weakDiv = document.getElementById('fofi-weak');
-  if (fofiDeboli.length > 0) {
-    weakDiv.classList.add('show');
-    document.getElementById('fofi-weak-body').innerHTML =
-      `Il cognome digitato non compare, ma il nome di battesimo sì: verificare che non sia lo stesso medico (anche un refuso nel cognome).` +
-      fofiDeboli.slice(0, 3).map(h => `<div class="fofi-match">
-          <div class="fofi-match-n">${escHtml(fofiRiferimento(h.rec))}</div>
-          <div class="fofi-match-tx">${escHtml(h.rec.tx.substring(0, 220))}${h.rec.tx.length > 220 ? '…' : ''}</div>
-        </div>`).join('');
-  } else {
-    weakDiv.classList.remove('show');
   }
 }
 
@@ -1103,11 +1061,6 @@ function buildPrompt() {
       fofiHits.map(h => `- ${fofiRiferimento(h.rec)} [${h.rec.t.join(',')}]: ${h.rec.tx.substring(0,200)}`).join('\n') +
       `\nTieni conto di queste segnalazioni nella tua valutazione e AGGIUNGI un controllo specifico "Verifica FOFI" con stato errore e le segnalazioni trovate.`
     : '\n\nVerifica FOFI: nessuna corrispondenza trovata nella banca dati FOFI per i dati inseriti.';
-  const fofiOmonimie = fofiDeboli.length > 0
-    ? `\n\nPOSSIBILE OMONIMIA FOFI (solo il nome di battesimo del medico coincide, il cognome no): ` +
-      fofiDeboli.map(h => `${fofiRiferimento(h.rec)}: ${h.rec.tx.substring(0,150)}`).join(' | ') +
-      `\nSegnalalo come avvertenza (verificare il cognome del medico), non come errore.`
-    : '';
 
   let dati = '\n\nDATI INSERITI DAL FARMACISTA:\n' +
     (medico ? `- Medico prescrittore: ${medico}\n` : '') +
@@ -1237,7 +1190,7 @@ VERDETTO in modalita' POST (linguaggio DIAGNOSTICO, mai prescrittivo):
 TIPO: ${tipoLabel}
 DATA ODIERNA: ${oggi}
 ${dati}${prioritaDati}
-${fofiBriefing}${fofiOmonimie}
+${fofiBriefing}
 
 NORMATIVA:
 ${getRequisiti()}
@@ -1449,9 +1402,6 @@ function mostraRisultati(r) {
   const fofiBanner = fofiHits.length > 0 ? `<div style="margin:0 16px 14px;padding:10px 14px;background:#FFF0F0;border:1px solid #F7C1C1;border-radius:8px;font-size:14px;color:#791F1F;">
     <strong>🚨 ${fofiHits.length} ${plurale(fofiHits.length, 'corrispondenza', 'corrispondenze')} nella banca dati FOFI 2025-2026</strong> — ${fofiHits.map(h=>escHtml(fofiRiferimento(h.rec))).join(', ')}
   </div>` : '';
-  const fofiBannerDeboli = fofiDeboli.length > 0 ? `<div style="margin:0 16px 14px;padding:10px 14px;background:var(--amber-50);border:1px solid var(--amber-100);border-radius:8px;font-size:14px;color:var(--amber-800);">
-    <strong>⚠ Possibile omonimia FOFI</strong> (solo nome di battesimo in comune) — ${fofiDeboli.map(h=>escHtml(fofiRiferimento(h.rec))).join(', ')}
-  </div>` : '';
 
   // Intestazione stampa: dati farmacia + contesto ricetta (medico/farmaco/data/tipo)
   // visibili solo in stampa via @media print. Per il medico/paziente che riceve
@@ -1496,7 +1446,7 @@ function mostraRisultati(r) {
       <div class="score-bar"><div class="score-bar-fill" style="width:${r.punteggio||0}%;background:${scoreColor};"></div></div>
     </div>
     <div class="checks-list">${checks}</div>
-    ${fofiBanner}${fofiBannerDeboli}
+    ${fofiBanner}
     ${azioniBox}
     ${!isPositive ? `<div class="print-hide" style="margin:0 16px 14px;padding:10px 14px;background:#FFF8E1;border:1px solid #FFD679;border-radius:8px;font-size:14px;color:#5C3A00;">
       💡 <strong>Errore di lettura nei dati?</strong> Se l'AI ha confuso un carattere (es. <code>/</code> con <code>1</code>) o non ha letto un campo, clicca <em>Correggi e riverifica</em>, compila il dato a mano nel form e rilancia. I valori del form hanno priorità sull'OCR.
@@ -1723,9 +1673,7 @@ function nuovaVerifica() {
   document.getElementById('fofi-live-medico').innerHTML='';
   document.getElementById('fofi-live-farmaco').innerHTML='';
   document.getElementById('fofi-alert').classList.remove('show');
-  document.getElementById('fofi-weak').classList.remove('show');
   fofiHits=[];
-  fofiDeboli=[];
   // NON resettare statoRicetta ne' tipoSelezionato: in genere il farmacista
   // controlla piu' ricette consecutive nello stesso stato/tipo (batch).
   rimuoviImg({stopPropagation:()=>{}});

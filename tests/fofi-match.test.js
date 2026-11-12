@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
 import {
   STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento,
-  NOMI_PROPRI, classificaHit,
 } from '../fofi-match.js';
 
 describe('normalize — pulizia testo FOFI', () => {
@@ -231,96 +226,5 @@ describe('fofiRiferimento — etichetta della fonte di una voce', () => {
   });
   it('voce senza numero né data → solo la fonte', () => {
     expect(fofiRiferimento({ n: null, t: ['T'], tx: 'x', src: 'Federfarma SP' })).toBe('Segnalazione Federfarma SP');
-  });
-});
-
-// ── Avviso giallo "possibile omonimia" (12/11/2026) ──────────────────────
-// "Giuseppe Verdiani" faceva scattare il banner rosso sulla circ. 15927 (Dr.
-// BURASCHI GIUSEPPE). Le corrispondenze NON cambiano: cambia solo il colore.
-// Giallo = in comune solo nomi di battesimo, nessun farmaco, e il cognome
-// digitato non c'è. Tutto il resto resta rosso.
-describe('classificaHit — rosso (forte) o giallo (solo nome di battesimo)', () => {
-  const rec = tx => ({ tx });
-  const c15927 = rec('circolazione di ricette false riportanti quale medico titolare il Dr.LEONE CARLO e con timbro e firma dei medici sostituti Dr. STRANIERI FRANCESCO e Dr. BURASCHI GIUSEPPE');
-
-  it('nome in comune + cognome diverso → giallo (Giuseppe Verdiani)', () => {
-    expect(classificaHit('Giuseppe Verdiani', 'Tachipirina', c15927)).toBe('debole');
-  });
-
-  it('due nomi propri di medici diversi + cognome assente → giallo', () => {
-    expect(classificaHit('Giuseppe Francesco Verdiani', '', c15927)).toBe('debole');
-  });
-
-  it('refuso nel cognome → giallo, non sparisce (Giuseppe Buraski)', () => {
-    expect(classificaHit('Giuseppe Buraski', '', c15927)).toBe('debole');
-  });
-
-  it('cognome presente → rosso, in qualunque ordine', () => {
-    expect(classificaHit('Giuseppe Buraschi', '', c15927)).toBe('forte');
-    expect(classificaHit('BURASCHI GIUSEPPE', '', c15927)).toBe('forte');
-  });
-
-  it('cognomi che sono anche nomi non sono nella lista ("Carlo Leone", "Luca Bruno")', () => {
-    for (const c of ['bruno', 'leone', 'martino', 'marino', 'fiore', 'pace', 'vitale', 'gentile', 'santo', 'rocco', 'romano', 'giordano', 'valentino']) {
-      expect(NOMI_PROPRI.has(c)).toBe(false);
-    }
-    expect(classificaHit('Carlo Leone', '', c15927)).toBe('forte');
-    expect(classificaHit('Luca Bruno', '', rec('furto timbro del Dr. BRUNO Mario'))).toBe('forte');
-  });
-
-  it('cognome composto: dopo di/de/d\'/del/della/lo/la è cognome, non nome → rosso', () => {
-    expect(classificaHit('Gianmarco Di Marco', '', rec('furto ricettario del Dott. DI MARCO, ASL'))).toBe('forte');
-    expect(classificaHit("Mario D'Angelo", '', rec("timbro del Dr. D'ANGELO"))).toBe('forte');
-    expect(classificaHit('Paolo De Luca', '', rec('ricette del Dr. DE LUCA'))).toBe('forte');
-  });
-
-  it('solo nomi propri digitati → rosso come oggi ("Giuseppe", "Calogero Piazza")', () => {
-    expect(classificaHit('Giuseppe', '', c15927)).toBe('forte');
-    const c15599 = rec('FURTO del ricettario SSN del Dr. PIAZZA CALOGERO, medico di medicina generale.');
-    expect(classificaHit('Calogero Piazza', '', c15599)).toBe('forte');
-  });
-
-  it('farmaco in comune → sempre rosso', () => {
-    expect(classificaHit('Giuseppe Verdiani', 'Minias gocce', rec('Dr. ROSSI GIUSEPPE, prescrizione di MINIAS gocce'))).toBe('forte');
-  });
-
-  it('"Dr.ssa" non conta come cognome ("ssa" è stopword)', () => {
-    expect(STOPWORDS_FOFI.has('ssa')).toBe(true);
-    expect(classificaHit('Dr.ssa Maria Verdi', '', rec('furto ricettario della Dr.ssa ROSSI MARIA'))).toBe('debole');
-  });
-
-  it('lista nomi: normalizzata, niente stopword', () => {
-    for (const n of NOMI_PROPRI) {
-      expect(n).toBe(normalize(n));
-      expect(STOPWORDS_FOFI.has(n)).toBe(false);
-    }
-  });
-});
-
-// Regressione sulla banca dati reale: il nome completo di un medico segnalato
-// deve dare ROSSO sulla sua voce (mai giallo). L'insieme delle corrispondenze
-// non cambia per costruzione (classificaHit cambia solo il colore).
-describe('classificaHit — regressione su fofi-db.js', () => {
-  const ctx = {};
-  vm.createContext(ctx);
-  vm.runInContext(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../fofi-db.js'), 'utf8') + ';globalThis.D=FOFI_DB;', ctx);
-  const RE_NOME = /\b(?:Dr|Dott)\.?(?:ssa|\.ssa)?\.?\s*((?:[A-ZÀ-Ý][A-ZÀ-Ý'’]+\s*){1,3})/g;
-  const casi = [];
-  for (const r of ctx.D) {
-    for (const m of r.tx.matchAll(RE_NOME)) casi.push([r, m[1].trim()]);
-    for (const m of r.m || []) casi.push([r, m]);
-  }
-
-  it('estrae abbastanza nomi da essere significativa', () => {
-    expect(casi.length).toBeGreaterThan(100);
-  });
-
-  it('nome completo presente nella voce → mai giallo', () => {
-    const gialli = casi.filter(([r, nome]) => {
-      const tok = tokenize(nome);
-      if (!tok.length || !tok.every(t => haystackTokens(r).has(t))) return false;
-      return classificaHit(nome, '', r) !== 'forte';
-    }).map(([r, nome]) => `${r.n ?? r.src}: ${nome}`);
-    expect(gialli).toEqual([]);
   });
 });

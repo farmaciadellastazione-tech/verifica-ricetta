@@ -35,8 +35,7 @@ const STOPWORDS_FOFI = new Set([
   'nato','nata','anni','anno','servizio','reparto','unita','operativa','operativo',
   'farmaco','farmaci','specialita','medicinale','medicinali','nome','cognome',
   'paziente','intestata','intestato','firmata','firmato','timbrata','timbrato',
-  'centro','sede','dipartimento','direzione','sanitaria','sanitario',
-  'ssa' // da "Dr.ssa" / "Dott.ssa": frammento di titolo, non un cognome
+  'centro','sede','dipartimento','direzione','sanitaria','sanitario'
 ]);
 
 // ── Normalizzazione e tokenizzazione ─────────────────────────────────────
@@ -81,76 +80,6 @@ function scoreMatch(tokens, record) {
   return { score, matchedTokens };
 }
 
-// ── Avviso giallo "possibile omonimia" ──────────────────────────────────
-
-// Nomi di battesimo italiani comuni (normalizzati). Servono SOLO a decidere il
-// colore di una corrispondenza (classificaHit), mai a scartarla. Esclusi apposta
-// i nomi che sono anche cognomi diffusi (Bruno, Leone, Martino, Marino, Fiore,
-// Pace, Vitale, Gentile, Santo, Rocco, Romano, Giordano, Valentino…).
-const NOMI_PROPRI = new Set([
-  // maschili
-  'giuseppe','giovanni','antonio','mario','francesco','luigi','angelo','vincenzo','pietro',
-  'salvatore','carlo','franco','domenico','paolo','michele','giorgio','roberto','stefano',
-  'alessandro','andrea','marco','luca','matteo','lorenzo','davide','simone','federico',
-  'riccardo','gabriele','emanuele','daniele','fabio','massimo','maurizio','claudio','sergio',
-  'enrico','alberto','alfredo','raffaele','nicola','gianni','giancarlo','gianluca',
-  'gianfranco','giampaolo','gianpaolo','pierluigi','piero','renato','sandro','silvio',
-  'tommaso','umberto','valerio','vittorio','walter','aldo','alessio','antonino','armando',
-  'arturo','attilio','cesare','ciro','cristian','christian','dario','diego','edoardo','elia',
-  'emilio','enzo','ernesto','ettore','fabrizio','filippo','flavio','gaetano','giacomo','gino',
-  'giulio','giuliano','guido','ivan','jacopo','leonardo','lucio','luciano','manuel',
-  'marcello','mattia','mauro','michelangelo','mirko','nicolo','nino','oreste','orazio',
-  'osvaldo','pasquale','patrizio','raimondo','rosario','ruggero','samuele','sebastiano',
-  'silvano','tiziano','tullio','vito','carmelo','calogero','gennaro','girolamo','ignazio',
-  'nunzio','saverio','teodoro','adriano','agostino','alfonso','amedeo','beniamino','corrado',
-  'cosimo','damiano','donato','eugenio','fausto','ferdinando','fulvio','graziano','livio',
-  'massimiliano','nazario','ottavio','rodolfo','romeo','severino','virgilio',
-  // femminili
-  'maria','anna','giuseppina','rosa','angela','giovanna','teresa','lucia','carmela',
-  'caterina','francesca','antonietta','carla','elena','rita','paola','laura','sara','giulia',
-  'chiara','martina','valentina','alessandra','federica','silvia','simona','elisa','claudia',
-  'cristina','roberta','barbara','monica','daniela','patrizia','stefania','sabrina',
-  'manuela','emanuela','michela','raffaella','serena','veronica','alice','giorgia','ilaria',
-  'irene','marta','beatrice','eleonora','aurora','sofia','gaia','noemi','arianna','camilla',
-  'debora','deborah','erica','erika','fabiola','gabriella','graziella','lorena','loredana',
-  'luisa','marisa','mirella','nadia','nicoletta','ornella','rossana','sonia','tiziana',
-  'vanessa','viviana','adele','agnese','annalisa','antonella','assunta','benedetta',
-  'carolina','cinzia','concetta','donatella','emma','enrica','filomena','franca','grazia',
-  'immacolata','ivana','lidia','luciana','margherita','mariangela','mariella','matilde',
-  'nunzia','rachele','rebecca','rosanna','rosaria','rossella','sandra','silvana','susanna',
-  'vincenza','verdiana','carmen','lucrezia','annamaria',
-]);
-
-// Particelle dei cognomi composti: la parola dopo è cognome anche se è un nome
-// ("Di Marco", "De Luca", "D'Angelo", "Lo Russo").
-const PARTICELLE_COGNOME = new Set(['di','de','d','del','della','dello','dei','degli','delle','da','dal','dalla','lo','la','li','le']);
-
-// Token che nell'input seguono una particella: valgono come cognome.
-function tokenCognomeComposto(s) {
-  const parole = normalize(s).split(' ');
-  const out = new Set();
-  for (let i = 1; i < parole.length; i++) if (PARTICELLE_COGNOME.has(parole[i - 1])) out.add(parole[i]);
-  return out;
-}
-
-// Colore di una corrispondenza FOFI già trovata (score ≥ soglia):
-//   'debole' (avviso giallo, possibile omonimia) se in comune ci sono SOLO nomi
-//            di battesimo, nessun farmaco, e nel campo medico è stato digitato
-//            anche un cognome che nella voce non c'è;
-//   'forte'  (banner rosso) in tutti gli altri casi. Nel dubbio: 'forte'.
-// Non scarta mai nulla: l'insieme delle corrispondenze resta quello di scoreMatch.
-function classificaHit(medico, farmaco, record) {
-  const ht = haystackTokens(record);
-  if (tokenize(farmaco).some(t => ht.has(t))) return 'forte';
-  const tokM = tokenize(medico);
-  const cognomiComposti = tokenCognomeComposto(medico);
-  const eNome = t => NOMI_PROPRI.has(t) && !cognomiComposti.has(t);
-  const inComune = tokM.filter(t => ht.has(t));
-  if (!inComune.length || inComune.some(t => !eNome(t))) return 'forte';
-  // solo nomi propri in comune: giallo solo se c'è un cognome digitato (assente)
-  return tokM.some(t => !eNome(t)) ? 'debole' : 'forte';
-}
-
 // ── Scadenza ricetta ─────────────────────────────────────────────────────
 
 // Default conservativo 30 giorni (SSN non ripetibile, bianca non ripetibile,
@@ -180,9 +109,6 @@ function fofiRiferimento(rec) {
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _exports = {
-  STOPWORDS_FOFI, NOMI_PROPRI, normalize, tokenize, haystackTokens, scoreMatch, classificaHit,
-  calcolaScadenza, fofiRiferimento,
-};
+const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
