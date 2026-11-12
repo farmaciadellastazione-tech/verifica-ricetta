@@ -130,14 +130,42 @@ jobs:
         if: steps.build.outputs.changed == 'true' && !inputs.dry_run
         env:
           GH_TOKEN: ${{ github.token }}
+        # Subito dopo il force-push GitHub non ha ancora calcolato la mergeabilità
+        # e il merge della PR viene rifiutato (dal 6/11 la PR #19 è rimasta
+        # bloccata su "Checking for the ability to merge automatically").
+        # Quindi: attesa del calcolo, merge della PR e, se GitHub lo rifiuta
+        # comunque, merge diretto del branch su dev (la PR risulta chiusa come
+        # mergiata). Niente `curl -f`: in caso di errore si stampa la risposta.
         run: |
           set -e
           REPO="${{ github.repository }}"
-          curl -sf -X PUT -H "Authorization: Bearer $GH_TOKEN" \
+          PR="${{ steps.pr_dev.outputs.pr_number }}"
+          API="https://api.github.com/repos/$REPO"
+          AUTH="Authorization: Bearer $GH_TOKEN"
+          for i in $(seq 1 10); do
+            # risposta non JSON (5xx, rate limit): si riprova, senza far cadere lo step
+            M=$(curl -s -H "$AUTH" "$API/pulls/$PR" | jq -r '.mergeable' 2>/dev/null || echo null)
+            [ "$M" != "null" ] && break
+            sleep 3
+          done
+          echo "Mergeabilità PR #$PR: $M"
+          CODE=$(curl -s -o "$RUNNER_TEMP/merge.out" -w '%{http_code}' -X PUT -H "$AUTH" \
             -H "Content-Type: application/json" \
-            "https://api.github.com/repos/$REPO/pulls/${{ steps.pr_dev.outputs.pr_number }}/merge" \
-            -d '{"merge_method":"merge"}'
-          echo "PR #${{ steps.pr_dev.outputs.pr_number }} mergiata in dev."
+            "$API/pulls/$PR/merge" -d '{"merge_method":"merge"}' || true)
+          if [ "$CODE" = "200" ]; then
+            echo "PR #$PR mergiata in dev."
+            exit 0
+          fi
+          echo "Merge della PR rifiutato (HTTP $CODE): $(cat "$RUNNER_TEMP/merge.out")"
+          CODE=$(curl -s -o "$RUNNER_TEMP/merge.out" -w '%{http_code}' -X POST -H "$AUTH" \
+            -H "Content-Type: application/json" \
+            "$API/merges" \
+            -d "{\"base\":\"dev\",\"head\":\"auto/fofi-update\",\"commit_message\":\"Merge PR #$PR: FOFI nuove segnalazioni [auto]\"}" || true)
+          case "$CODE" in
+            201) echo "auto/fofi-update mergiato direttamente in dev (PR #$PR)." ;;
+            204) echo "dev contiene già auto/fofi-update." ;;
+            *) echo "::error::merge in dev fallito (HTTP $CODE): $(cat "$RUNNER_TEMP/merge.out")"; exit 1 ;;
+          esac
 
       - name: Deploy automatico dev → main (produzione)
         if: steps.build.outputs.changed == 'true' && !inputs.dry_run

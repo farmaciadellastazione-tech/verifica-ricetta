@@ -7,7 +7,8 @@
 //      (formato storico, sospeso dall'Ordine il 3/11/2026: resta per retrocompatibilità)
 //   2. PDF delle singole circolari FOFI linkati nelle mail dell'Ordine (fofiruf.it)
 //   3. inoltri singoli di Federfarma La Spezia (allegato PDF/docx, senza numero FOFI)
-//   Le voci di 2 e 3 vanno in output.json ({aggiornata, entries}), da applicare con
+//   4. avvisi dell'Ordine nel corpo mail (segnalazione di una farmacia, senza PDF né numero)
+//   Le voci di 2, 3 e 4 vanno in output.json ({aggiornata, entries}), da applicare con
 //   tools/apply-fofi-entries.mjs. Servono `pdftotext`/`pdftoppm` (poppler-utils), `unzip`
 //   e `tesseract` con lingua ita (OCR delle scansioni ATSL) nel PATH.
 //
@@ -33,7 +34,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { formatEmailDate } = require(resolve(ROOT, 'fofi-xlsx.js'));
 const {
   extractPdfLinks, circolarePdfToEntry, isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText,
-  testoInsufficiente, serveRilettura,
+  testoInsufficiente, serveRilettura, isAvvisoOrdine, ordineAvvisoEntry,
 } = require(resolve(ROOT, 'fofi-avvisi.js'));
 
 const GIORNI_XLSX = 30; // Excel sospeso dal 3/11/2026: non riscaricare quello vecchio per mesi
@@ -227,6 +228,28 @@ async function cercaFederfarma(client, known, tmp) {
   return out;
 }
 
+// 4. Avvisi dell'Ordine con il testo nel corpo mail (nessun PDF, nessun numero).
+async function cercaAvvisiOrdine(client, known) {
+  const out = [];
+  const uids = await client.search({ from: 'fofiruf.it', since: giorniFa(GIORNI_AVVISI) }, { uid: true });
+  for (const uid of uids || []) {
+    const parsed = await scaricaMail(client, uid);
+    const subject = (parsed.subject || '').trim();
+    const key = parsed.messageId || '';
+    if (!key || known.chiavi.has(key) || !isAvvisoOrdine(subject)) continue;
+    // Con link a PDF e nessun testo tra virgolette è un inoltro di circolari
+    // (lo gestisce cercaPdfCircolari); con l'avviso nel corpo si prende comunque,
+    // anche se in allegato c'è un PDF (es. la denuncia).
+    if (extractPdfLinks(parsed.html || parsed.textAsHtml || '').length &&
+        !/"[^"]{40,}"|“[^”]{40,}”|«[^»]{40,}»/.test(parsed.text || '')) continue;
+    const date = formatEmailDate(parsed.date?.toUTCString() || '');
+    known.chiavi.add(key);
+    out.push({ entry: ordineAvvisoEntry({ subject, text: parsed.text || '', date, key }), date: parsed.date });
+    console.log(`+ Ordine SP ${date}: ${subject}`);
+  }
+  return out;
+}
+
 async function main() {
   const OUT = process.argv[2] || '.fofi-incoming.xlsx';
   const JSON_OUT = OUT.replace(/\.xlsx$/i, '') + '.json';
@@ -259,6 +282,7 @@ async function main() {
       const trovate = [
         ...await cercaPdfCircolari(client, known, tmp),
         ...await cercaFederfarma(client, known, tmp),
+        ...await cercaAvvisiOrdine(client, known),
       ];
       if (trovate.length) {
         const nuove = trovate.filter(t => !t.rilettura);
@@ -270,7 +294,7 @@ async function main() {
           entries: nuove.map(t => t.entry),
           riletture: trovate.filter(t => t.rilettura).map(t => t.entry),
         }, null, 1));
-        console.log(`${trovate.length} voci da PDF/Federfarma (di cui riletture OCR: ${trovate.length - nuove.length}) -> ${JSON_OUT}`);
+        console.log(`${trovate.length} voci da PDF/Federfarma/Ordine (di cui riletture OCR: ${trovate.length - nuove.length}) -> ${JSON_OUT}`);
       } else {
         console.log('Nessuna circolare PDF o inoltro Federfarma nuovo.');
       }

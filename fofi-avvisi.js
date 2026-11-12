@@ -31,12 +31,30 @@ function pulisciRighe(s) {
     .filter(Boolean).join('\n');
 }
 
+// Testo "piatto": gli a capo dentro un paragrafo diventano spazi. Serve perché
+// pdftotext di poppler (in CI) spezza le righe come sulla pagina, mentre Xpdf
+// (in locale) mette ogni paragrafo su una riga: le regex non devono dipendere
+// dall'impaginazione. Restano gli a capo doppi (fine blocco) e quelli prima di
+// un bullet, così gli elenchi puntati restano una voce per riga.
+function appiattisci(s) {
+  return String(s || '').replace(/\f/g, '\n\n')
+    .replace(/(?<!\n)[ \t]*\n(?![ \t]*\n)(?![ \t]*[•])[ \t]*/g, ' ');
+}
+
+// Oggetto della circolare: dopo "Segnalazione urgente:" fino al numero di
+// circolare (solo se chiude la riga: un CAP come 16121 nel testo non conta),
+// all'inizio del corpo ("Si informa"), alla data "Roma, gg/mm/aaaa" o a fine blocco.
+const FINE_OGGETTO = /(?=\s+(?:1[5-9]\d{3}[ \t]*(?:\n|$)|Si informa|Roma,\s*\d{1,2}\/\d{1,2}\/\d{4}|Circolare n\.|e p\.c\.)|\n\n|$)/;
+// Fine del corpo: "Si chiede" maiuscolo a inizio frase (dopo un punto o a capo);
+// un "si chiede" minuscolo dentro il testo della segnalazione non conta.
+const FINE_CORPO = /(?<=\.)\s+Si chiede\b|\n\s*Si chiede\b/;
+
 // Testo di una circolare FOFI (output pdftotext) -> voce {n,t,tx} o null se la
 // circolare non è una segnalazione (corsi, note operative...) o se manca il numero.
 // nHint: numero ricavato dal nome file del link ("16132.pdf"), ha la precedenza.
 function circolarePdfToEntry(text, nHint) {
   const s = String(text || '').replace(/\r/g, '');
-  if (!/Segnalazione urgente/i.test(s)) return null;
+  if (!/Segnalazione\s+urgente/i.test(s)) return null;
 
   let n = Number.isInteger(nHint) ? nHint : null;
   if (n == null) {
@@ -47,9 +65,32 @@ function circolarePdfToEntry(text, nHint) {
   }
   if (n == null) return null;
 
-  const oggetti = [...s.matchAll(/Segnalazione urgente:\s*([^\n]+)/gi)].map(m => m[1]).join('\n');
-  const corpo = s.match(/segnalazione relativa\s+([\s\S]*?)\n\s*Si chiede/i);
-  let tx = corpo ? corpo[1].replace(/^(a|al|alla|allo|ai|alle|agli)\b\s*:?\s*/i, '') : oggetti;
+  const flat = appiattisci(s);
+  const reOggetto = new RegExp('Segnalazione urgente:\\s*([\\s\\S]*?)' + FINE_OGGETTO.source, 'gi');
+  const visti = new Set();
+  const oggetti = [...flat.matchAll(reOggetto)].map(m => m[1].trim())
+    .filter(o => {
+      const k = o.replace(/\.$/, '').toLowerCase();
+      if (!o || visti.has(k)) return false;
+      visti.add(k);
+      return true;
+    }).join('\n');
+
+  // Corpo: da "segnalazione relativa" (toglie il preambolo "la scrivente
+  // Federazione ha ricevuto...") oppure, se manca, da "Si informa che"; fino a
+  // "Si chiede". Senza fine riconoscibile si resta sull'oggetto.
+  let tx = oggetti;
+  const rel = flat.match(/segnalazione relativa\s+/i);
+  const inf = flat.match(/Si informa che\s+/i);
+  const inizio = rel || inf;
+  if (inizio) {
+    const resto = flat.slice(inizio.index + inizio[0].length);
+    const fine = resto.search(FINE_CORPO);
+    if (fine >= 0) {
+      tx = resto.slice(0, fine);
+      if (rel) tx = tx.replace(/^(a|al|alla|allo|ai|alle|agli)\b\s*:?\s*/i, '');
+    }
+  }
   tx = pulisciRighe(tx);
 
   let t = tipiDaTesto(oggetti);
@@ -167,6 +208,60 @@ function federfarmaEntry({ subject, text, ocr, date, key }) {
   return e;
 }
 
+// ── Avvisi dell'Ordine SP nel corpo mail (dal 12/11/2026) ──
+// L'Ordine inoltra anche segnalazioni di singole farmacie ("Segnalazione
+// possibile ricetta falsificata"): niente PDF, niente numero di circolare, il
+// testo dell'avviso è tra virgolette nel corpo. Le circolari FOFI ("Circolare/i
+// FOFI nr. …") e la vecchia mail dell'Excel ("Segnalazioni urgenti FOFI") hanno
+// già il loro canale e vanno escluse.
+function isAvvisoOrdine(subject) {
+  const s = String(subject || '').toLowerCase().replace(/\s+/g, ' ');
+  if (/circolar|segnalazioni urgenti fofi|corso|ecm\b/.test(s)) return false;
+  return /segnalaz/.test(s) && /ricett|falsific|timbr|furt|smarrim/.test(s);
+}
+
+const MAX_TX_ORDINE = 1500;
+// Fine del testo utile: saluti / ringraziamenti oppure, se mancano, firma,
+// recapiti e disclaimer dell'Ordine.
+const FINE_AVVISO_ORDINE = /[;,.]?\s*(?:ringrazi|cordiali saluti|distinti saluti|si porgono|funzionario|\b(?:tel|cell|pec|mail)\b\s*[:.]?\s*[\w\d]|avvertenza di riservatezza)/i;
+// Preambolo dell'Ordine fino ai due punti ("…avviso da parte della Dott.ssa X,
+// della Farmacia Y, del quale si prega di prendere buona nota :").
+const PREAMBOLO_ORDINE = /^[\s\S]{0,400}?(?:buona nota|seguente avviso|si trasmette[^:]{0,200}|si riceve[^:]{0,200})\s*:\s*/i;
+// Testo tra virgolette ("", “”, «»): matchAll scorre le coppie in ordine, così
+// non si cattura mai il testo tra la chiusura di una coppia e l'apertura della successiva.
+const VIRGOLETTE = /"([^"]*)"|“([^”]*)”|«([^»]*)»/g;
+// PRIVACY: iniziali del paziente ("iniziali X. Y.", "Iniziali: X.Y.", "(X. Y.)").
+const INIZIALI = /\s*\(?\s*\binizial[ei]\b\s*:?\s*(?:[A-Za-z]\s*\.\s*){1,3}\)?|\s*\(\s*(?:[A-Z]\s*\.\s*){1,3}\)/gi;
+
+// Voce senza numero per un avviso dell'Ordine. `text` è il corpo in testo
+// semplice. Si tiene SOLO il testo tra virgolette (l'avviso vero): fuori ci
+// sono il nome della farmacista segnalante, il funzionario e i recapiti, che
+// farebbero scattare il banner per omonimia. PRIVACY: via le iniziali del
+// paziente (fofi-db.js è pubblico).
+function ordineAvvisoEntry({ subject, text, date, key }) {
+  const sogg = String(subject || '').replace(/\s+/g, ' ').trim();
+  const corpo = String(text || '').replace(/\|/g, ' ').replace(/\s+/g, ' ').trim();
+  // Il passaggio tra virgolette più lungo è l'avviso (quelli brevi sono nomi
+  // di farmacie, titoli...). Se è troppo corto si ricade sul corpo.
+  const citati = [...corpo.matchAll(VIRGOLETTE)].map(m => (m[1] ?? m[2] ?? m[3]).trim());
+  let avviso = citati.sort((a, b) => b.length - a.length)[0] || '';
+  if (avviso.length < 40) {
+    avviso = corpo.replace(PREAMBOLO_ORDINE, '').replace(/^gent\.?\w*\s*,?\s*/i, '');
+    const fine = avviso.search(FINE_AVVISO_ORDINE);
+    if (fine >= 0) {
+      // senza saluti, prima di "Funzionario"/recapiti c'è il nome del firmatario:
+      // via le parole maiuscole dopo l'ultima fine frase (mai dentro una frase,
+      // per non togliere il nome di un medico)
+      avviso = avviso.slice(0, fine).replace(/([.;:!?])(?:\s+[A-ZÀ-Ý][\wà-ÿ'’]*){1,3}\s*$/, '$1');
+    }
+  }
+  avviso = avviso.replace(INIZIALI, '').trim().slice(0, MAX_TX_ORDINE);
+  const tx = avviso ? sogg + '\n' + avviso : sogg;
+  let t = tipiDaTesto(tx);
+  if (!t.length) t = ['F'];
+  return { n: null, t, tx, m: [], f: [], src: 'Ordine SP', d: date || '', k: key || '' };
+}
+
 // word/document.xml di un .docx -> testo semplice (un paragrafo per riga).
 function docxXmlToText(xml) {
   const s = String(xml || '')
@@ -242,6 +337,7 @@ const _exports = {
   testoInsufficiente, serveRilettura, applicaRiletture,
   dataPiuRecente, tipiDaTesto, circolarePdfToEntry, extractPdfLinks,
   isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa,
+  isAvvisoOrdine, ordineAvvisoEntry,
 };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;

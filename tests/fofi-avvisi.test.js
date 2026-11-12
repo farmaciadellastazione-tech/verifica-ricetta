@@ -6,6 +6,7 @@ import {
   circolarePdfToEntry, tipiDaTesto, extractPdfLinks,
   isFederfarmaSegnalazione, federfarmaEntry, docxXmlToText, giorniDa, dataPiuRecente,
   testoInsufficiente, serveRilettura, applicaRiletture,
+  isAvvisoOrdine, ordineAvvisoEntry,
 } from '../fofi-avvisi.js';
 
 const FIX = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -41,6 +42,23 @@ describe('circolarePdfToEntry — PDF circolare FOFI → voce FOFI_DB', () => {
     expect(e.tx).not.toMatch(/•/);
   });
 
+  it('16141: corpo con medico e farmaco (non solo l\'oggetto)', () => {
+    const e = circolarePdfToEntry(txt(16141), 16141);
+    expect(e.n).toBe(16141);
+    expect(e.t).toEqual(['F', 'T']);
+    expect(e.tx).toMatch(/ANDREA CANTATORE/);
+    expect(e.tx).toMatch(/MOUNJARO/);
+    expect(e.tx).not.toMatch(/Si chiede ai Presidenti/);
+  });
+
+  it('16142: corpo senza "segnalazione relativa" → testo da "Si informa che"', () => {
+    const e = circolarePdfToEntry(txt(16142), 16142);
+    expect(e.n).toBe(16142);
+    expect(e.tx).toMatch(/ALBERTO BRUSA/);
+    for (const f of ['MOUNJARO', 'LYRICA', 'DEPALGOS']) expect(e.tx).toMatch(f);
+    expect(e.tx).not.toMatch(/Si chiede ai Presidenti/);
+  });
+
   it('il numero suggerito (nome file "16132.pdf") ha la precedenza', () => {
     expect(circolarePdfToEntry(txt(16132), 16132).n).toBe(16132);
   });
@@ -52,6 +70,69 @@ describe('circolarePdfToEntry — PDF circolare FOFI → voce FOFI_DB', () => {
 
   it('nessun numero ricavabile → null (non si inventano voci senza n)', () => {
     expect(circolarePdfToEntry('Segnalazione urgente: furto timbro del Dr. X. relativa al furto del timbro. Si chiede')).toBeNull();
+  });
+});
+
+// In CI pdftotext è poppler-utils, che spezza le righe come sulla pagina; le
+// fixture sopra sono di Xpdf (in locale), che mette ogni paragrafo su una riga.
+// Simuliamo l'a capo di poppler: il risultato non deve dipendere dall'impaginazione.
+function aCapoPoppler(s, larghezza = 70) {
+  return s.replace(/\r/g, '').split('\n').map(riga => {
+    const out = [];
+    let cur = '';
+    for (const w of riga.split(' ')) {
+      if (cur && (cur + ' ' + w).length > larghezza) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w;
+    }
+    out.push(cur);
+    return out.join('\n');
+  }).join('\n');
+}
+
+describe('circolarePdfToEntry — righe spezzate (output poppler, come in CI)', () => {
+  for (const [n, attesi] of [
+    [16132, ['STRACI EMANUELE', 'DEPALGOS']],
+    [16141, ['ANDREA CANTATORE', 'MOUNJARO']],
+    [16142, ['ALBERTO BRUSA', 'MOUNJARO', 'LYRICA', 'DEPALGOS']],
+    [16130, ['QUADRELLI VERDIANA SERENA', 'FERRARO MARGHERITA', 'ANIBAN LEO']],
+  ]) {
+    it(`${n}: stessi nomi e farmaci nel tx anche con righe spezzate`, () => {
+      const e = circolarePdfToEntry(aCapoPoppler(txt(n)), n);
+      expect(e.n).toBe(n);
+      for (const a of attesi) expect(e.tx).toMatch(a);
+      expect(e.tx).not.toMatch(/Si chiede ai Presidenti/);
+      expect(e.tx).not.toMatch(/•/);
+    });
+  }
+
+  it('stessi tipi F/T con e senza righe spezzate', () => {
+    for (const n of [16130, 16132, 16135, 16141, 16142]) {
+      expect(circolarePdfToEntry(aCapoPoppler(txt(n)), n).t).toEqual(circolarePdfToEntry(txt(n), n).t);
+    }
+  });
+
+  it('corpo con "segnalazione relativa" anche senza "Si informa che"', () => {
+    const s = 'Circolare n.\n16200\nSegnalazione urgente: falsificazione ricette Dr. MARIO ROSSI.\n\nSi comunica che è pervenuta segnalazione relativa al Dr. MARIO ROSSI per le specialità OXYCONTIN.\nSi chiede ai Presidenti di Ordine';
+    expect(circolarePdfToEntry(s, 16200).tx).toMatch(/OXYCONTIN/);
+  });
+
+  it('"si chiede" minuscolo dentro il corpo non lo tronca', () => {
+    const s = 'Circolare n.\n16201\nSegnalazione urgente: ricette\n\nSi informa che la scrivente Federazione ha ricevuto una segnalazione relativa al Dr. MARIO ROSSI, per cui si chiede attenzione, per le specialità OXYCONTIN e LYRICA.\nSi chiede ai Presidenti di Ordine';
+    const tx = circolarePdfToEntry(s, 16201).tx;
+    expect(tx).toMatch(/OXYCONTIN/);
+    expect(tx).toMatch(/LYRICA/);
+  });
+
+  it('oggetto: "Roma," o un CAP nel testo non lo troncano', () => {
+    const a = circolarePdfToEntry('Circolare n.\n16202\nSegnalazione urgente: furto ricettario ASL Roma, Dr. MARIO ROSSI.\n\ne p.c.', 16202);
+    expect(a.tx).toMatch(/MARIO ROSSI/);
+    const b = circolarePdfToEntry('Circolare n.\n16203\nSegnalazione urgente: furto timbro Dr. MARIO ROSSI via Roma 1 16121 Genova e Dr. LUCA BIANCHI.\n\ne p.c.', 16203);
+    expect(b.tx).toMatch(/LUCA BIANCHI/);
+  });
+
+  it('oggetto spezzato a fine riga: il cognome non si perde (caso 16144)', () => {
+    const s = 'Circolare n.\n16144\nSegnalazione urgente: falsificazione ricette a nome del Dr. VINCENZO\nROSSI.\n\nSi chiede ai Presidenti di Ordine';
+    const e = circolarePdfToEntry(s, 16144);
+    expect(e.tx).toMatch(/VINCENZO ROSSI/);
   });
 });
 
@@ -128,6 +209,100 @@ describe('federfarmaEntry — voce senza numero, con chiave di deduplica', () =>
   });
   it('tipo non deducibile → F (prudenziale: mai voce senza tipo)', () => {
     expect(federfarmaEntry({ subject: 'Furto dr Rossi', text: '', date: '01/11/2026', key: 'k2' }).t.length).toBeGreaterThan(0);
+  });
+});
+
+// ── Avvisi dell'Ordine SP nel corpo mail (dal 12/11/2026): segnalazione di una
+// farmacia inoltrata dall'Ordine, senza PDF né numero di circolare. Testo
+// anonimizzato (il repo è pubblico): stessa struttura della mail reale.
+const AVVISO_ORDINE = '| |\n\n| |\n| Gent.mi, si riceve e trasmette il seguente avviso da parte della Dottoressa Rossi, della Farmacia Esempio, del quale si prega di prendere buona nota : " Con la presente si intende segnalare che, in data recente, si è presentata presso la farmacia un’utente (iniziali X. Y.) munita di una ricetta bianca per i farmaci Depalgos 20 mg + 325 mg e Minias gocce, apparentemente prescritta dal reparto di Psichiatria dell\'Ospedale di Pisa. Sul momento non è stata effettuata l\'erogazione dei medicinali richiesti dall\' utente, e si è provveduto a contattare telefonicamente la struttura ospedaliera, la quale ha confermato di avere avuto in carico la paziente ma ha smentito di aver emesso tale prescrizione " ; ringraziandovi per l\'attenzione e restando a disposizione si porgono Cordiali saluti. Mario Bianchi Funzionario giuridico amministrativo Ordine dei Farmacisti della Provincia della Spezia tel 0187 000000 – cell 300-0000000 Mail : mail@example.it AVVERTENZA DI RISERVATEZZA La presente e-mail, nonché ogni eventuale allegato, è destinata esclusivamente ai soggetti indicati |';
+
+describe('isAvvisoOrdine — avviso dell\'Ordine SP senza circolare', () => {
+  it('segnalazione di ricetta falsificata → sì', () => {
+    expect(isAvvisoOrdine('IMPORTANTE : Segnalazione possibile  ricetta falsificata')).toBe(true);
+    expect(isAvvisoOrdine('Segnalazione furto timbro Dr. Rossi')).toBe(true);
+  });
+
+  it('circolari FOFI, vecchio Excel cumulativo e altri temi → no', () => {
+    expect(isAvvisoOrdine('IMPORTANTE : Segnalazioni  urgenti FOFI- ASL 5   falsificazione ricette/smarrimento timbro/smarrimento buoni acquisto')).toBe(false);
+    expect(isAvvisoOrdine('Circolari FOFI nr. 16141-16142 :  COMUNICAZIONI FURTI/SMARRIMENTI/FALSIFICAZIONI.')).toBe(false);
+    expect(isAvvisoOrdine('Circolare FOFI nr. 16133  : Commissione Federale per la Medicina di Genere')).toBe(false);
+    expect(isAvvisoOrdine('Corso ECM: segnalazione reazioni avverse')).toBe(false);
+  });
+});
+
+describe('ordineAvvisoEntry — voce senza numero dal corpo mail', () => {
+  const e = ordineAvvisoEntry({
+    subject: 'IMPORTANTE : Segnalazione possibile  ricetta falsificata',
+    text: AVVISO_ORDINE, date: '12/11/2026', key: '<abc@fofiruf.it>',
+  });
+
+  it('n null, fonte Ordine SP, data e chiave di deduplica', () => {
+    expect(e.n).toBeNull();
+    expect(e.src).toBe('Ordine SP');
+    expect(e.d).toBe('12/11/2026');
+    expect(e.k).toBe('<abc@fofiruf.it>');
+    expect(e.t).toEqual(['F']);
+  });
+
+  it('nel tx il testo della segnalazione (farmaci, reparto, ospedale)', () => {
+    for (const s of ['Depalgos', 'Minias', 'Psichiatria', 'Ospedale di Pisa']) expect(e.tx).toMatch(s);
+  });
+
+  it('niente dati personali né firme/disclaimer (fofi-db.js è pubblico)', () => {
+    expect(e.tx).not.toMatch(/iniziali|X\. Y\./);
+    // nomi fuori dalle virgolette: farmacista segnalante e funzionario dell'Ordine
+    expect(e.tx).not.toMatch(/Rossi|Bianchi|Farmacia Esempio/);
+    expect(e.tx).not.toMatch(/Cordiali|AVVERTENZA|@|0187/);
+  });
+
+  it('virgolette brevi prima dell\'avviso: si prende il passaggio tra virgolette, non il testo in mezzo', () => {
+    const s = ordineAvvisoEntry({
+      subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k3>',
+      text: 'avviso della "Farmacia Esempio" della Dottoressa Rossi Maria del quale si prega di prendere buona nota : "Con la presente si segnala una ricetta falsa di Rivotril gocce a nome del Dr. Verdi Luca." Cordiali saluti',
+    });
+    expect(s.tx).toMatch(/Rivotril/);
+    expect(s.tx).not.toMatch(/Rossi Maria/);
+  });
+
+  it('virgolette italiane «»: niente preambolo né firma/recapiti', () => {
+    const s = ordineAvvisoEntry({
+      subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k4>',
+      text: 'si trasmette avviso della Dottoressa Rossi Maria: «Ricetta falsa di Rivotril gocce a nome del Dr. Verdi Luca, ASL 5.» Mario Bianchi tel 0187 000000 mail a@b.it',
+    });
+    expect(s.tx).toMatch(/Rivotril/);
+    expect(s.tx).not.toMatch(/Rossi Maria|Bianchi|0187|@/);
+  });
+
+  it('senza virgolette e senza saluti: niente firma, recapiti, disclaimer', () => {
+    const s = ordineAvvisoEntry({
+      subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k5>',
+      text: 'si trasmette il seguente avviso, del quale si prega di prendere buona nota : ricetta falsa di Rivotril gocce a nome del Dr. Verdi Luca. Mario Bianchi Funzionario giuridico amministrativo tel 0187 000000 AVVERTENZA DI RISERVATEZZA',
+    });
+    expect(s.tx).toMatch(/Rivotril/);
+    expect(s.tx).toMatch(/Verdi Luca/);
+    expect(s.tx).not.toMatch(/Bianchi|0187|AVVERTENZA/);
+  });
+
+  it('iniziali del paziente in ogni forma → tolte', () => {
+    for (const forma of ['Iniziali X. Y.', 'iniziali: X.Y.', '(X. Y.)', '(iniziali X.Y.)']) {
+      const s = ordineAvvisoEntry({
+        subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k6>',
+        text: `"Si è presentata una paziente ${forma} con ricetta falsa di Rivotril gocce."`,
+      });
+      expect(s.tx).toMatch(/Rivotril/);
+      expect(s.tx).not.toMatch(/X\.\s?Y\./);
+    }
+  });
+
+  it('senza testo tra virgolette: corpo fino ai saluti, senza recapiti', () => {
+    const s = ordineAvvisoEntry({
+      subject: 'Segnalazione ricetta falsificata', date: '12/11/2026', key: '<k2>',
+      text: 'Gent.mi, si segnala una ricetta falsificata di Rivotril gocce a nome del Dr. Verdi Luca, ASL 5. Cordiali saluti. Mario Bianchi tel 0187 000000',
+    });
+    expect(s.tx).toMatch(/Rivotril/);
+    expect(s.tx).toMatch(/Verdi Luca/);
+    expect(s.tx).not.toMatch(/Cordiali|Bianchi|0187/);
   });
 });
 
