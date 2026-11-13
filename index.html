@@ -69,6 +69,14 @@
   .field-row input:focus, .field-row select:focus, .field-row textarea:focus { border-color: var(--teal-400); }
   .field-row textarea { resize: vertical; min-height: 60px; }
 
+  /* Link "Apri le segnalazioni in banca dati" + pannello sopra la ricetta */
+  .fofi-link { display: inline-block; margin-top: 10px; font-family: var(--font); font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: var(--radius); border: 1px solid var(--red-400); background: var(--bg); color: var(--red-800); cursor: pointer; }
+  .bd-overlay { position: fixed; inset: 0; z-index: 1000; background: #F4F2EC; display: none; flex-direction: column; }
+  .bd-overlay.show { display: flex; }
+  .bd-bar { flex: none; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); background: var(--bg); border-bottom: 0.5px solid var(--border-sec); }
+  .bd-back { font-family: var(--font); font-size: 16px; font-weight: 700; padding: 10px 16px; border-radius: var(--radius); border: 0.5px solid var(--teal-100); background: var(--teal-50); color: var(--teal-600); cursor: pointer; }
+  .bd-overlay iframe { flex: 1; width: 100%; border: 0; background: #F4F2EC; }
+
   /* FOFI Alert Banner */
   .fofi-alert { border-radius: var(--radius-lg); border: 2px solid var(--red-400); background: var(--red-50); padding: 1rem 1.25rem; margin-bottom: 1rem; display: none; }
   .fofi-alert.show { display: block; }
@@ -196,7 +204,7 @@
     body { background: #fff; padding: 0; color: #000; font-size: 11pt; }
     .container { max-width: none; margin: 0; padding: 0; }
     .page-header, #api-config, #form-section, .install-btn, .footer,
-    .fofi-alert, .db-badge, .print-hide { display: none !important; }
+    .fofi-alert, .db-badge, .print-hide, .bd-overlay, .fofi-link { display: none !important; }
     .print-only { display: block !important; }
     .results-card { border: 1.5px solid #000; border-radius: 0; box-shadow: none; margin: 0; page-break-inside: avoid; }
     .results-header { background: #fff !important; border-bottom: 1.5px solid #000; padding: 10px 14px; }
@@ -486,7 +494,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 120;
+const APP_BUILD = 121;
 const APP_BUILD_DATE = '13/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -842,9 +850,9 @@ function cercaFOFI() {
     alertDiv.classList.add('show');
     const tipoLabel = { F: 'FALSIFICAZIONE RICETTE', T: 'FURTO/SMARRIMENTO TIMBRO O RICETTARIO', B: 'BUONI ACQUISTO' };
     const mostrate = Math.min(3, fofiHits.length);
-    const altre = fofiTotale > mostrate
-      ? `<div class="fofi-match-tx" style="margin-top:6px;">…e altre ${fofiTotale - mostrate}: <a href="banca-dati.html" target="_blank" rel="noopener">vedi banca dati</a></div>`
-      : '';
+    const altre = (fofiTotale > mostrate
+      ? `<div class="fofi-match-tx" style="margin-top:6px;">…e altre ${fofiTotale - mostrate}</div>`
+      : '') + linkBancaDatiFOFI();
     alertBody.innerHTML = `${plurale(fofiTotale, 'Trovata', 'Trovate')} <strong>${fofiTotale}</strong> ${plurale(fofiTotale, 'segnalazione corrispondente', 'segnalazioni corrispondenti')} nella banca dati circolari FOFI 2025-2026. <strong>Non erogare prima di verifica approfondita.</strong>` +
       fofiHits.slice(0, 3).map(h => {
         const tipoBadges = h.rec.t.map(t => `<span class="fofi-match-tipo ${t}">${tipoLabel[t]||t}</span>`).join('');
@@ -857,6 +865,52 @@ function cercaFOFI() {
     alertDiv.classList.remove('show');
   }
 }
+
+// ─── Banca dati filtrata sulla ricetta (pannello) ─────────────────────
+// I testi del confronto (campi + nomi letti dalla foto) vanno nel # di
+// banca-dati.html (hashFiltroFOFI): restano nel dispositivo, e la pagina
+// rifà cercaVoci sugli stessi testi → stesso elenco dell'avviso.
+function linkBancaDatiFOFI() {
+  if (!fofiTotale) return '';
+  return `<button type="button" class="fofi-link" onclick="apriBancaDatiFOFI()">📖 Apri ${fofiTotale === 1 ? 'la segnalazione' : `le ${fofiTotale} segnalazioni`} in banca dati</button>`;
+}
+
+function apriBancaDatiFOFI() {
+  const medico = document.getElementById('f-medico').value;
+  const farmaco = document.getElementById('f-farmaco').value;
+  const overlay = document.getElementById('bd-overlay');
+  overlay.querySelector('iframe')?.remove();
+  // iframe nuovo con src già impostato prima di inserirlo: il suo caricamento
+  // non aggiunge voci alla cronologia (il "indietro" deve chiudere il pannello).
+  const frame = document.createElement('iframe');
+  frame.title = 'Banca dati FOFI — segnalazioni della ricetta';
+  frame.src = 'banca-dati.html' + hashFiltroFOFI([medico, farmaco, ...fofiDatiFoto]);
+  overlay.appendChild(frame);
+  overlay.classList.add('show');
+  document.body.style.overflow = 'hidden';
+  // Voce in cronologia: il tasto/gesto "indietro" (Android) chiude il pannello
+  // invece di uscire dall'app e perdere il risultato.
+  history.pushState({ bancaDatiFOFI: true }, '');
+}
+
+function nascondiBancaDatiFOFI() {
+  const overlay = document.getElementById('bd-overlay');
+  overlay.classList.remove('show');
+  overlay.querySelector('iframe')?.remove();
+  document.body.style.overflow = '';
+}
+
+function chiudiBancaDatiFOFI() {
+  if (history.state && history.state.bancaDatiFOFI) history.back(); // → popstate
+  else nascondiBancaDatiFOFI();
+}
+
+window.addEventListener('popstate', () => {
+  if (document.getElementById('bd-overlay').classList.contains('show')) nascondiBancaDatiFOFI();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('bd-overlay').classList.contains('show')) chiudiBancaDatiFOFI();
+});
 
 // ─── AI ANALYSIS ─────────────────────────────────────────────────────
 function getRequisiti() {
@@ -1413,7 +1467,8 @@ function mostraRisultati(r) {
   </div>` : '';
 
   const fofiBanner = fofiHits.length > 0 ? `<div style="margin:0 16px 14px;padding:10px 14px;background:#FFF0F0;border:1px solid #F7C1C1;border-radius:8px;font-size:14px;color:#791F1F;">
-    <strong>🚨 ${fofiTotale} ${plurale(fofiTotale, 'corrispondenza', 'corrispondenze')} nella banca dati FOFI 2025-2026</strong> — ${fofiHits.map(h=>escHtml(fofiRiferimento(h.rec))).join(', ')}
+    <strong>🚨 ${fofiTotale} ${plurale(fofiTotale, 'corrispondenza', 'corrispondenze')} nella banca dati FOFI 2025-2026</strong> — ${fofiHits.map(h=>escHtml(fofiRiferimento(h.rec))).join(', ')}${fofiTotale > fofiHits.length ? ` e altre ${fofiTotale - fofiHits.length}` : ''}<br>
+    ${linkBancaDatiFOFI()}
   </div>` : '';
 
   // Intestazione stampa: dati farmacia + contesto ricetta (medico/farmaco/data/tipo)
@@ -1821,6 +1876,13 @@ function apriEmailSegnalazione() {
 
     </div>
   </div>
+</div>
+
+<!-- Banca dati FOFI filtrata sulla ricetta, sopra il risultato: chiudendo il
+     pannello si torna alla ricetta così com'era (l'iframe viene creato a ogni
+     apertura e rimosso alla chiusura, vedi apriBancaDatiFOFI). -->
+<div class="bd-overlay" id="bd-overlay" role="dialog" aria-modal="true" aria-label="Segnalazioni FOFI della ricetta">
+  <div class="bd-bar"><button type="button" class="bd-back" onclick="chiudiBancaDatiFOFI()">← Torna alla ricetta</button></div>
 </div>
 </body>
 </html>
