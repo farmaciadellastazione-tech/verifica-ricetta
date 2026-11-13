@@ -54,11 +54,15 @@ New repository secret**. Crea i tre:
 
 ## Provarla
 
+Scorciatoia: in `banca-dati.html` il pulsante **🔄 Aggiorna ora** apre
+direttamente la pagina del workflow su GitHub (serve essere loggati).
+
 - GitHub → scheda **Actions** → *Aggiornamento banca dati FOFI* → **Run workflow**
   (sul branch `dev`). Se non ci sono circolari nuove, il job termina senza fare
   nulla; altrimenti compare una PR verso `dev`.
 
-> Lo **scheduler automatico** (ogni mattina) parte solo quando il workflow è
+> Lo **scheduler automatico** (lun-sab alle 07, 11, 15, 18 ora solare; un'ora
+> dopo con l'ora legale; GitHub può ritardare di 10-30 minuti) parte solo quando il workflow è
 > presente sul **branch di default** del repo (`main`): finché resta solo su
 > `dev`, usalo a mano con *Run workflow*. Dopo il merge su `main` (con la tua
 > conferma) gira da solo.
