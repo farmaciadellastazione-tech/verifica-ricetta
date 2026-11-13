@@ -486,14 +486,16 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 119;
+const APP_BUILD = 120;
 const APP_BUILD_DATE = '13/11/2026';
 
 let tipoSelezionato = 'bianca';
 let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)
 let images = []; // [{base64, mime}, ...] - supporta fronte/retro o piu' allegati; miniatura ricostruita al volo
 const MAX_IMAGES = 4;
-let fofiHits = [];
+let fofiHits = [];      // prime 5 corrispondenze FOFI (vedi cercaVoci)
+let fofiTotale = 0;     // numero vero di corrispondenze, anche oltre le 5
+let fofiDatiFoto = [];  // medico + farmaci letti da Gemini sulla foto: entrano nel confronto FOFI
 
 // Singolare se n è 1, altrimenti plurale ("1 segnalazione", "2 segnalazioni").
 // Locale a index.html apposta: il banner FOFI non deve dipendere da una funzione
@@ -798,35 +800,25 @@ function cercaFOFI() {
 
   const tokMedico = tokenize(medico);
   const tokFarmaco = tokenize(farmaco);
-  const allToks = [...tokMedico, ...tokFarmaco];
 
-  if (allToks.length === 0) {
-    document.getElementById('fofi-alert').classList.remove('show');
-    document.getElementById('fofi-live-medico').innerHTML = '';
-    document.getElementById('fofi-live-farmaco').innerHTML = '';
-    fofiHits = [];
-    return;
-  }
+  // Confronto su campi digitati + medico/farmaci letti dalla foto (dopo
+  // un'analisi): punteggio, poi a parità la segnalazione più recente.
+  const trovate = cercaVoci([medico, farmaco, ...fofiDatiFoto], FOFI_DB);
+  fofiHits = trovate.voci;
+  fofiTotale = trovate.totale;
 
-  // Token "lunghi" (>=4) per il match a parola intera dei live indicator:
-  // pre-calcolati una volta (prima venivano rifiltrati per ogni record, 149x).
+  // Token "lunghi" (>=4) per il match a parola intera dei live indicator
+  // (solo sui campi digitati: indicano il campo che sta scrivendo).
   const tokMedicoLong = tokMedico.filter(t => t.length >= 4);
   const tokFarmacoLong = tokFarmaco.filter(t => t.length >= 4);
-
-  // Un solo passaggio sulla banca dati: punteggio complessivo + conteggi live
-  // per campo, riusando lo stesso token-set per record (prima erano tre
-  // scansioni separate di FOFI_DB a ogni battitura).
-  const scored = [];
   let medicoCount = 0, farmacoCount = 0;
-  for (const rec of FOFI_DB) {
-    const ht = haystackTokens(rec);
-    if (tokMedicoLong.length && tokMedicoLong.some(t => ht.has(t))) medicoCount++;
-    if (tokFarmacoLong.length && tokFarmacoLong.some(t => ht.has(t))) farmacoCount++;
-    const { score } = scoreMatch(allToks, rec);
-    if (score >= 3) scored.push({ rec, score });
+  if (tokMedicoLong.length || tokFarmacoLong.length) {
+    for (const rec of FOFI_DB) {
+      const ht = haystackTokens(rec);
+      if (tokMedicoLong.length && tokMedicoLong.some(t => ht.has(t))) medicoCount++;
+      if (tokFarmacoLong.length && tokFarmacoLong.some(t => ht.has(t))) farmacoCount++;
+    }
   }
-  scored.sort((a, b) => b.score - a.score);
-  fofiHits = scored.slice(0, 5);
 
   // Live indicator per campo — conteggio match a parola intera
   const lm = document.getElementById('fofi-live-medico');
@@ -849,14 +841,18 @@ function cercaFOFI() {
   if (fofiHits.length > 0) {
     alertDiv.classList.add('show');
     const tipoLabel = { F: 'FALSIFICAZIONE RICETTE', T: 'FURTO/SMARRIMENTO TIMBRO O RICETTARIO', B: 'BUONI ACQUISTO' };
-    alertBody.innerHTML = `${plurale(fofiHits.length, 'Trovata', 'Trovate')} <strong>${fofiHits.length}</strong> ${plurale(fofiHits.length, 'segnalazione corrispondente', 'segnalazioni corrispondenti')} nella banca dati circolari FOFI 2025-2026. <strong>Non erogare prima di verifica approfondita.</strong>` +
+    const mostrate = Math.min(3, fofiHits.length);
+    const altre = fofiTotale > mostrate
+      ? `<div class="fofi-match-tx" style="margin-top:6px;">…e altre ${fofiTotale - mostrate}: <a href="banca-dati.html" target="_blank" rel="noopener">vedi banca dati</a></div>`
+      : '';
+    alertBody.innerHTML = `${plurale(fofiTotale, 'Trovata', 'Trovate')} <strong>${fofiTotale}</strong> ${plurale(fofiTotale, 'segnalazione corrispondente', 'segnalazioni corrispondenti')} nella banca dati circolari FOFI 2025-2026. <strong>Non erogare prima di verifica approfondita.</strong>` +
       fofiHits.slice(0, 3).map(h => {
         const tipoBadges = h.rec.t.map(t => `<span class="fofi-match-tipo ${t}">${tipoLabel[t]||t}</span>`).join('');
         return `<div class="fofi-match">
           <div class="fofi-match-n">${tipoBadges} ${escHtml(fofiRiferimento(h.rec))} (corrispondenza: ${h.score})</div>
           <div class="fofi-match-tx">${escHtml(h.rec.tx.substring(0, 220))}${h.rec.tx.length > 220 ? '…' : ''}</div>
         </div>`;
-      }).join('');
+      }).join('') + altre;
   } else {
     alertDiv.classList.remove('show');
   }
@@ -1056,11 +1052,15 @@ function buildPrompt() {
   const isPre = statoRicetta === 'da-spedire';
   const modalitaLabel = isPre ? 'PRE-DISPENSAZIONE (ricetta non ancora spedita)' : 'POST-DISPENSAZIONE (ricetta gia\' spedita)';
 
+  // Con corrispondenze sui dati digitati Gemini ne tiene conto nel giudizio.
+  // Senza, NON dire "nessuna corrispondenza": la foto può contenere un medico
+  // o un farmaco segnalato. Il confronto vero si fa dopo, in codice, sui nomi
+  // letti (medico_prescrittore/farmaci) e integraFOFI scrive il controllo.
   const fofiBriefing = fofiHits.length > 0
-    ? `\n\nALLERTA FOFI: Il sistema ha trovato ${fofiHits.length} ${plurale(fofiHits.length, 'segnalazione', 'segnalazioni')} nella banca dati circolari FOFI 2025-2026 ${plurale(fofiHits.length, 'corrispondente', 'corrispondenti')} ai dati inseriti:\n` +
+    ? `\n\nALLERTA FOFI: Il sistema ha trovato ${fofiTotale} ${plurale(fofiTotale, 'segnalazione', 'segnalazioni')} nella banca dati circolari FOFI 2025-2026 ${plurale(fofiTotale, 'corrispondente', 'corrispondenti')} ai dati inseriti:\n` +
       fofiHits.map(h => `- ${fofiRiferimento(h.rec)} [${h.rec.t.join(',')}]: ${h.rec.tx.substring(0,200)}`).join('\n') +
       `\nTieni conto di queste segnalazioni nella tua valutazione e AGGIUNGI un controllo specifico "Verifica FOFI" con stato errore e le segnalazioni trovate.`
-    : '\n\nVerifica FOFI: nessuna corrispondenza trovata nella banca dati FOFI per i dati inseriti.';
+    : '\n\nVerifica FOFI: il confronto con la banca dati FOFI lo esegue il sistema DOPO la tua analisi, sui nomi che riporti in "medico_prescrittore" e "farmaci". NON aggiungere un controllo "Verifica FOFI" e non dare per verificata l\'assenza di segnalazioni.';
 
   let dati = '\n\nDATI INSERITI DAL FARMACISTA:\n' +
     (medico ? `- Medico prescrittore: ${medico}\n` : '') +
@@ -1248,7 +1248,9 @@ Rispondi SOLO con JSON valido, senza testo prima o dopo:
     { "campo": "nome requisito o adempimento", "stato": "ok"|"errore"|"attenzione"|"info", "note": "max 20 parole" }
   ],
   "azioni_richieste": ["azione 1", "azione 2"],
-  "azioni_urgenti": ["azione urgente se ricetta sospetta falsa o inadempienza grave post-spedizione, altrimenti array vuoto"]
+  "azioni_urgenti": ["azione urgente se ricetta sospetta falsa o inadempienza grave post-spedizione, altrimenti array vuoto"],
+  "medico_prescrittore": "nome e cognome del medico come scritti sulla ricetta o sul timbro, senza titoli; stringa vuota se non leggibile",
+  "farmaci": ["nome di ogni medicinale prescritto come scritto sulla ricetta (nome commerciale o principio attivo), senza dosaggio; array vuoto se non leggibile"]
 }
 
 REGOLE VERDETTO TRASVERSALI:
@@ -1329,6 +1331,17 @@ async function analizza() {
       console.error('[Verifica] JSON malformato ricevuto:', raw);
       throw new Error(`Risposta dell'AI non valida (JSON malformato — finishReason: ${candidate?.finishReason || 'sconosciuto'}). Riprova.`);
     }
+    // Confronto FOFI anche su medico e farmaci letti dalla foto (prima girava
+    // solo sui campi digitati: con la sola foto non veniva fatto). cercaFOFI
+    // aggiorna il banner rosso; integraFOFI scrive il controllo "Verifica FOFI".
+    // Vale solo per le analisi con foto: "Correggi e riverifica" (senza foto)
+    // non deve cancellare quanto letto dall'analisi precedente.
+    if (images.length) {
+      const str = v => (typeof v === 'string' ? v : '');
+      fofiDatiFoto = [str(result.medico_prescrittore), ...(Array.isArray(result.farmaci) ? result.farmaci.map(str) : [])].filter(Boolean);
+    }
+    cercaFOFI();
+    result = integraFOFI(result, { voci: fofiHits, totale: fofiTotale });
     mostraRisultati(result);
     // Le foto non servono piu' una volta ottenuto l'esito: liberale subito
     // dalla memoria (su iOS l'accumulo di immagini blocca la PWA). "Correggi e
@@ -1400,7 +1413,7 @@ function mostraRisultati(r) {
   </div>` : '';
 
   const fofiBanner = fofiHits.length > 0 ? `<div style="margin:0 16px 14px;padding:10px 14px;background:#FFF0F0;border:1px solid #F7C1C1;border-radius:8px;font-size:14px;color:#791F1F;">
-    <strong>🚨 ${fofiHits.length} ${plurale(fofiHits.length, 'corrispondenza', 'corrispondenze')} nella banca dati FOFI 2025-2026</strong> — ${fofiHits.map(h=>escHtml(fofiRiferimento(h.rec))).join(', ')}
+    <strong>🚨 ${fofiTotale} ${plurale(fofiTotale, 'corrispondenza', 'corrispondenze')} nella banca dati FOFI 2025-2026</strong> — ${fofiHits.map(h=>escHtml(fofiRiferimento(h.rec))).join(', ')}
   </div>` : '';
 
   // Intestazione stampa: dati farmacia + contesto ricetta (medico/farmaco/data/tipo)
@@ -1673,7 +1686,7 @@ function nuovaVerifica() {
   document.getElementById('fofi-live-medico').innerHTML='';
   document.getElementById('fofi-live-farmaco').innerHTML='';
   document.getElementById('fofi-alert').classList.remove('show');
-  fofiHits=[];
+  fofiHits=[]; fofiTotale=0; fofiDatiFoto=[];
   // NON resettare statoRicetta ne' tipoSelezionato: in genere il farmacista
   // controlla piu' ricette consecutive nello stesso stato/tipo (batch).
   rimuoviImg({stopPropagation:()=>{}});
