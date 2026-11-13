@@ -126,6 +126,24 @@ function integraFOFI(risultato, { voci, totale }) {
   return r;
 }
 
+// Filtro della banca dati aperta dall'avviso FOFI: i testi della ricetta
+// (medico, farmaci) vanno nel # dell'indirizzo, che resta nel dispositivo e
+// non viene inviato al server. banca-dati.html li rilegge e rifà cercaVoci.
+function hashFiltroFOFI(testi) {
+  const p = new URLSearchParams();
+  for (const t of testi || []) {
+    const s = String(t ?? '').trim();
+    if (s) p.append('fofi', s);
+  }
+  const q = p.toString();
+  return q ? '#' + q : '';
+}
+
+function leggiFiltroFOFI(hash) {
+  return new URLSearchParams(String(hash || '').replace(/^#/, ''))
+    .getAll('fofi').map(s => s.trim()).filter(Boolean);
+}
+
 // ── Scadenza ricetta ─────────────────────────────────────────────────────
 
 // Default conservativo 30 giorni (SSN non ripetibile, bianca non ripetibile,
@@ -236,6 +254,6 @@ function problemiMetadati(rec) {
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, SOGLIA_FOFI, cercaVoci, integraFOFI, calcolaScadenza, fofiRiferimento, dataDMY, chiaveData, ordinaRecenti, pulisciNome, problemiMetadati };
+const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, SOGLIA_FOFI, cercaVoci, integraFOFI, hashFiltroFOFI, leggiFiltroFOFI, calcolaScadenza, fofiRiferimento, dataDMY, chiaveData, ordinaRecenti, pulisciNome, problemiMetadati };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
