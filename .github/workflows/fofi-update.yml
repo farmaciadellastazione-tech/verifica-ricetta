@@ -115,7 +115,7 @@ jobs:
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
           BRANCH=auto/fofi-update
           git checkout -b "$BRANCH"
-          git add fofi-db.js sw.js index.html
+          git add fofi-db.js sw.js index.html banca-dati.html
           git commit -m "FOFI: nuove segnalazioni (circ. $ADDED)"
           git push -f origin "$BRANCH"
           REPO="${{ github.repository }}"
