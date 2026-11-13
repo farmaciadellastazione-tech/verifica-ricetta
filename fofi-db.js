@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "12/11/2026";
+const FOFI_DB_AGGIORNATA = "13/11/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC"]},
@@ -223,5 +223,6 @@ const FOFI_DB = [
 {"n":16149,"t":["T"],"tx":"FURTO dei TIMBRI, di RICETTARI in bianco e di alcune RICETTE rosse non compilate del Dr. PENNISI FILIPPO, Medico di Medicina Generale dell’ASL TO4.","m":[],"f":[],"d":"12/11/2026"},
 {"n":16150,"t":["T"],"tx":"SMARRIMENTO di un RICETTARIO (Sistema Sanitario Nazionale, Regione Marche, partita 2025 con numero 14389) e TIMBRO MEDICO della Dr.ssa CAROLINA CIAVAGLIA, Dirigente Medico dell’AOU delle Marche.","m":[],"f":[],"d":"12/11/2026"},
 {"n":16151,"t":["T"],"tx":"SMARRIMENTO del RICETTARIO SSN identificato con i seguenti estremi: S13024Y0017845582 (comprende n. 100 ricette a partire da S13024Y0017845009 fino a S13024Y0017845999) della U.O.C. Area -Direttore Dr. MAURO PASSAMONTI, ASL Teramo.","m":[],"f":[],"d":"12/11/2026"},
-{"n":null,"t":["F"],"tx":"IMPORTANTE : Segnalazione possibile ricetta falsificata\nCon la presente si intende segnalare che, in data recente, si è presentata presso la farmacia un’utente munita di una ricetta bianca per i farmaci Depalgos 20 mg + 325 mg e Minias gocce, apparentemente prescritta dal reparto di Psichiatria dell'Ospedale di Pisa. Sul momento non è stata effettuata l'erogazione dei medicinali richiesti dall' utente, e si è provveduto a contattare telefonicamente la struttura ospedaliera, la quale ha confermato di avere avuto in carico la paziente ma ha smentito di aver emesso tale prescrizione","m":[],"f":[],"src":"Ordine SP","d":"12/11/2026","k":"<Y4B530X6TUU4.R54BUCW944FY@60a755cc9f58>"}
+{"n":null,"t":["F"],"tx":"IMPORTANTE : Segnalazione possibile ricetta falsificata\nCon la presente si intende segnalare che, in data recente, si è presentata presso la farmacia un’utente munita di una ricetta bianca per i farmaci Depalgos 20 mg + 325 mg e Minias gocce, apparentemente prescritta dal reparto di Psichiatria dell'Ospedale di Pisa. Sul momento non è stata effettuata l'erogazione dei medicinali richiesti dall' utente, e si è provveduto a contattare telefonicamente la struttura ospedaliera, la quale ha confermato di avere avuto in carico la paziente ma ha smentito di aver emesso tale prescrizione","m":[],"f":[],"src":"Ordine SP","d":"12/11/2026","k":"<Y4B530X6TUU4.R54BUCW944FY@60a755cc9f58>"},
+{"n":16154,"t":["F"],"tx":"ricette MOUNJARO, LYRICA e DEPALGOS","m":[],"f":[],"d":"13/11/2026"}
 ];
