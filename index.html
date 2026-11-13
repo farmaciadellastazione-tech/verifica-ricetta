@@ -489,12 +489,13 @@
 
 <script src="fofi-db.js"></script>
 <script src="fofi-match.js"></script>
+<script src="canale-eparine.js"></script>
 <script>
 
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 122;
+const APP_BUILD = 123;
 const APP_BUILD_DATE = '13/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -1320,6 +1321,7 @@ REGOLE TIPO RICETTA (importanti, valide in entrambe le modalita'):
 CASISTICHE PARTICOLARI DI EROGAZIONE (valide per tutti i tipi, verifica giugno 2026):
 - FUORI REGIONE: la ricetta SSN dematerializzata (promemoria/NRE) e' erogabile in QUALSIASI regione (ricetta elettronica nazionale a pieno regime). Ticket ed esenzioni sono quelli della regione di iscrizione sanitaria dell'assistito, NON di quella di erogazione. NON segnalare come errore una ricetta DEM prescritta in altra regione: e' valida e spedibile. I farmaci in DPC prescritti fuori regione si erogano comunque in regime DPC.
 - DPC (DISTRIBUZIONE PER CONTO): alcuni farmaci di fascia A del PHT sono inseriti dalla Regione in DPC e si erogano PER CONTO della ASL (farmaco di proprieta' ASL, remunerazione fissa, il paziente non paga il prezzo del farmaco), NON sul normale canale convenzionato. L'elenco e' REGIONALE (Liguria: "Elenco A DPC", aggiornato spesso). Se il farmaco prescritto e' un tipico farmaco da PHT/DPC (molti oncologici orali, alcuni antivirali, immunosoppressori, ecc.), aggiungi un controllo "attenzione": "Verificare se rientra nell'Elenco DPC regionale; in tal caso erogazione in regime DPC per conto ASL, non SSN convenzionato". Non conoscendo l'elenco regionale completo, NON darlo per certo: segnala solo come verifica.
+- ENOXAPARINA (Inhixa, Clexane, Rovi, Ghemaxan, Rovinadil — Liguria, circ. FF.Lig 0100 del 23/10/2026): doppio canale DPC/convenzionata. Il canale lo calcola il SISTEMA dopo la tua analisi, sui campi "data_prescrizione" e "nota_dpc": per l'enoxaparina NON aggiungere il controllo generico DPC qui sopra e non stabilire tu il canale. Riporta con cura: la data di redazione della ricetta; se il campo NOTE della ricetta/promemoria e' visibile e contiene la sigla "DPC" -> "presente"; se il campo note e' visibile e NON contiene "DPC" -> "assente"; se il campo note non compare nella foto o non e' leggibile (o non c'e' foto) -> "non_visibile". Nel dubbio usa "non_visibile". Biosimilari: il marchio prescritto non e' sostituibile.
 - RICETTA SASN (gente di mare / personale navigante marittimo e aviazione civile): modulo speciale (DM 18/5/2004) simile alla ricetta SSN, otticamente leggibile (esiste anche la versione dematerializzata). E' VALIDA su tutto il territorio nazionale e ogni farmacia convenzionata DEVE spedirla. Trattala come una ricetta SSN ai fini dei requisiti; il rimborso passa dall'Ufficio SASN (Trieste), non dalla ASL. NON segnalarla come "tipo errato".
 - RICETTA ESTERA UE (Direttiva 2011/24/UE, D.Lgs. 38/2014): valida in Italia se contiene nome/cognome paziente, data di nascita, identificazione del prescrittore (nome, qualifica, contatti, indirizzo, firma) e del farmaco (DCI o nome commerciale, forma, quantita', dosaggio, posologia). Erogazione PRIVATA (il paziente paga, nessun rimborso SSN). ESCLUSI gli stupefacenti/psicotropi (non ammessi con ricetta transfrontaliera). Il farmaco deve essere autorizzato e in commercio in Italia. RICETTA EXTRA-UE: trattata come ricetta privata, senza valore SSN; stupefacenti esclusi.
 
@@ -1335,7 +1337,9 @@ Rispondi SOLO con JSON valido, senza testo prima o dopo:
   "azioni_richieste": ["azione 1", "azione 2"],
   "azioni_urgenti": ["azione urgente se ricetta sospetta falsa o inadempienza grave post-spedizione, altrimenti array vuoto"],
   "medico_prescrittore": "nome e cognome del medico come scritti sulla ricetta o sul timbro, senza titoli; stringa vuota se non leggibile",
-  "farmaci": ["nome di ogni medicinale prescritto come scritto sulla ricetta (nome commerciale o principio attivo), senza dosaggio; array vuoto se non leggibile"]
+  "farmaci": ["nome di ogni medicinale prescritto come scritto sulla ricetta (nome commerciale o principio attivo), senza dosaggio; array vuoto se non leggibile"],
+  "data_prescrizione": "data di redazione della ricetta in formato gg/mm/aaaa; stringa vuota se non leggibile",
+  "nota_dpc": "presente" | "assente" | "non_visibile"
 }
 
 REGOLE VERDETTO TRASVERSALI:
@@ -1511,6 +1515,25 @@ function mostraRisultati(r) {
     ${linkBancaDatiFOFI()}
   </div>` : '';
 
+  // Canale di erogazione enoxaparina (DPC / convenzionata, dal 16/11/2026):
+  // lo decide canaleEnoxaparina (canale-eparine.js), non Gemini. I campi del
+  // form hanno priorità su quanto letto dalla foto.
+  const canaleEnox = canaleEnoxaparina({
+    farmaci: [document.getElementById('f-farmaco').value, ...(Array.isArray(r.farmaci) ? r.farmaci : [])],
+    tipo: tipoSelezionato,
+    data: document.getElementById('f-data').value || r.data_prescrizione,
+    siglaDpc: r.nota_dpc,
+  });
+  const stileCanale = {
+    DPC:           { bg:'#E6F1FB', bd:'#9CC5EE', fg:'#0C3D6B', titolo:'💉 Enoxaparina: erogazione in DPC' },
+    CONVENZIONATA: { bg:'#E1F5EE', bd:'#9FE1CB', fg:'#0F4F3D', titolo:'💉 Enoxaparina: erogazione in convenzionata' },
+    DA_VERIFICARE: { bg:'#FFF8E1', bd:'#FFD679', fg:'#5C3A00', titolo:'💉 Enoxaparina: canale da verificare a video' },
+  };
+  const sc = canaleEnox && stileCanale[canaleEnox.canale];
+  const canaleBox = sc ? `<div class="print-hide" style="margin:0 16px 14px;padding:10px 14px;background:${sc.bg};border:1px solid ${sc.bd};border-radius:8px;font-size:14px;color:${sc.fg};">
+    <strong>${sc.titolo}</strong><br>${escHtml(canaleEnox.motivo)}<br><span style="font-size:13px;">${escHtml(canaleEnox.sostituzione)}</span>
+  </div>` : '';
+
   // Intestazione stampa: dati farmacia + contesto ricetta (medico/farmaco/data/tipo)
   // visibili solo in stampa via @media print. Per il medico/paziente che riceve
   // il foglio: deve poter identificare la ricetta e capire cosa manca.
@@ -1555,6 +1578,7 @@ function mostraRisultati(r) {
     </div>
     <div class="checks-list">${checks}</div>
     ${fofiBanner}
+    ${canaleBox}
     ${azioniBox}
     ${!isPositive ? `<div class="print-hide" style="margin:0 16px 14px;padding:10px 14px;background:#FFF8E1;border:1px solid #FFD679;border-radius:8px;font-size:14px;color:#5C3A00;">
       💡 <strong>Errore di lettura nei dati?</strong> Se l'AI ha confuso un carattere (es. <code>/</code> con <code>1</code>) o non ha letto un campo, clicca <em>Correggi e riverifica</em>, compila il dato a mano nel form e rilancia. I valori del form hanno priorità sull'OCR.
