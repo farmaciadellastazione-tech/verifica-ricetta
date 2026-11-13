@@ -494,7 +494,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 121;
+const APP_BUILD = 122;
 const APP_BUILD_DATE = '13/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -511,6 +511,24 @@ let fofiDatiFoto = [];  // medico + farmaci letti da Gemini sulla foto: entrano 
 // quel file insieme alla pagina nuova → ReferenceError e banner che non compare).
 function plurale(n, singolare, plur) {
   return n === 1 ? singolare : plur;
+}
+let ultimiTempi = '';   // riga "⏱ …" sotto il risultato (durata + token, vedi descriviTempi)
+
+// Riga di misura sotto il risultato: serve a capire dove va il tempo
+// dell'analisi (ragionamento, risposta, istruzioni riutilizzate dalla cache
+// implicita di Gemini) prima di toccare thinkingBudget o il prompt.
+function descriviTempi(ms, modello, usage) {
+  const u = usage || {};
+  const num = n => Number(n || 0).toLocaleString('it-IT');
+  const pezzi = [`⏱ Analisi in ${(ms / 1000).toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`];
+  if (modello) pezzi.push(modello);
+  if (u.thoughtsTokenCount != null) pezzi.push(`ragionamento ${num(u.thoughtsTokenCount)} token`);
+  if (u.candidatesTokenCount != null) pezzi.push(`risposta ${num(u.candidatesTokenCount)} token`);
+  if (u.promptTokenCount) {
+    const cache = u.cachedContentTokenCount || 0;
+    pezzi.push(`istruzioni riutilizzate ${Math.round(cache * 100 / u.promptTokenCount)}% (${num(cache)} su ${num(u.promptTokenCount)} token)`);
+  }
+  return pezzi.join(' · ');
 }
 let ultimoRisultato = null;   // usato da correggiERiverifica per limitare i campi a quelli non conformi
 
@@ -1239,17 +1257,30 @@ VERDETTO in modalita' POST (linguaggio DIAGNOSTICO, mai prescrittivo):
 - "ATTENZIONE": piccole irregolarita' sanabili (timbro presente ma data poco leggibile) o adempimenti non verificabili dall'immagine che richiedono conferma del farmacista.
 - "NON_VALIDA": una o piu' INADEMPIENZE GRAVI EFFETTIVAMENTE OSSERVABILI sull'immagine (timbro spedizione assente, fustella SSN mancante; estremi documento mancanti SOLO se: (a) la ricetta e' un MODULO A RICALCO oppure (b) la sostanza e' transitata POST-15/6/2009 - tramadolo, tramadolo+paracetamolo, tapentadolo Palexia, remimazolam) o dichiarate dal farmacista (mancata registrazione stupefacenti). ATTENZIONE: il documento del ritirante NON e' richiesto su RNR/SSN non a ricalco per i farmaci PRE-15/6/2009: benzo orali Sez. E (Xanax, Tavor cpr/gtt, Lexotan, EN gocce/cpr, Stilnox, ecc.), benzo iniettabili (EN fiale, Valium fiale, Noan fiale, Diazemuls), codeina+paracetamolo (Tachidol, Codamol, Co-Efferalgan, Lonarid), ossicodone orale (Oxycontin, Depalgos, Targin), morfina orale (MS Contin, Oramorph), fentanil cerotti/sublinguali (Durogesic, Abstral, Effentora), buprenorfina cerotti (Transtec), idromorfone (Jurnista) — non segnalarlo come mancanza per queste forme su RNR/SSN. Sommario: indica le inadempienze con linguaggio retrospettivo ("manca timbro sulla ricetta spedita", "estremi documento non annotati"), MAI "non erogare" o "errori nell'inserimento dati".`;
 
-  return `Sei un farmacista esperto italiano. Verifica questa ricetta.
+  // Il prompt è diviso in due: le ISTRUZIONI FISSE (uguali per tutte le
+  // ricette dello stesso tipo e modalità) vanno per prime nella richiesta,
+  // poi le immagini, poi la parte che cambia (data, dati del form, FOFI).
+  // Così Gemini riconosce l'inizio identico tra una ricetta e l'altra e lo
+  // riutilizza (cache implicita): risposta più rapida. NIENTE di variabile
+  // (data, campi, immagini, FOFI) nella parte fissa, o la cache non scatta.
+  const variabile = `RICETTA DA VERIFICARE (applica le istruzioni sopra)
 
 TIPO: ${tipoLabel}
 DATA ODIERNA: ${oggi}
-${dati}${prioritaDati}
+
+${images.length === 0 ? 'Analizza i dati forniti (nessuna immagine).' : images.length === 1 ? 'Analizza l\'immagine allegata E i dati forniti.' : `Analizza le ${images.length} immagini allegate (probabilmente fronte+retro della STESSA ricetta, o ricetta + allegati come fustella/documento ritirante). Trattale come un unico insieme: estrai e combina le informazioni da tutte le facciate. NON segnalare un campo come "mancante" se compare in una qualsiasi delle immagini. E i dati forniti.`}
+${dati}
 ${fofiBriefing}
+
+Rispondi SOLO con il JSON nel formato indicato nelle istruzioni.`;
+
+  const fisso = `Sei un farmacista esperto italiano. Verifica la ricetta descritta in fondo, dopo queste istruzioni (immagini allegate e dati inseriti dal farmacista).
+
+TIPO: ${tipoLabel}
+${prioritaDati}
 
 NORMATIVA:
 ${getRequisiti()}
-
-${images.length === 0 ? 'Analizza i dati forniti (nessuna immagine).' : images.length === 1 ? 'Analizza l\'immagine allegata E i dati forniti.' : `Analizza le ${images.length} immagini allegate (probabilmente fronte+retro della STESSA ricetta, o ricetta + allegati come fustella/documento ritirante). Trattale come un unico insieme: estrai e combina le informazioni da tutte le facciate. NON segnalare un campo come "mancante" se compare in una qualsiasi delle immagini. E i dati forniti.`}
 
 ${modalitaIstruzioni}
 
@@ -1312,6 +1343,8 @@ REGOLE VERDETTO TRASVERSALI:
 - "NON_NECESSARIA": il prodotto NON richiede ricetta medica per legge — ad esempio integratori alimentari (magnesio, multivitaminici, probiotici, omega-3, melatonina, fermenti lattici), cosmetici, dispositivi medici (cerotti, garze, termometri), farmaci OTC/SOP (paracetamolo da banco, ibuprofene 200mg, antiacidi, lassativi blandi). In questo caso punteggio 85+, nessuna azione urgente, sommario tipo "Integratore/OTC: dispensabile senza prescrizione". Anche se il medico lo ha scritto su ricetta, se per legge non e' richiesta, usa questo verdetto. In caso di dubbio sulla classificazione, NON usare NON_NECESSARIA — applica i requisiti del tipo di ricetta dichiarato.
 
 Includi 7-12 controlli specifici.`;
+
+  return { fisso, variabile };
 }
 
 async function analizza() {
@@ -1326,9 +1359,13 @@ async function analizza() {
   btn.textContent = '⏳ Analisi in corso...';
   document.getElementById('loading-bar').classList.add('active');
 
-  const parts = [];
+  // Ordine: istruzioni fisse → immagini → dati di questa ricetta (vedi buildPrompt).
+  const prompt = buildPrompt();
+  const parts = [{ text: prompt.fisso }];
   images.forEach(img => parts.push({ inline_data: { mime_type: img.mime, data: img.base64 } }));
-  parts.push({ text: buildPrompt() });
+  parts.push({ text: prompt.variabile });
+  ultimiTempi = '';
+  const t0 = performance.now();
 
   try {
     // Modelli in ordine di preferenza: 2.5-flash (qualita') -> flash-latest (alias 3.5)
@@ -1369,6 +1406,9 @@ async function analizza() {
       console.info(`[Verifica] Servito da modello fallback: ${modelloUsato}`);
     }
     const data = await res.json();
+    // Durata dall'invio alla risposta (compresi eventuali tentativi di fallback)
+    ultimiTempi = descriviTempi(performance.now() - t0, modelloUsato, data.usageMetadata);
+    console.info(`[Verifica] ${ultimiTempi}`);
     const candidate = data.candidates?.[0];
     const raw = (candidate?.content?.parts || []).map(p => p.text || '').join('');
     if (!raw) throw new Error('Risposta vuota dall\'API Gemini');
@@ -1526,7 +1566,8 @@ function mostraRisultati(r) {
     <button class="btn-nuova" onclick="correggiERiverifica()" style="background:#FFE8B0;color:#5C3A00;">✏ Correggi e riverifica</button>
     <button class="btn-nuova" onclick="nuovaVerifica()">↩ Nuova verifica</button>
     <button class="btn-segnala-risultati${isSospetta ? '' : ' secondario'}" onclick="apriSegnalazione()">${isSospetta ? '🚨 Segnala ricetta sospetta' : 'Segnala ricetta sospetta'}</button>
-  </div>`;
+  </div>
+  ${ultimiTempi ? `<div class="print-hide" style="text-align:center;font-size:12px;color:var(--text-ter);margin:4px 16px 10px;">${escHtml(ultimiTempi)}</div>` : ''}`;
 
   sec.style.display = 'block';
   document.getElementById('form-section').style.display = 'none';
