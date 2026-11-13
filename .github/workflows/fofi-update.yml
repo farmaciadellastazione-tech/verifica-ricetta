@@ -10,13 +10,22 @@ name: Aggiornamento banca dati FOFI
 
 on:
   schedule:
-    - cron: '0 6 * * 1-6'   # lun-sab alle 06:00 UTC (~07/08 in Italia)
+    # lun-sab quattro volte al giorno (orari UTC): in Italia 07/11/15/18
+    # con l'ora solare, 08/12/16/19 con l'ora legale. Così una circolare
+    # arrivata in mattinata entra in banca dati entro poche ore.
+    - cron: '0 6,10,14,17 * * 1-6'
   workflow_dispatch:
     inputs:
       dry_run:
         description: 'Prova a secco: mostra cosa verrebbe aggiunto, senza PR/merge/deploy'
         type: boolean
         default: false
+
+# Un solo aggiornamento alla volta: se un lancio manuale si sovrappone a
+# quello programmato, il secondo aspetta (niente PR doppie sulla stessa mail).
+concurrency:
+  group: fofi-update
+  cancel-in-progress: false
 
 permissions:
   contents: write
