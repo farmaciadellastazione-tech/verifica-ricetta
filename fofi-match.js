@@ -80,6 +80,52 @@ function scoreMatch(tokens, record) {
   return { score, matchedTokens };
 }
 
+// Soglia minima: almeno un token lungo (≥5) o tre corti.
+const SOGLIA_FOFI = 3;
+
+// Confronto FOFI su più testi insieme: campi digitati dal farmacista + medico
+// e farmaci letti da Gemini sulla foto. Token deduplicati (lo stesso nome nel
+// campo e nella foto conta una volta). Ordine: punteggio decrescente e, a
+// parità, la segnalazione più recente prima (ordinaRecenti), così una
+// circolare appena arrivata non resta sotto quelle vecchie.
+// Ritorna { voci: [{rec, score}] (al massimo `limite`), totale }.
+function cercaVoci(testi, db, limite = 5) {
+  const tokens = [...new Set((testi || []).flatMap(t => tokenize(t)))];
+  if (!tokens.length) return { voci: [], totale: 0 };
+  const trovate = [];
+  for (const rec of db) {
+    const { score } = scoreMatch(tokens, rec);
+    if (score >= SOGLIA_FOFI) trovate.push({ rec, score });
+  }
+  // sort stabile: dopo ordinaRecenti, il punteggio decide e la data fa da spareggio
+  const ordinate = ordinaRecenti(trovate).sort((a, b) => b.score - a.score);
+  return { voci: ordinate.slice(0, limite), totale: ordinate.length };
+}
+
+// Rende il controllo "Verifica FOFI" del risultato Gemini coerente con la
+// banca dati: toglie quello scritto da Gemini (che non conosce la banca dati
+// e, analizzando la sola foto, non sa cosa c'è) e mette quello vero. Con
+// corrispondenze: controllo in cima con stato 'fofi', azione di verifica e
+// verdetto almeno ATTENZIONE (SOSPETTA_FALSA/NON_VALIDA restano). Non tocca
+// il risultato originale.
+function integraFOFI(risultato, { voci, totale }) {
+  const r = { ...risultato };
+  const altri = (r.controlli || []).filter(c => !/fofi/i.test(c.campo || ''));
+  if (!totale) {
+    r.controlli = [...altri, { campo: 'Verifica FOFI', stato: 'ok', note: 'Nessuna corrispondenza nella banca dati FOFI' }];
+    return r;
+  }
+  const riferimenti = voci.map(v => fofiRiferimento(v.rec)).join(', ');
+  const extra = totale > voci.length ? ` e altre ${totale - voci.length}` : '';
+  r.controlli = [{ campo: 'Verifica FOFI', stato: 'fofi', note: `Corrispondenza con ${riferimenti}${extra}` }, ...altri];
+  r.azioni_richieste = [
+    `Verificare la segnalazione FOFI (${riferimenti}${extra}) prima di erogare: confrontare medico e farmaco con il testo della circolare`,
+    ...(r.azioni_richieste || []),
+  ];
+  if (r.verdetto === 'VALIDA' || r.verdetto === 'NON_NECESSARIA') r.verdetto = 'ATTENZIONE';
+  return r;
+}
+
 // ── Scadenza ricetta ─────────────────────────────────────────────────────
 
 // Default conservativo 30 giorni (SSN non ripetibile, bianca non ripetibile,
@@ -190,6 +236,6 @@ function problemiMetadati(rec) {
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, calcolaScadenza, fofiRiferimento, dataDMY, chiaveData, ordinaRecenti, pulisciNome, problemiMetadati };
+const _exports = { STOPWORDS_FOFI, normalize, tokenize, haystackTokens, scoreMatch, SOGLIA_FOFI, cercaVoci, integraFOFI, calcolaScadenza, fofiRiferimento, dataDMY, chiaveData, ordinaRecenti, pulisciNome, problemiMetadati };
 Object.assign(globalThis, _exports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;
