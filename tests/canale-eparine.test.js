@@ -82,6 +82,7 @@ describe('canaleEnoxaparina — decisione del canale', () => {
     expect(r.motivo).toMatch(/a destra/i);
     expect(r.motivo).toMatch(/PDF/);
     expect(r.motivo).toMatch(/rossa/i);
+    expect(r.motivo).toMatch(/nota AIFA/i);
   });
 
   it('data non leggibile → DA_VERIFICARE, si chiede di controllare la data', () => {
@@ -117,5 +118,15 @@ describe('caricamento nell\'app', () => {
     expect(riga).toMatch(/a destra/i);
     expect(riga).toMatch(/PDF/);
     expect(riga).toMatch(/rossa/i);
+  });
+
+  it('il prompt indica le caselle della nota AIFA (NOTA CUF) e che "DPC" lì non è una nota AIFA errata', () => {
+    const html = readFileSync(resolve(ROOT, 'index.html'), 'utf8');
+    const riga = html.split('\n').find(l => l.startsWith('- ENOXAPARINA'));
+    expect(riga).toMatch(/NOTA CUF/);
+    expect(riga).toMatch(/non e' una nota AIFA/i);
+    // anche le regole operative sulle note AIFA devono escludere la sigla DPC
+    const regole = html.slice(html.indexOf('REGOLE OPERATIVE PER CONTROLLO NOTE AIFA'), html.indexOf('FARMACI CHE RICHIEDONO SPECIALISTA'));
+    expect(regole).toMatch(/"DPC"/);
   });
 });
