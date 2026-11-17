@@ -77,6 +77,15 @@ describe('canaleEnoxaparina — decisione del canale', () => {
     }
   });
 
+  it('campo note non visibile: indica dove guardare (riquadro a destra, DEM stampata/PDF o ricetta rossa)', () => {
+    const r = canaleEnoxaparina({ ...base, data: '20/11/2026', siglaDpc: 'non_visibile' });
+    expect(r.motivo).toMatch(/a destra/i);
+    expect(r.motivo).toMatch(/PDF/);
+    expect(r.motivo).toMatch(/rossa/i);
+    expect(r.motivo).toMatch(/nota AIFA/i);
+    expect(r.motivo).toMatch(/colonna NOTA/);
+  });
+
   it('data non leggibile → DA_VERIFICARE, si chiede di controllare la data', () => {
     const r = canaleEnoxaparina({ ...base, data: '', siglaDpc: 'presente' });
     expect(r.canale).toBe('DA_VERIFICARE');
@@ -103,5 +112,29 @@ describe('caricamento nell\'app', () => {
   it('index.html include canale-eparine.js e sw.js lo mette in cache', () => {
     expect(readFileSync(resolve(ROOT, 'index.html'), 'utf8')).toMatch(/<script src="canale-eparine\.js"><\/script>/);
     expect(readFileSync(resolve(ROOT, 'sw.js'), 'utf8')).toMatch(/'\.\/canale-eparine\.js'/);
+  });
+
+  it('il prompt dice a Gemini che il campo note è il riquadro a destra, su DEM (stampa/PDF) e rossa', () => {
+    const riga = readFileSync(resolve(ROOT, 'index.html'), 'utf8').split('\n').find(l => l.startsWith('- ENOXAPARINA'));
+    expect(riga).toMatch(/a destra/i);
+    expect(riga).toMatch(/PDF/);
+    expect(riga).toMatch(/rossa/i);
+  });
+
+  it('il prompt indica le caselle della nota AIFA (NOTA CUF) e che "DPC" lì non è una nota AIFA errata', () => {
+    const html = readFileSync(resolve(ROOT, 'index.html'), 'utf8');
+    const riga = html.split('\n').find(l => l.startsWith('- ENOXAPARINA'));
+    expect(riga).toMatch(/NOTA CUF/);
+    expect(riga).toMatch(/non e' una nota AIFA/i);
+    // anche le regole operative sulle note AIFA devono escludere la sigla DPC
+    const regole = html.slice(html.indexOf('REGOLE OPERATIVE PER CONTROLLO NOTE AIFA'), html.indexOf('FARMACI CHE RICHIEDONO SPECIALISTA'));
+    expect(regole).toMatch(/"DPC"/);
+  });
+
+  it('il prompt descrive il promemoria DEM (colonna NOTA dopo QTA, "---" = vuota) e le caselle barrate con # sulla rossa', () => {
+    const riga = readFileSync(resolve(ROOT, 'index.html'), 'utf8').split('\n').find(l => l.startsWith('- ENOXAPARINA'));
+    expect(riga).toMatch(/QTA/);
+    expect(riga).toMatch(/"---"/);
+    expect(riga).toMatch(/# # #/);
   });
 });
