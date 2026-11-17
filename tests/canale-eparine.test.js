@@ -83,6 +83,7 @@ describe('canaleEnoxaparina — decisione del canale', () => {
     expect(r.motivo).toMatch(/PDF/);
     expect(r.motivo).toMatch(/rossa/i);
     expect(r.motivo).toMatch(/nota AIFA/i);
+    expect(r.motivo).toMatch(/colonna NOTA/);
   });
 
   it('data non leggibile → DA_VERIFICARE, si chiede di controllare la data', () => {
@@ -128,5 +129,12 @@ describe('caricamento nell\'app', () => {
     // anche le regole operative sulle note AIFA devono escludere la sigla DPC
     const regole = html.slice(html.indexOf('REGOLE OPERATIVE PER CONTROLLO NOTE AIFA'), html.indexOf('FARMACI CHE RICHIEDONO SPECIALISTA'));
     expect(regole).toMatch(/"DPC"/);
+  });
+
+  it('il prompt descrive il promemoria DEM (colonna NOTA dopo QTA, "---" = vuota) e le caselle barrate con # sulla rossa', () => {
+    const riga = readFileSync(resolve(ROOT, 'index.html'), 'utf8').split('\n').find(l => l.startsWith('- ENOXAPARINA'));
+    expect(riga).toMatch(/QTA/);
+    expect(riga).toMatch(/"---"/);
+    expect(riga).toMatch(/# # #/);
   });
 });
