@@ -74,7 +74,7 @@ function canaleEnoxaparina({ farmaci, tipo, data, siglaDpc } = {}) {
     motivo = 'Campo note senza sigla "DPC": canale convenzionato, farmaco dal grossista e ticket regionale.';
   } else {
     canale = 'DA_VERIFICARE';
-    motivo = 'Campo note non visibile nella foto: controlla la ricetta a video. Sigla "DPC" → DPC; campo note vuoto → convenzionata.';
+    motivo = 'Campo note non visibile nella foto: controlla il riquadro note a destra sulla ricetta (DEM stampata o in PDF, oppure rossa cartacea) o a video. Sigla "DPC" → DPC; campo note vuoto → convenzionata.';
   }
   return { canale, motivo, sostituzione };
 }
