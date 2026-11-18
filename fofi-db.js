@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "17/11/2026";
+const FOFI_DB_AGGIORNATA = "18/11/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC"]},
@@ -226,5 +226,6 @@ const FOFI_DB = [
 {"n":null,"t":["F"],"tx":"IMPORTANTE : Segnalazione possibile ricetta falsificata\nCon la presente si intende segnalare che, in data recente, si è presentata presso la farmacia un’utente munita di una ricetta bianca per i farmaci Depalgos 20 mg + 325 mg e Minias gocce, apparentemente prescritta dal reparto di Psichiatria dell'Ospedale di Pisa. Sul momento non è stata effettuata l'erogazione dei medicinali richiesti dall' utente, e si è provveduto a contattare telefonicamente la struttura ospedaliera, la quale ha confermato di avere avuto in carico la paziente ma ha smentito di aver emesso tale prescrizione","m":[],"f":[],"src":"Ordine SP","d":"12/11/2026","k":"<Y4B530X6TUU4.R54BUCW944FY@60a755cc9f58>"},
 {"n":16154,"t":["F"],"tx":"ricette MOUNJARO, LYRICA e DEPALGOS","m":[],"f":[],"d":"13/11/2026"},
 {"n":16161,"t":["T"],"tx":"FURTO del TIMBRO e del RICETTARIO SSN (unitamente alle matrici ricettari ritirati dal medico) della Dr.ssa LANG ANNA, iscritta all’Ordine dei Medici della Provincia di Pavia.","m":[],"f":[],"d":"17/11/2026"},
-{"n":16162,"t":["T"],"tx":"FURTO di 3 RICETTARI e del TIMBRO della Dott.ssa MARSEGLIA CONCETTA, Medico di Base di Rignano sull’Arno (FI) - ASL Toscana Centro.","m":[],"f":[],"d":"17/11/2026"}
+{"n":16162,"t":["T"],"tx":"FURTO di 3 RICETTARI e del TIMBRO della Dott.ssa MARSEGLIA CONCETTA, Medico di Base di Rignano sull’Arno (FI) - ASL Toscana Centro.","m":[],"f":[],"d":"17/11/2026"},
+{"n":16163,"t":["F","T"],"tx":"FALSIFICAZIONE di RICETTE e CONTRAFFAZIONE del TIMBRO del Dr. ANTONIO SABATO, medico di medicina generale ATS Pavia;\nSMARRIMENTO TIMBRO del Dr. AZZINI CARLO, Dirigente Medico presso la SC Multidisciplinare di Patologia Mammaria dell’ASST di Cremona.","m":[],"f":[],"d":"18/11/2026"}
 ];
