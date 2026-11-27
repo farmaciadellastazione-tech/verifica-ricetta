@@ -1,6 +1,6 @@
 // Banca dati FOFI — circolari falsificazioni/furti ricette 2025-2026
 // Estratto da index.html per manutenibilita'. Variabile globale FOFI_DB consumata dall'inline script principale.
-const FOFI_DB_AGGIORNATA = "24/11/2026";
+const FOFI_DB_AGGIORNATA = "27/11/2026";
 const FOFI_DB = [
 {"n":15373,"t":["T"],"tx":"furto del timbro personale della DOTT.SSA FEDERICA DESOGUS, n. ordine dei medici 11355, codice regionale 7533, MEDICO Regione Autonoma della Sardegna.","m":["FEDERICA DESOGUS"],"f":[]},
 {"n":15375,"t":["F"],"tx":"falsificazione di ricetta medica di “DUROGESIC 100 mcg/h cerotti” a firma del dr. RUGGERO GATTI, Direttore del Servizio dipendenze dell’ASL CN2.","m":[],"f":["DUROGESIC"]},
@@ -229,5 +229,6 @@ const FOFI_DB = [
 {"n":16162,"t":["T"],"tx":"FURTO di 3 RICETTARI e del TIMBRO della Dott.ssa MARSEGLIA CONCETTA, Medico di Base di Rignano sull’Arno (FI) - ASL Toscana Centro.","m":[],"f":[],"d":"17/11/2026"},
 {"n":16163,"t":["F","T"],"tx":"FALSIFICAZIONE di RICETTE e CONTRAFFAZIONE del TIMBRO del Dr. ANTONIO SABATO, medico di medicina generale ATS Pavia;\nSMARRIMENTO TIMBRO del Dr. AZZINI CARLO, Dirigente Medico presso la SC Multidisciplinare di Patologia Mammaria dell’ASST di Cremona.","m":[],"f":[],"d":"18/11/2026"},
 {"n":16166,"t":["T"],"tx":"FURTO del TIMBRO PERSONALE e del RICETTARIO SSN n. 030210333150006 del Dr. COVI ANDREA, iscritto all’Ordine dei medici della Provincia di Trento (numero iscrizione 0000005314).","m":[],"f":[],"d":"20/11/2026"},
-{"n":16172,"t":["T"],"tx":"SMARRIMENTO del TIMBRO da parte del Dr. RONCHI ALBERTO, Specialista in Chirurgia generale presso l’Ospedale di Vizzolo Predabissi (MI).","m":[],"f":[],"d":"24/11/2026"}
+{"n":16172,"t":["T"],"tx":"SMARRIMENTO del TIMBRO da parte del Dr. RONCHI ALBERTO, Specialista in Chirurgia generale presso l’Ospedale di Vizzolo Predabissi (MI).","m":[],"f":[],"d":"24/11/2026"},
+{"n":16179,"t":["F","T"],"tx":"smarrimento del timbro da neuropsicologa e alla falsificazione di ricette del farmaco RITROVIL, a nome della Dr.ssa DANIELE ALESSANDRA, - PSICOTERAPEUTA – NEUROPSICOLOGA, iscritta all’Albo degli Psicologi della Lombardia, non abilitata alla prescrizione di medicinali.","m":[],"f":[],"d":"27/11/2026"}
 ];
