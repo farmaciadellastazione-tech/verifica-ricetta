@@ -30,7 +30,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FILE_REGOLE = resolve(ROOT, 'regole-prescrizione.js');
 const FILE_REPORT = resolve(ROOT, '.regole-report.json');
 const {
-  circolarePertinente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile,
+  circolarePertinente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa,
   regoleToDbFile, regolaDuplicata, regoleNuove, reportPR,
 } = require(resolve(ROOT, 'regole-core.js'));
 const { dataDMY } = require(resolve(ROOT, 'fofi-match.js'));
@@ -54,11 +54,11 @@ export function corpoUtile(text) {
   return String(text || '').split(/(?:^|\n)\s*\[cid:|(?:^|\n)C\.so Nazionale 222/)[0].trim();
 }
 
-async function chiamaGemini(prompt, key) {
+async function chiamaGemini(prompt, apiKey) {
   for (const modello of MODELLI) {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modello}:generateContent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -73,11 +73,82 @@ async function chiamaGemini(prompt, key) {
       console.warn(`[Regole] ${modello} non disponibile (${r.status}), provo il successivo`);
       continue;
     }
-    if (!r.ok) throw new Error(`Gemini ${modello}: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
+    if (!r.ok) {
+      const e = erroreGemini(r.status, await r.text());
+      throw Object.assign(new Error(`Gemini ${modello}: ${e.testo}`), { chiaveRifiutata: e.chiaveRifiutata });
+    }
     const j = await r.json();
     return (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
   }
   throw new Error('Gemini: tutti i modelli occupati');
+}
+
+// Analisi di UNA circolare: Gemini estrae, validaRegola controlla.
+// `apiKey` è la chiave Gemini, `msgId` il Message-ID della mail (diventa k):
+// nomi distinti apposta (bug 28/11/2026: una variabile `key` per entrambi
+// mandava a Gemini il Message-ID). `gemini` sostituibile nei test.
+// Esito: 'letta' | 'errore' (da rileggere) | 'chiave_rifiutata' (stop).
+export async function esaminaCircolare({ subject, testo, d, msgId, apiKey, regoleEsistenti = [], gemini = chiamaGemini }) {
+  const fonte = subject;
+  const out = { esito: 'letta', regole: [], scartate: [], avvisi: [], errore: '' };
+  let risposta;
+  try {
+    risposta = await gemini(promptEstrazione(subject, testo), apiKey);
+  } catch (err) {
+    out.esito = err.chiaveRifiutata ? 'chiave_rifiutata' : 'errore';
+    out.errore = err.message;
+    out.avvisi.push({ fonte, problemi: [`Gemini non ha risposto (${err.message.slice(0, 160)}): circolare da rileggere alla prossima corsa`] });
+    return out;
+  }
+  if (!rispostaLeggibile(risposta)) {
+    out.esito = 'errore';
+    out.errore = 'risposta di Gemini illeggibile o troncata';
+    out.avvisi.push({ fonte, problemi: ['risposta di Gemini illeggibile o troncata: circolare da rileggere alla prossima corsa'] });
+    return out;
+  }
+  const grezze = parseRispostaEstrazione(risposta);
+  for (const g of grezze) {
+    const r = {
+      tipo: g.tipo,
+      farmaci: Array.isArray(g.farmaci) ? g.farmaci.map(f => String(f).trim()).filter(Boolean) : [],
+      regola: String(g.regola || '').trim(),
+      dal: String(g.dal || '').trim(),
+      estratto: String(g.estratto || '').trim(),
+      fonte, d, k: msgId,
+    };
+    const problemi = validaRegola(r, testo);
+    // L'enoxaparina la decide canale-eparine.js (codice testato, non il prompt).
+    if (r.farmaci.length && r.farmaci.every(isEnoxaparina)) problemi.push('enoxaparina: già gestita da canale-eparine.js');
+    if (!problemi.length && regolaDuplicata(r, [...regoleEsistenti, ...out.regole])) problemi.push('già presente (promemoria o reinoltro)');
+    if (problemi.length) {
+      out.scartate.push({ fonte, problemi: [`${r.farmaci.join(', ') || '?'} — ${problemi.join('; ')}`] });
+      console.log(`  - scartata (${problemi.join('; ')})`);
+      continue;
+    }
+    const av = avvisiRegola(r, testo);
+    if (av.length) out.avvisi.push({ fonte, problemi: av });
+    out.regole.push(r);
+    console.log(`  + [${r.tipo}] ${r.farmaci.join(', ')} dal ${r.dal}`);
+  }
+  if (!grezze.length) console.log('  (nessuna regola)');
+  return out;
+}
+
+// Controllo della chiave all'avvio del workflow, senza mai stamparla
+// (repository pubblico: i log delle Actions sono visibili a tutti).
+async function controllaChiave() {
+  const grezza = process.env.GEMINI_API_KEY;
+  const dia = diagnosiChiave(grezza);
+  console.log(`Chiave Gemini: ${dia.lunghezza} caratteri, formato ${dia.formatoOk ? 'ok' : 'NON standard'}` +
+    `${dia.spaziEsterni ? ', spazi/a capo ai lati (verranno tolti)' : ''}${dia.caratteriStrani ? ', CARATTERI NON VALIDI' : ''}`);
+  if (!dia.lunghezza) { console.error('::error::Secret GEMINI_API_KEY assente o vuoto'); return 1; }
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', {
+    headers: { 'x-goog-api-key': String(grezza).trim() },
+  });
+  if (r.ok) { console.log('Chiave Gemini accettata.'); return 0; }
+  const e = erroreGemini(r.status, await r.text());
+  console.error(`::error::Chiave Gemini non accettata: ${e.testo}`);
+  return 1;
 }
 
 function giorniFa(n) {
@@ -87,8 +158,9 @@ function giorniFa(n) {
 }
 
 async function aggiorna(giorni) {
-  const { GMAIL_USER: user, GMAIL_APP_PASSWORD: pass, GEMINI_API_KEY: key } = process.env;
-  if (!user || !pass || !key) {
+  const { GMAIL_USER: user, GMAIL_APP_PASSWORD: pass } = process.env;
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  if (!user || !pass || !apiKey) {
     console.error('Mancano GMAIL_USER / GMAIL_APP_PASSWORD / GEMINI_API_KEY.');
     return 2;
   }
@@ -97,6 +169,7 @@ async function aggiorna(giorni) {
   const scartate = [];
   const avvisi = [];
   let lette = 0;
+  let erroriGemini = 0;
 
   const client = new ImapFlow({ host: 'imap.gmail.com', port: 993, secure: true, auth: { user, pass }, logger: false });
   const tmp = mkdtempSync(join(tmpdir(), 'regole-'));
@@ -114,8 +187,8 @@ async function aggiorna(giorni) {
         // prima solo l'intestazione: le mail non pertinenti non si scaricano
         const env = await client.fetchOne(String(uid), { envelope: true }, { uid: true });
         const subject = (env?.envelope?.subject || '').trim();
-        const key = env?.envelope?.messageId || '';
-        if (!key || esaminate.has(key) || !circolarePertinente(subject)) continue;
+        const msgId = env?.envelope?.messageId || '';
+        if (!msgId || esaminate.has(msgId) || !circolarePertinente(subject)) continue;
 
         const parsed = await scaricaMail(client, uid);
         if (!parsed) continue;
@@ -129,50 +202,23 @@ async function aggiorna(giorni) {
           continue;
         }
 
-        const fonte = subject;
         const d = parsed.date ? dataDMY(parsed.date) : '';
         console.log(`Esamino: ${subject} (${d})`);
-        // Un errore o una risposta troncata su una mail non blocca le altre e
-        // la mail NON va tra le esaminate: si rilegge alla prossima corsa.
-        let risposta;
-        try {
-          risposta = await chiamaGemini(promptEstrazione(subject, testo), key);
-        } catch (err) {
-          console.warn(`::warning::[Regole] Gemini non ha risposto per "${subject}": ${err.message}`);
-          avvisi.push({ fonte, problemi: [`Gemini non ha risposto (${err.message.slice(0, 120)}): circolare da rileggere alla prossima corsa`] });
+        const r = await esaminaCircolare({ subject, testo, d, msgId, apiKey, regoleEsistenti: db.regole });
+        scartate.push(...r.scartate);
+        avvisi.push(...r.avvisi);
+        if (r.esito === 'chiave_rifiutata') {
+          console.error(`::error::Chiave Gemini rifiutata (${r.errore}): aggiornare il secret GEMINI_API_KEY`);
+          return 1;
+        }
+        if (r.esito === 'errore') {
+          // la mail NON va tra le esaminate: si rilegge alla prossima corsa
+          console.warn(`::warning::[Regole] ${r.errore} — "${subject}" da rileggere alla prossima corsa`);
+          erroriGemini++;
           continue;
         }
-        if (!rispostaLeggibile(risposta)) {
-          console.warn(`::warning::[Regole] risposta di Gemini illeggibile o troncata per "${subject}"`);
-          avvisi.push({ fonte, problemi: ['risposta di Gemini illeggibile o troncata: circolare da rileggere alla prossima corsa'] });
-          continue;
-        }
-        const grezze = parseRispostaEstrazione(risposta);
-        for (const g of grezze) {
-          const r = {
-            tipo: g.tipo,
-            farmaci: Array.isArray(g.farmaci) ? g.farmaci.map(f => String(f).trim()).filter(Boolean) : [],
-            regola: String(g.regola || '').trim(),
-            dal: String(g.dal || '').trim(),
-            estratto: String(g.estratto || '').trim(),
-            fonte, d, k: key,
-          };
-          const problemi = validaRegola(r, testo);
-          // L'enoxaparina la decide canale-eparine.js (codice testato, non il prompt).
-          if (r.farmaci.length && r.farmaci.every(isEnoxaparina)) problemi.push('enoxaparina: già gestita da canale-eparine.js');
-          if (!problemi.length && regolaDuplicata(r, db.regole)) problemi.push('già presente (promemoria o reinoltro)');
-          if (problemi.length) {
-            scartate.push({ fonte, problemi: [`${r.farmaci.join(', ') || '?'} — ${problemi.join('; ')}`] });
-            console.log(`  - scartata (${problemi.join('; ')})`);
-            continue;
-          }
-          const av = avvisiRegola(r, testo);
-          if (av.length) avvisi.push({ fonte, problemi: av });
-          db.regole.push(r);
-          console.log(`  + [${r.tipo}] ${r.farmaci.join(', ')} dal ${r.dal}`);
-        }
-        if (!grezze.length) console.log('  (nessuna regola)');
-        esaminate.add(key);
+        db.regole.push(...r.regole);
+        esaminate.add(msgId);
         lette++;
       }
     } finally {
@@ -183,7 +229,12 @@ async function aggiorna(giorni) {
     rmSync(tmp, { recursive: true, force: true });
   }
 
-  if (!lette) {
+  const esito = esitoCorsa({ lette, erroriGemini });
+  if (esito === 1) {
+    console.error(`::error::Nessuna circolare letta: ${erroriGemini} errori di Gemini (vedi gli avvisi sopra)`);
+    return 1;
+  }
+  if (esito === 3) {
     console.log('Nessuna circolare nuova da esaminare.');
     return 3;
   }
@@ -204,6 +255,7 @@ function report(fileBase) {
 
 async function main() {
   const args = process.argv.slice(2);
+  if (args.includes('--controlla-chiave')) return controllaChiave();
   const iReport = args.indexOf('--report');
   if (iReport >= 0) return report(resolve(args[iReport + 1] || ''));
   const iGiorni = args.indexOf('--giorni');

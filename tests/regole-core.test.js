@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import {
   circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, regoleToPrompt, regoleToDbFile,
-  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile,
+  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa,
 } from '../regole-core.js';
 
 // Circolari reali Federfarma La Spezia (solo oggetto e testo normativo).
@@ -239,5 +239,66 @@ describe('regole-prescrizione.js — dati pubblicati', () => {
     const sw = readFileSync(resolve(ROOT, 'sw.js'), 'utf8');
     expect(sw).toContain("'./regole-prescrizione.js'");
     expect(sw).toContain("'./regole-core.js'");
+  });
+});
+
+// Review 28/11: secret GEMINI_API_KEY rifiutato (API_KEY_INVALID) mentre la
+// stessa chiave funzionava nel browser; il workflow risultava "riuscito".
+describe('diagnosiChiave — controlla il secret senza mai mostrarlo', () => {
+  const buona = 'AIza' + 'x'.repeat(35);
+  it('chiave nel formato giusto', () => {
+    expect(diagnosiChiave(buona)).toEqual({ lunghezza: 39, formatoOk: true, spaziEsterni: false, caratteriStrani: false });
+  });
+  it('spazi o a capo ai lati, caratteri invisibili, formato diverso', () => {
+    expect(diagnosiChiave(buona + '\n').spaziEsterni).toBe(true);
+    expect(diagnosiChiave(' ' + buona).spaziEsterni).toBe(true);
+    expect(diagnosiChiave(buona.slice(0, 10) + '​' + buona.slice(10)).caratteriStrani).toBe(true);
+    expect(diagnosiChiave('"' + buona + '"').caratteriStrani).toBe(true);
+    expect(diagnosiChiave('AQ.' + 'x'.repeat(40)).formatoOk).toBe(false);
+    expect(diagnosiChiave(buona.slice(0, 30)).formatoOk).toBe(false);
+  });
+  it('il risultato non contiene la chiave', () => {
+    expect(JSON.stringify(diagnosiChiave(buona))).not.toContain('xxxx');
+  });
+});
+
+describe('erroreGemini — messaggio su una riga (gli avvisi di GitHub mostrano solo la prima)', () => {
+  const corpo = JSON.stringify({ error: { code: 400, message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] } }, null, 2);
+  it('estrae motivo e messaggio', () => {
+    const e = erroreGemini(400, corpo);
+    expect(e.testo).toBe('HTTP 400 API_KEY_INVALID: API key not valid. Please pass a valid API key.');
+    expect(e.testo).not.toContain('\n');
+    expect(e.chiaveRifiutata).toBe(true);
+  });
+  it('altri errori: niente chiaveRifiutata; corpo non JSON accorciato su una riga', () => {
+    expect(erroreGemini(404, '{"error":{"message":"model not found","status":"NOT_FOUND"}}')).toEqual({ testo: 'HTTP 404 NOT_FOUND: model not found', chiaveRifiutata: false });
+    const e = erroreGemini(500, 'errore\ninterno ' + 'x'.repeat(500));
+    expect(e.testo).not.toContain('\n');
+    expect(e.testo.length).toBeLessThan(250);
+  });
+  it('403 con chiave bloccata o permesso negato vale come chiave rifiutata', () => {
+    expect(erroreGemini(403, '{"error":{"message":"blocked","details":[{"reason":"API_KEY_SERVICE_BLOCKED"}]}}').chiaveRifiutata).toBe(true);
+  });
+});
+
+describe('esitoCorsa — errori di Gemini non devono sembrare "niente di nuovo"', () => {
+  it('circolari lette → 0; niente da leggere → 3', () => {
+    expect(esitoCorsa({ lette: 2, erroriGemini: 0 })).toBe(0);
+    expect(esitoCorsa({ lette: 2, erroriGemini: 1 })).toBe(0);
+    expect(esitoCorsa({ lette: 0, erroriGemini: 0 })).toBe(3);
+  });
+  it('nessuna letta e almeno un errore di Gemini → errore (1)', () => {
+    expect(esitoCorsa({ lette: 0, erroriGemini: 5 })).toBe(1);
+  });
+});
+
+describe('circolarePertinente — revoche AIC rimandate alla fase 2', () => {
+  it('scarta le revoche AIC/AIP anche se citano AIFA', () => {
+    expect(circolarePertinente("244-RRS-REVOCHE AIC E AIP SPECIALITA' MEDICINALI. ANTICIPAZIONI AIFA")).toBe(false);
+    expect(circolarePertinente('250 -RRS-REVOCHE AIC E AIP SPECIALITÀ MEDICINALI - ANTICIPAZIONI AIFA')).toBe(false);
+    expect(circolarePertinente('240 -RRS-DECADENZA AIC SPECIALITÀ MEDICINALI')).toBe(false);
+  });
+  it('le riclassificazioni restano', () => {
+    expect(circolarePertinente("231 -RRS- RICLASSIFICAZIONE SPECIALITA' MEDICINALE LEVOTUSS GOCCE IN CLASSE C")).toBe(true);
   });
 });
