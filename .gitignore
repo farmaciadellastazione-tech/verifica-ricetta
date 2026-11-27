@@ -7,3 +7,8 @@ coverage/
 # File temporanei dell'automazione FOFI (allegato scaricato, output di build)
 .fofi-incoming.xlsx
 build.out
+
+# File temporanei dell'automazione regole di prescrizione
+.regole-base.js
+.regole-pr.md
+.regole-report.json
