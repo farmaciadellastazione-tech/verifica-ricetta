@@ -1,0 +1,166 @@
+name: Aggiornamento regole di prescrizione
+
+# Legge le circolari di Federfarma SP e dell'Ordine (note AIFA, riclassificazioni,
+# DPC), fa estrarre le regole a Gemini e apre/aggiorna una PR su `dev` che
+# tocca SOLO regole-prescrizione.js. La PR NON viene mergiata in automatico:
+# la rivede il farmacista. Dopo il merge in dev il job "bump" aggiorna build e
+# cache PWA; in produzione ci arriva con la propagazione dev → main della
+# pipeline FOFI (o con un merge manuale).
+#
+# Secret: GMAIL_USER, GMAIL_APP_PASSWORD (gli stessi della pipeline FOFI) e
+# GEMINI_API_KEY.
+
+on:
+  schedule:
+    # lun-sab alle 06:30 UTC (07:30 ora solare, 08:30 ora legale)
+    - cron: '30 6 * * 1-6'
+  workflow_dispatch:
+    inputs:
+      giorni:
+        description: 'Quanti giorni di posta leggere'
+        type: number
+        default: 30
+  push:
+    branches: [dev]
+    paths: [regole-prescrizione.js]
+
+concurrency:
+  group: regole-update-${{ github.event_name == 'push' && 'bump' || 'update' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: auto/regole-update
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Installa dipendenze
+        run: |
+          npm ci
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils unzip tesseract-ocr tesseract-ocr-ita >/dev/null
+
+      # Con una PR ancora aperta si riparte dal suo file: le regole in attesa
+      # di revisione e le correzioni fatte a mano nel branch non si perdono.
+      # PR chiusa senza merge = regole rifiutate: si riparte da dev.
+      - name: Riprendi la PR aperta
+        id: pr
+        # Se l'API non risponde ci si ferma: ripartire da dev e fare force-push
+        # cancellerebbe le regole in attesa e le correzioni fatte nella PR.
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          RESP=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&base=dev&state=open") \
+            || { echo "::error::API GitHub non raggiungibile: non so se la PR è aperta, mi fermo"; exit 1; }
+          PR=$(echo "$RESP" | jq -r '.[0].number // empty')
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+          git show origin/dev:regole-prescrizione.js > .regole-base.js
+          if [ -n "$PR" ]; then
+            git fetch origin "$BRANCH"
+            git checkout "origin/$BRANCH" -- regole-prescrizione.js
+            echo "PR #$PR aperta: riparto dal suo regole-prescrizione.js"
+          fi
+
+      - name: Leggi le circolari ed estrai le regole
+        id: fetch
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set +e
+          node tools/update-regole.mjs --giorni "${{ inputs.giorni || 30 }}"
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ] && [ "$code" -ne 3 ]; then echo "::error::update-regole fallito (exit $code)"; exit "$code"; fi
+          PR="${{ steps.pr.outputs.number }}"
+          # PR aperta, nessuna circolare nuova e branch già allineato a dev:
+          # niente da ripubblicare (evita force-push e corpo della PR riscritto).
+          if [ "$code" -eq 3 ] && [ -n "$PR" ] && git merge-base --is-ancestor origin/dev "origin/$BRANCH"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          elif cmp -s regole-prescrizione.js .regole-base.js; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Test
+        if: steps.fetch.outputs.changed == 'true'
+        run: npm test
+
+      - name: Apri/aggiorna la Pull Request su dev (senza merge)
+        if: steps.fetch.outputs.changed == 'true'
+        run: |
+          set -e
+          REPO="${{ github.repository }}"
+          API="https://api.github.com/repos/$REPO"
+          node tools/update-regole.mjs --report .regole-base.js > .regole-pr.md
+          git config user.name "regole-update-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/$REPO.git"
+          git checkout -B "$BRANCH"
+          git add regole-prescrizione.js
+          git commit -m "Regole di prescrizione: aggiornamenti dalle circolari (da rivedere)"
+          git push -f origin "$BRANCH"
+          PR="${{ steps.pr.outputs.number }}"
+          BODY=$(printf '%s\n\n🤖 Aggiornamento automatico (workflow regole-update)' "$(cat .regole-pr.md)")
+          if [ -n "$PR" ]; then
+            jq -n --arg body "$BODY" '{body:$body}' \
+              | curl -sf -X PATCH -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" "$API/pulls/$PR" -d @- >/dev/null
+            echo "PR #$PR aggiornata."
+          else
+            PR=$(jq -n --arg body "$BODY" --arg head "$BRANCH" \
+              '{title:"Regole di prescrizione: aggiornamenti dalle circolari (da rivedere)", head:$head, base:"dev", body:$body}' \
+              | curl -sf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" "$API/pulls" -d @- \
+              | jq -r '.number')
+            echo "PR #$PR aperta."
+          fi
+          # Scartate e avvisi di questa corsa anche come commento: il corpo della
+          # PR viene riscritto a ogni corsa, i commenti restano.
+          if [ -f .regole-report.json ] && [ "$(jq '(.scartate|length)+(.avvisi|length)' .regole-report.json)" != "0" ]; then
+            jq -n --rawfile body .regole-pr.md '{body:$body}' \
+              | curl -sf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" "$API/issues/$PR/comments" -d @- >/dev/null
+          fi
+
+  # Dopo il merge della PR in dev: build + cache PWA, altrimenti le PWA
+  # installate continuano a usare il regole-prescrizione.js vecchio.
+  bump:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Bump versione + cache PWA
+        run: |
+          set -e
+          git config user.name "regole-update-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin dev && git reset -q --hard origin/dev
+            node tools/bump-build.mjs
+            git commit -qam "Bump build: nuove regole di prescrizione"
+            if git push origin HEAD:dev; then exit 0; fi
+            echo "dev è cambiato nel frattempo, riprovo"
+            sleep 5
+          done
+          echo "::error::push del bump non riuscito"; exit 1

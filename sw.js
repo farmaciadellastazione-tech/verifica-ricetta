@@ -1,7 +1,7 @@
 // Service worker — Verifica Ricetta
 // Cache-first per asset statici (app + DB FOFI), bypass per API esterne.
 // Bumpare CACHE_NAME ad ogni deploy per invalidare la cache vecchia.
-const CACHE_NAME = 'verifica-ricetta-build131';
+const CACHE_NAME = 'verifica-ricetta-build134';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,8 @@ const ASSETS = [
   './fofi-match.js',
   './fofi-xlsx.js',
   './canale-eparine.js',
+  './regole-core.js',
+  './regole-prescrizione.js',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',

@@ -117,3 +117,37 @@ direttamente la pagina del workflow su GitHub (serve essere loggati).
   Furti/Smarrimenti/falsificazioni*, accesso con codice fiscale): non è
   automatizzabile, serve come consultazione manuale.
 - In ogni caso la banca dati **non** viene modificata finché la PR non è approvata.
+
+---
+
+# Automazione regole di prescrizione (note AIFA, riclassificazioni, DPC)
+
+Workflow `.github/workflows/regole-update.yml`, lun-sab alle 06:30 UTC.
+
+1. `tools/update-regole.mjs` legge le mail di `federfarmalaspezia.it` e
+   `fofiruf.it` degli ultimi 30 giorni. Tiene solo quelle con oggetto
+   pertinente (`circolarePertinente` in `regole-core.js`: AIFA/note, RRS
+   riclassificazioni, DPC, modalità di prescrizione/erogazione).
+2. Ricava il testo di corpo mail e allegati PDF/docx (OCR per le scansioni) e
+   lo passa a Gemini, che restituisce le regole con una **citazione testuale**.
+3. `validaRegola` scarta le regole la cui citazione non si trova nel testo
+   della circolare, senza farmaci citati o con data non valida; scarta anche
+   doppioni (promemoria) ed enoxaparina (la gestisce `canale-eparine.js`).
+4. Apre/aggiorna la PR `auto/regole-update` → `dev`, che tocca solo
+   `regole-prescrizione.js`. **Nessun merge automatico**: la descrizione
+   mostra regola + citazione per ciascuna voce. Per togliere una regola si
+   cancella la sua riga nel branch della PR.
+5. Al merge in `dev` il job `bump` aggiorna build e cache PWA. In produzione la
+   regola arriva con la propagazione dev → main della pipeline FOFI (o con un
+   merge manuale).
+
+Secret necessari: `GMAIL_USER`, `GMAIL_APP_PASSWORD` (già presenti) e
+**`GEMINI_API_KEY`** (Settings → Secrets and variables → Actions).
+
+Prima esecuzione / recupero arretrato: *Actions → Aggiornamento regole di
+prescrizione → Run workflow* con `giorni` = 60.
+
+Una PR chiusa senza merge vale come rifiuto: le circolari restano tra le
+esaminate solo se mergiate, quindi alla corsa successiva verrebbero
+riproposte. Per rifiutare definitivamente una regola, meglio cancellarne la
+riga nel branch e mergiare (la circolare resta in `REGOLE_ESAMINATE`).

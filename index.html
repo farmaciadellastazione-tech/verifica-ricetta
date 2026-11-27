@@ -490,12 +490,14 @@
 <script src="fofi-db.js"></script>
 <script src="fofi-match.js"></script>
 <script src="canale-eparine.js"></script>
+<script src="regole-core.js"></script>
+<script src="regole-prescrizione.js"></script>
 <script>
 
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 131;
+const APP_BUILD = 134;
 const APP_BUILD_DATE = '27/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -1325,6 +1327,7 @@ CASISTICHE PARTICOLARI DI EROGAZIONE (valide per tutti i tipi, verifica giugno 2
 - ENOXAPARINA (Inhixa, Clexane, Rovi, Ghemaxan, Rovinadil — Liguria, circ. FF.Lig 0100 del 23/10/2026): doppio canale DPC/convenzionata. Il canale lo calcola il SISTEMA dopo la tua analisi, sui campi "data_prescrizione" e "nota_dpc": per l'enoxaparina NON aggiungere il controllo generico DPC qui sopra e non stabilire tu il canale. Il campo NOTE e' quello della nota AIFA: le caselle a DESTRA delle righe di prescrizione (sulla ricetta rossa cartacea sono le 3 caselle stampate "NOTA CUF", accanto alle caselle S/H/Altro, barrate se non usate con X X X o # # #; sul promemoria della ricetta dematerializzata, stampato o PDF, e' l'ultima colonna "NOTA" della tabella prescrizioni, a destra della colonna "QTA", e se vuota riporta "---"). La sigla "DPC" in quelle caselle non e' una nota AIFA: NON segnalarla come nota mancante, inesistente o incompatibile col farmaco. Riporta con cura: la data di redazione della ricetta; se il campo NOTE della ricetta/promemoria e' visibile e contiene la sigla "DPC" -> "presente"; se il campo note e' visibile e NON contiene "DPC" (vuoto, "---" o barrato con X X X / # # #) -> "assente"; se il campo note non compare nella foto o non e' leggibile (o non c'e' foto) -> "non_visibile". Nel dubbio usa "non_visibile". Biosimilari: il marchio prescritto non e' sostituibile.
 - RICETTA SASN (gente di mare / personale navigante marittimo e aviazione civile): modulo speciale (DM 18/5/2004) simile alla ricetta SSN, otticamente leggibile (esiste anche la versione dematerializzata). E' VALIDA su tutto il territorio nazionale e ogni farmacia convenzionata DEVE spedirla. Trattala come una ricetta SSN ai fini dei requisiti; il rimborso passa dall'Ufficio SASN (Trieste), non dalla ASL. NON segnalarla come "tipo errato".
 - RICETTA ESTERA UE (Direttiva 2011/24/UE, D.Lgs. 38/2014): valida in Italia se contiene nome/cognome paziente, data di nascita, identificazione del prescrittore (nome, qualifica, contatti, indirizzo, firma) e del farmaco (DCI o nome commerciale, forma, quantita', dosaggio, posologia). Erogazione PRIVATA (il paziente paga, nessun rimborso SSN). ESCLUSI gli stupefacenti/psicotropi (non ammessi con ricetta transfrontaliera). Il farmaco deve essere autorizzato e in commercio in Italia. RICETTA EXTRA-UE: trattata come ricetta privata, senza valore SSN; stupefacenti esclusi.
+${typeof regoleToPrompt === 'function' && typeof REGOLE_PRESCRIZIONE !== 'undefined' ? regoleToPrompt(REGOLE_PRESCRIZIONE) : ''}
 
 Rispondi SOLO con JSON valido, senza testo prima o dopo:
 

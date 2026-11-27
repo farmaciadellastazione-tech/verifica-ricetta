@@ -118,7 +118,8 @@ function ocrPdf(f, tmp) {
 
 // Buffer di un allegato -> testo (pdf via pdftotext, con OCR se è una scansione;
 // docx via unzip). '' se non leggibile.
-function allegatoToText(buf, nomeFile, tmp) {
+// Esportata: la riusa tools/update-regole.mjs.
+export function allegatoToText(buf, nomeFile, tmp) {
   const f = join(tmp, 'a' + Math.random().toString(36).slice(2) + (/\.docx$/i.test(nomeFile) ? '.docx' : '.pdf'));
   writeFileSync(f, buf);
   try {
