@@ -179,6 +179,14 @@ ${esaminate.map(k => JSON.stringify(k) + ',\n').join('')}];
 `;
 }
 
+// La stessa regola è già in elenco? (promemoria o reinoltro della circolare:
+// stesso tipo, stessa decorrenza, stessi farmaci a meno di maiuscole e ordine)
+function regolaDuplicata(r, elenco) {
+  const firma = x => [x.tipo, x.dal, (x.farmaci || []).map(_norm).sort().join('|')].join('#');
+  const f = firma(r);
+  return (elenco || []).some(x => firma(x) === f);
+}
+
 // Regole presenti in `dopo` e assenti in `prima` (confronto per contenuto).
 function regoleNuove(prima, dopo) {
   const viste = new Set((prima || []).map(r => JSON.stringify(r)));
@@ -222,6 +230,6 @@ function reportPR(nuove, scartate = [], avvisi = []) {
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _regoleExports = { TIPI_REGOLA, circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, regoleToPrompt, regoleToDbFile, regoleNuove, reportPR };
+const _regoleExports = { TIPI_REGOLA, circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR };
 Object.assign(globalThis, _regoleExports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _regoleExports;

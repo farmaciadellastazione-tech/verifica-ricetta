@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import {
   circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, regoleToPrompt, regoleToDbFile,
-  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR,
+  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata,
 } from '../regole-core.js';
 
 // Circolari reali Federfarma La Spezia (solo oggetto e testo normativo).
@@ -151,6 +151,19 @@ describe('regoleToDbFile — file regole-prescrizione.js', () => {
     vm.createContext(ctx);
     vm.runInContext(src + ';globalThis.__R = { regole: REGOLE_PRESCRIZIONE, esaminate: REGOLE_ESAMINATE };', ctx);
     expect(JSON.parse(JSON.stringify(ctx.__R))).toEqual(db);
+  });
+});
+
+describe('regolaDuplicata — promemoria e reinoltri della stessa circolare', () => {
+  const a = { ...regolaLevotuss, fonte: '231', d: '30/10/2026', k: '<a@x>' };
+  it('stesso tipo, stessa decorrenza, stessi farmaci (maiuscole e ordine a parte)', () => {
+    expect(regolaDuplicata({ ...regolaLevotuss, farmaci: ['LEVODROPROPIZINA', 'levotuss'], regola: 'altro testo' }, [a])).toBe(true);
+  });
+  it('decorrenza, tipo o farmaci diversi: regola nuova', () => {
+    expect(regolaDuplicata({ ...regolaLevotuss, dal: '01/12/2026' }, [a])).toBe(false);
+    expect(regolaDuplicata({ ...regolaLevotuss, tipo: 'nota_aifa' }, [a])).toBe(false);
+    expect(regolaDuplicata({ ...regolaLevotuss, farmaci: ['Levotuss'] }, [a])).toBe(false);
+    expect(regolaDuplicata(regolaLevotuss, [])).toBe(false);
   });
 });
 
