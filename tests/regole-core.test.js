@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import {
   circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, regoleToPrompt, regoleToDbFile,
-  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata,
+  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile,
 } from '../regole-core.js';
 
 // Circolari reali Federfarma La Spezia (solo oggetto e testo normativo).
@@ -111,6 +111,37 @@ describe('parseRispostaEstrazione — JSON di Gemini', () => {
     expect(parseRispostaEstrazione('{"regole":[]}')).toEqual([]);
     expect(parseRispostaEstrazione('non so')).toEqual([]);
     expect(parseRispostaEstrazione('{"altro":1}')).toEqual([]);
+  });
+});
+
+// Review 27/11: una risposta troncata o illeggibile non deve valere come
+// "nessuna regola", altrimenti la circolare finisce tra le esaminate per sempre.
+describe('rispostaLeggibile — distingue "nessuna regola" da risposta rotta', () => {
+  it('JSON con l\'array regole (anche vuoto) → leggibile', () => {
+    expect(rispostaLeggibile('{"regole":[]}')).toBe(true);
+    expect(rispostaLeggibile('```json\n{"regole":[{"tipo":"dpc"}]}\n```')).toBe(true);
+  });
+  it('troncata, vuota o senza regole → non leggibile', () => {
+    expect(rispostaLeggibile('{"regole":[{"tipo":"nota_aifa","farmaci":["dii')).toBe(false);
+    expect(rispostaLeggibile('')).toBe(false);
+    expect(rispostaLeggibile(null)).toBe(false);
+    expect(rispostaLeggibile('non so')).toBe(false);
+    expect(rispostaLeggibile('{"altro":1}')).toBe(false);
+  });
+});
+
+describe('review 27/11 — numeri e parole corte devono coincidere', () => {
+  it('classe o anno diversi non passano anche con citazione lunga', () => {
+    expect(estrattoPresente('dalla classe A in classe H con decorrenza 31 ottobre 2026', LEVOTUSS)).toBe(false);
+    expect(estrattoPresente('dalla classe A in classe C con decorrenza 31 ottobre 2027', LEVOTUSS)).toBe(false);
+    expect(estrattoPresente('dalla classe A in classe C con decorrenza 30 ottobre 2026', LEVOTUSS)).toBe(false);
+  });
+  it('la citazione esatta continua a passare', () => {
+    expect(estrattoPresente('dalla classe A in classe C con decorrenza 31 ottobre 2026', LEVOTUSS)).toBe(true);
+  });
+  it('tipi ereditati da Object (toString, constructor) non sono tipi validi', () => {
+    for (const tipo of ['toString', 'constructor', '__proto__'])
+      expect(validaRegola({ ...regolaLevotuss, tipo }, LEVOTUSS).join()).toMatch(/tipo/);
   });
 });
 

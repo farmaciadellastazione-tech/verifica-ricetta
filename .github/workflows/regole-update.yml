@@ -60,11 +60,15 @@ jobs:
       # PR chiusa senza merge = regole rifiutate: si riparte da dev.
       - name: Riprendi la PR aperta
         id: pr
+        # Se l'API non risponde ci si ferma: ripartire da dev e fare force-push
+        # cancellerebbe le regole in attesa e le correzioni fatte nella PR.
         run: |
+          set -euo pipefail
           REPO="${{ github.repository }}"
-          PR=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&base=dev&state=open" \
-            | jq -r '.[0].number // empty')
+          RESP=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/pulls?head=${REPO%%/*}:$BRANCH&base=dev&state=open") \
+            || { echo "::error::API GitHub non raggiungibile: non so se la PR è aperta, mi fermo"; exit 1; }
+          PR=$(echo "$RESP" | jq -r '.[0].number // empty')
           echo "number=$PR" >> "$GITHUB_OUTPUT"
           git show origin/dev:regole-prescrizione.js > .regole-base.js
           if [ -n "$PR" ]; then
@@ -85,7 +89,12 @@ jobs:
           code=$?
           set -e
           if [ "$code" -ne 0 ] && [ "$code" -ne 3 ]; then echo "::error::update-regole fallito (exit $code)"; exit "$code"; fi
-          if cmp -s regole-prescrizione.js .regole-base.js; then
+          PR="${{ steps.pr.outputs.number }}"
+          # PR aperta, nessuna circolare nuova e branch già allineato a dev:
+          # niente da ripubblicare (evita force-push e corpo della PR riscritto).
+          if [ "$code" -eq 3 ] && [ -n "$PR" ] && git merge-base --is-ancestor origin/dev "origin/$BRANCH"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          elif cmp -s regole-prescrizione.js .regole-base.js; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"

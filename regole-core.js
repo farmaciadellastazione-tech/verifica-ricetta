@@ -68,14 +68,19 @@ function estrattoPresente(estratto, testo) {
   const t = _tok(testo);
   if (` ${t.join(' ')} `.includes(` ${e.join(' ')} `)) return true;
   const minimo = Math.ceil(e.length * SOGLIA_ESTRATTO);
-  const ok = (x, y) => x === y || (x.length >= 5 && !/\d/.test(x) && _quasiUguali(x, y));
+  const lunga = x => x.length >= 5 && !/\d/.test(x);
+  const maxMancate = e.length - minimo;
   for (let i = 0; i + e.length <= t.length; i++) {
-    let match = 0;
-    for (let k = 0; k < e.length; k++) {
-      if (ok(e[k], t[i + k])) match++;
-      else if (k - match >= e.length - minimo) break; // non può più arrivare alla soglia
+    let mancate = 0;
+    let k = 0;
+    for (; k < e.length; k++) {
+      const x = e[k], y = t[i + k];
+      if (x === y || (lunga(x) && _quasiUguali(x, y))) continue;
+      // numeri e parole corte ("classe H", "2027") devono essere identici:
+      // basta uno diverso per scartare la finestra
+      if (!lunga(x) || ++mancate > maxMancate) break;
     }
-    if (match >= minimo) return true;
+    if (k === e.length) return true;
   }
   return false;
 }
@@ -100,7 +105,7 @@ const MAX_CARATTERI_REGOLA = 600;
 function validaRegola(r, testo) {
   const out = [];
   if (!r || typeof r !== 'object') return ['regola non valida'];
-  if (!TIPI_REGOLA[r.tipo]) out.push(`tipo "${r.tipo}" non previsto`);
+  if (!Object.hasOwn(TIPI_REGOLA, String(r.tipo))) out.push(`tipo "${r.tipo}" non previsto`);
   const farmaci = Array.isArray(r.farmaci) ? r.farmaci.filter(f => typeof f === 'string' && f.trim()) : [];
   if (!farmaci.length) out.push('nessun farmaco indicato');
   else if (!farmaci.some(f => _citato(f, testo))) out.push(`nessun farmaco citato nella circolare (${farmaci.join(', ')})`);
@@ -153,11 +158,28 @@ function parseRispostaEstrazione(s) {
   }
 }
 
+// La risposta di Gemini è un JSON completo con l'array "regole" (anche vuoto)?
+// No (troncata, bloccata, testo libero) → la circolare va riletta, non
+// segnata come esaminata.
+function rispostaLeggibile(s) {
+  const t = String(s || '').replace(/^s*```(?:json)?s*/i, '').replace(/s*```s*$/, '');
+  try {
+    return Array.isArray(JSON.parse(t)?.regole);
+  } catch {
+    return false;
+  }
+}
+
+// Etichetta del tipo (solo chiavi proprie: niente "toString" o "constructor").
+function _etichetta(tipo) {
+  return Object.hasOwn(TIPI_REGOLA, String(tipo)) ? TIPI_REGOLA[tipo] : String(tipo);
+}
+
 // Sezione del prompt di verifica con le regole approvate.
 function regoleToPrompt(regole) {
   if (!Array.isArray(regole) || !regole.length) return '';
   const righe = regole.map(r =>
-    `- [${TIPI_REGOLA[r.tipo] || r.tipo}] ${(r.farmaci || []).join(', ')}: ${r.regola} (dal ${r.dal}; fonte: ${r.fonte})`);
+    `- [${_etichetta(r.tipo)}] ${(r.farmaci || []).join(', ')}: ${r.regola} (dal ${r.dal}; fonte: ${r.fonte})`);
   return `AGGIORNAMENTI NORMATIVI RECENTI (circolari Federfarma/Ordine riviste dal farmacista; PREVALGONO sulle indicazioni generali sopra, comprese le note AIFA elencate in NORMATIVA, in caso di conflitto):
 Applica ciascuna regola solo se il farmaco prescritto e' tra quelli indicati e la data di redazione della ricetta e' uguale o successiva alla decorrenza ("dal"); per le ricette precedenti vale la disciplina previgente. Riclassificazione in classe C: su ricetta SSN il farmaco non e' piu' rimborsabile (controllo "errore", da spedire come privata), su ricetta bianca privata nessun effetto. Nota AIFA: vale solo su SSN. DPC: controllo "attenzione" sul canale di erogazione. Cita la fonte nella nota del controllo.
 ${righe.join('\n')}`;
@@ -203,7 +225,7 @@ function reportPR(nuove, scartate = [], avvisi = []) {
     md.push(`## Regole da approvare (${nuove.length})`);
     for (const r of nuove) {
       md.push('');
-      md.push(`### [${TIPI_REGOLA[r.tipo] || r.tipo}] ${(r.farmaci || []).join(', ')} — dal ${r.dal}`);
+      md.push(`### [${_etichetta(r.tipo)}] ${(r.farmaci || []).join(', ')} — dal ${r.dal}`);
       md.push(`**Regola:** ${r.regola}`);
       md.push('');
       md.push(`> ${r.estratto}`);
@@ -230,6 +252,6 @@ function reportPR(nuove, scartate = [], avvisi = []) {
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _regoleExports = { TIPI_REGOLA, circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR };
+const _regoleExports = { TIPI_REGOLA, circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR };
 Object.assign(globalThis, _regoleExports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _regoleExports;

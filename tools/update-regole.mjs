@@ -30,7 +30,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FILE_REGOLE = resolve(ROOT, 'regole-prescrizione.js');
 const FILE_REPORT = resolve(ROOT, '.regole-report.json');
 const {
-  circolarePertinente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione,
+  circolarePertinente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile,
   regoleToDbFile, regolaDuplicata, regoleNuove, reportPR,
 } = require(resolve(ROOT, 'regole-core.js'));
 const { dataDMY } = require(resolve(ROOT, 'fofi-match.js'));
@@ -132,7 +132,22 @@ async function aggiorna(giorni) {
         const fonte = subject;
         const d = parsed.date ? dataDMY(parsed.date) : '';
         console.log(`Esamino: ${subject} (${d})`);
-        const grezze = parseRispostaEstrazione(await chiamaGemini(promptEstrazione(subject, testo), key));
+        // Un errore o una risposta troncata su una mail non blocca le altre e
+        // la mail NON va tra le esaminate: si rilegge alla prossima corsa.
+        let risposta;
+        try {
+          risposta = await chiamaGemini(promptEstrazione(subject, testo), key);
+        } catch (err) {
+          console.warn(`::warning::[Regole] Gemini non ha risposto per "${subject}": ${err.message}`);
+          avvisi.push({ fonte, problemi: [`Gemini non ha risposto (${err.message.slice(0, 120)}): circolare da rileggere alla prossima corsa`] });
+          continue;
+        }
+        if (!rispostaLeggibile(risposta)) {
+          console.warn(`::warning::[Regole] risposta di Gemini illeggibile o troncata per "${subject}"`);
+          avvisi.push({ fonte, problemi: ['risposta di Gemini illeggibile o troncata: circolare da rileggere alla prossima corsa'] });
+          continue;
+        }
+        const grezze = parseRispostaEstrazione(risposta);
         for (const g of grezze) {
           const r = {
             tipo: g.tipo,
