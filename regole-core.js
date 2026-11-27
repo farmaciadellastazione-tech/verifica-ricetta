@@ -18,7 +18,7 @@ const TIPI_REGOLA = {
 
 // Oggetto della mail → vale la pena farla leggere a Gemini?
 const _PERTINENTE = /\bAIFA\b|\bnot[ae]\s+(aifa\s+)?\d|riclassific|\bclasse\s+[ACH]\b|\bfascia\s+[ACH]\b|\bDPC\b|\bPHT\b|modalit[aà]\s+di\s+(prescrizione|erogazione)|\berogazione\b|regime\s+di\s+fornitura|piano\s+terapeutico/i;
-const _ESCLUSA = /vaccin|valori\s+di\s+rimborso|\bECM\b|\bcorso\b|prelievi|riepilogo|segnalazion|falsificat|furto|smarriment|ritiro\s+lott/i;
+const _ESCLUSA = /vaccin|valori\s+di\s+rimborso|\bECM\b|\bcorso\b|prelievi|riepilogo|segnalazion|falsificat|furto|smarriment|ritiro\s+lott|revoc|decadenz/i;
 
 function circolarePertinente(oggetto) {
   const s = String(oggetto || '');
@@ -250,8 +250,50 @@ function reportPR(nuove, scartate = [], avvisi = []) {
   return md.join('\n');
 }
 
+// ── Diagnostica della chiave Gemini (workflow) ──────────────────────────
+
+// Controlla il valore del secret SENZA mai restituirlo: il repository è
+// pubblico e i log delle Actions sono visibili a tutti.
+function diagnosiChiave(k) {
+  const s = String(k ?? '');
+  const t = s.trim();
+  return {
+    lunghezza: t.length,
+    formatoOk: /^AIza[0-9A-Za-z_-]{35}$/.test(t),
+    spaziEsterni: s !== t,
+    caratteriStrani: /[^0-9A-Za-z_.-]/.test(t),
+  };
+}
+
+const _MOTIVI_CHIAVE = /API_KEY_INVALID|API_KEY_SERVICE_BLOCKED|API_KEY_HTTP_REFERRER_BLOCKED|API_KEY_IP_ADDRESS_BLOCKED|API_KEY_ANDROID_APP_BLOCKED|API_KEY_IOS_APP_BLOCKED|API_KEY_EXPIRED/;
+
+// Errore HTTP di Gemini → messaggio su UNA riga (gli avvisi di GitHub ne
+// mostrano solo la prima) + se dipende dalla chiave (inutile proseguire).
+function erroreGemini(status, corpo) {
+  let motivo = '', messaggio = '';
+  try {
+    const e = JSON.parse(corpo).error || {};
+    motivo = (e.details || []).map(d => d.reason).find(Boolean) || e.status || '';
+    messaggio = e.message || '';
+  } catch {
+    messaggio = String(corpo || '');
+  }
+  messaggio = messaggio.replace(/\s+/g, ' ').trim().slice(0, 200);
+  return {
+    testo: `HTTP ${status}${motivo ? ' ' + motivo : ''}: ${messaggio}`,
+    chiaveRifiutata: _MOTIVI_CHIAVE.test(motivo),
+  };
+}
+
+// Exit code della corsa: 0 = circolari lette, 3 = niente di nuovo,
+// 1 = nessuna letta per errori di Gemini (deve risultare in rosso).
+function esitoCorsa({ lette, erroriGemini }) {
+  if (lette > 0) return 0;
+  return erroriGemini > 0 ? 1 : 3;
+}
+
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _regoleExports = { TIPI_REGOLA, circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR };
+const _regoleExports = { TIPI_REGOLA, circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR, diagnosiChiave, erroreGemini, esitoCorsa };
 Object.assign(globalThis, _regoleExports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _regoleExports;

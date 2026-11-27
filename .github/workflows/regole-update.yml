@@ -77,6 +77,13 @@ jobs:
             echo "PR #$PR aperta: riparto dal suo regole-prescrizione.js"
           fi
 
+      # Prova la chiave prima di leggere la posta: se è rifiutata l'esecuzione
+      # si ferma in rosso con il motivo (la chiave non viene mai stampata).
+      - name: Controlla la chiave Gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node tools/update-regole.mjs --controlla-chiave
+
       - name: Leggi le circolari ed estrai le regole
         id: fetch
         env:
