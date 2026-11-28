@@ -10,10 +10,12 @@ name: Aggiornamento banca dati FOFI
 
 on:
   schedule:
-    # lun-sab quattro volte al giorno (orari UTC): in Italia 07/11/15/18
-    # con l'ora solare, 08/12/16/19 con l'ora legale. Così una circolare
+    # lun-sab quattro volte al giorno (orari UTC): in Italia 07:13/11:13/15:13/18:13
+    # con l'ora solare, un'ora dopo con l'ora legale. Così una circolare
     # arrivata in mattinata entra in banca dati entro poche ore.
-    - cron: '0 6,10,14,17 * * 1-6'
+    # Minuto 13 e non :00: allo scoccare dell'ora GitHub è più carico e le
+    # esecuzioni programmate arrivano con ore di ritardo o saltano (28/11/2026).
+    - cron: '13 6,10,14,17 * * 1-6'
   workflow_dispatch:
     inputs:
       dry_run:

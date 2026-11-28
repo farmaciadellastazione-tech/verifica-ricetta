@@ -12,8 +12,12 @@ name: Aggiornamento regole di prescrizione
 
 on:
   schedule:
-    # lun-sab alle 06:30 UTC (07:30 ora solare, 08:30 ora legale)
-    - cron: '30 6 * * 1-6'
+    # lun-sab due volte (UTC): 07:17 e 13:47 ora solare, un'ora dopo con l'ora
+    # legale. Minuti insoliti e due giri: le esecuzioni programmate di GitHub
+    # alle ore/mezz'ore tonde arrivano in ritardo o saltano (28/11/2026). Le
+    # circolari già lette vengono saltate, quindi il secondo giro non duplica.
+    - cron: '17 6 * * 1-6'
+    - cron: '47 12 * * 1-6'
   workflow_dispatch:
     inputs:
       giorni:
