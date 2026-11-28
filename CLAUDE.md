@@ -60,7 +60,7 @@ The FOFI database is matched against the prescriber and drug returned by Gemini 
 - `statoRicetta`: `'da-spedire'` (pre-controllo, default) | `'gia-spedita'` (verifica conformità a posteriori) — changes the button label and tweaks the prompt's framing.
 
 The regulatory logic for ricetta bianca privata vs SSN is **substantially different** and is encoded in the prompt itself (see the `bianca` / `ssn` / `stupefacenti` blocks inside `buildPrompt`). Notable rules already baked in:
-- Note AIFA (N01, 13, 64, 75, ecc.) apply only su SSN, mai su bianca privata.
+- Note AIFA (N01, 13, 75, ecc.) apply only su SSN, mai su bianca privata. (La "Nota 64" non esiste: non citarla — test in `tests/prompt-note-aifa.test.js`.)
 - RMR (ricalco) vs RNR (bianca/SSN non a ricalco) determina la necessità del documento ritirante per stupefacenti allegato III-bis (vedi DPR 309/90 art. 45 c. 6-bis).
 - Alcuni farmaci sono OSP1 (uso ospedaliero esclusivo, art. 92 DL 219/06) — segnala "errore di prescrivibilità", non "manca documento".
 
