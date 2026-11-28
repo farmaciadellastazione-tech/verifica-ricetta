@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import {
   circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, regoleToPrompt, regoleToDbFile,
-  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa,
+  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa, circolareDaValutare,
 } from '../regole-core.js';
 
 // Circolari reali Federfarma La Spezia (solo oggetto e testo normativo).
@@ -368,5 +368,26 @@ describe('logistica DPC — eccezione per entrate/uscite di medicinali', () => {
       'DPC: esclusione di PROLIA dalla distribuzione per conto',
       'Proroga accordo DPC e uscita di EPREX dal canale',
     ]) expect(circolarePertinente(s), s).toBe(true);
+  });
+});
+
+// Circolari sugli stupefacenti (28/11/2026): cambiano le regole di base del
+// prompt, non una regola per farmaco → nella PR come "da valutare a mano".
+describe('circolareDaValutare — stupefacenti da leggere a mano', () => {
+  it('oggetti con sigla STUP o stupefacenti', () => {
+    for (const s of [
+      '245 -STUP- DEMATERIALIZZAZIONE DELLE RICETTE A CAARICO DEL CITTADINO (CD RICETTE BIANCHE) PER I MEDICINALI STUPEFACENTI DELLE SEZIONI B,C,D ED E',
+      '249 -STUP-DEMATERIALIZZAZIONE RICETTE BIANCHE STUPEFACENTI SEZIONI B, C, D ED E. PRECISAZIONI',
+      'circ FF Lig. n. 0070 del 06-07-26 Erogazione ricette dema farmaci stupefacenti. Chiarimenti Federfarma momentanea sospensione',
+    ]) expect(circolareDaValutare(s), s).toBe(true);
+  });
+  it('le altre circolari no; le segnalazioni FOFI di furti/falsi nemmeno', () => {
+    for (const s of [
+      '241 -AIFA-DETERMINAZIONI 20 OTTOBRE 2026. AGGIORNAMENTO NOTA AIFA 31.',
+      'circ FF.Lig 0053 del 08-06-26 DPC. Aggiornamento elenco A dal 08-06-2026',
+      'IMPORTANTE : Segnalazione possibile ricetta falsificata stupefacenti',
+      'furto ricettario stupefacenti',
+      '', null,
+    ]) expect(circolareDaValutare(s), String(s)).toBe(false);
   });
 });
