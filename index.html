@@ -163,6 +163,9 @@
   .btn-nuova:hover { background: var(--bg-sec); }
 
   /* FOFI DB status badge */
+  /* Avviso PR regole: ambra, non rosso (il rosso resta riservato all'allarme FOFI). Niente display: rispetta [hidden]. */
+  .avviso-regole { margin: 0 0 14px; padding: 10px 14px; background: var(--amber-50); border: 1px solid var(--amber-100); border-radius: 8px; font-size: 14px; color: var(--amber-800); line-height: 1.45; }
+  .avviso-regole a { color: var(--amber-800); font-weight: 600; }
   .db-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: var(--green-600); background: var(--green-50); border: 0.5px solid var(--teal-100); border-radius: 20px; padding: 4px 12px; margin-top: 6px; }
   .db-badge-dot { width: 6px; height: 6px; background: var(--teal-400); border-radius: 50%; }
 
@@ -294,6 +297,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Avviso: nuove regole di prescrizione in attesa di revisione (vedi controllaPRRegole) -->
+  <div class="avviso-regole" id="avviso-regole" hidden></div>
 
   <div id="form-section">
 
@@ -497,8 +503,8 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 137;
-const APP_BUILD_DATE = '27/11/2026';
+const APP_BUILD = 138;
+const APP_BUILD_DATE = '28/11/2026';
 
 let tipoSelezionato = 'bianca';
 let statoRicetta = 'da-spedire';   // 'da-spedire' (pre-controllo) | 'gia-spedita' (verifica conformità)
@@ -610,6 +616,32 @@ function installaPWA() {
     document.getElementById('install-btn').classList.remove('show');
   });
 }
+// ─── Avviso PR regole di prescrizione ──────────────────────────────────
+// Il workflow regole-update apre una PR su GitHub quando una circolare porta
+// regole nuove: va rivista (da Claude Code) prima del merge. All'avvio si
+// chiede all'API pubblica di GitHub se ce n'è una aperta; se GitHub non
+// risponde l'avviso semplicemente non compare (la verifica non ne dipende).
+async function controllaPRRegole() {
+  const box = document.getElementById('avviso-regole');
+  if (!box || typeof prRegoleInAttesa !== 'function') return;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch('https://api.github.com/repos/farmaciadellastazione-tech/verifica-ricetta/pulls?state=open&per_page=20',
+      { signal: ctrl.signal, headers: { Accept: 'application/vnd.github+json' } });
+    clearTimeout(timer);
+    if (!r.ok) return;
+    const prs = prRegoleInAttesa(await r.json());
+    if (!prs.length) return;
+    const link = prs.map(p => `<a href="${escHtml(p.url)}" target="_blank" rel="noopener">PR #${p.numero}</a>`).join(', ');
+    box.innerHTML = `📋 <strong>Nuove regole di prescrizione da rivedere</strong> (${link}).<br>Apri Claude Code nel progetto e scrivi «controlla la PR».`;
+    box.hidden = false;
+  } catch (err) {
+    console.info('[Verifica] avviso regole non disponibile:', err.name);
+  }
+}
+controllaPRRegole();
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')

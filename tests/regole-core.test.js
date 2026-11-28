@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import {
   circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, regoleToPrompt, regoleToDbFile,
-  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa,
+  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa,
 } from '../regole-core.js';
 
 // Circolari reali Federfarma La Spezia (solo oggetto e testo normativo).
@@ -300,5 +300,32 @@ describe('circolarePertinente — revoche AIC rimandate alla fase 2', () => {
   });
   it('le riclassificazioni restano', () => {
     expect(circolarePertinente("231 -RRS- RICLASSIFICAZIONE SPECIALITA' MEDICINALE LEVOTUSS GOCCE IN CLASSE C")).toBe(true);
+  });
+});
+
+// Avviso nell'app quando c'è una PR delle regole da rivedere (28/11/2026).
+describe('prRegoleInAttesa — risposta dell\'API GitHub /pulls', () => {
+  const pr = (n, ref, state = 'open') => ({ number: n, state, html_url: `https://github.com/x/y/pull/${n}`, head: { ref } });
+  it('solo le PR aperte del branch auto/regole-update', () => {
+    expect(prRegoleInAttesa([pr(28, 'auto/regole-update'), pr(29, 'auto/fofi-update'), pr(27, 'auto/regole-update', 'closed')]))
+      .toEqual([{ numero: 28, url: 'https://github.com/x/y/pull/28' }]);
+  });
+  it('risposta vuota, errore o formato inatteso → nessun avviso', () => {
+    expect(prRegoleInAttesa([])).toEqual([]);
+    expect(prRegoleInAttesa({ message: 'API rate limit exceeded' })).toEqual([]);
+    expect(prRegoleInAttesa(null)).toEqual([]);
+    expect(prRegoleInAttesa([{ number: 1 }])).toEqual([]);
+  });
+  it('url non GitHub scartato (niente link arbitrari nella pagina)', () => {
+    expect(prRegoleInAttesa([{ ...pr(30, 'auto/regole-update'), html_url: 'https://evil.example/pull/30' }])).toEqual([]);
+  });
+});
+
+describe('index.html — avviso PR regole', () => {
+  it('ha il riquadro e lo popola all\'avvio', () => {
+    const html = readFileSync(resolve(ROOT, 'index.html'), 'utf8');
+    expect(html).toContain('id="avviso-regole"');
+    expect(html).toMatch(/controllaPRRegole\(\)/);
+    expect(html).toContain('api.github.com/repos/farmaciadellastazione-tech/verifica-ricetta/pulls');
   });
 });

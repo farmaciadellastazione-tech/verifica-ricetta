@@ -292,8 +292,22 @@ function esitoCorsa({ lette, erroriGemini }) {
   return erroriGemini > 0 ? 1 : 3;
 }
 
+// ── Avviso nell'app: PR delle regole in attesa di revisione ─────────────
+
+const BRANCH_PR_REGOLE = 'auto/regole-update';
+
+// Risposta di GET /repos/.../pulls → PR aperte del workflow regole.
+// Qualsiasi risposta inattesa (errore, rate limit) → [] (nessun avviso).
+function prRegoleInAttesa(pulls) {
+  if (!Array.isArray(pulls)) return [];
+  return pulls
+    .filter(p => p && p.state === 'open' && p.head?.ref === BRANCH_PR_REGOLE && Number.isInteger(p.number)
+      && /^https:\/\/github\.com\//.test(String(p.html_url || '')))
+    .map(p => ({ numero: p.number, url: p.html_url }));
+}
+
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _regoleExports = { TIPI_REGOLA, circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR, diagnosiChiave, erroreGemini, esitoCorsa };
+const _regoleExports = { TIPI_REGOLA, circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa };
 Object.assign(globalThis, _regoleExports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _regoleExports;
