@@ -322,7 +322,7 @@
     <div class="card">
       <div class="section-label">Tipo ricetta</div>
       <div class="tipo-tabs">
-        <div class="tipo-tab" data-tipo="ssn">SSN / Dematerializzata</div>
+        <div class="tipo-tab" data-tipo="ssn">SSN</div>
         <div class="tipo-tab active" data-tipo="bianca">Bianca privata</div>
         <div class="tipo-tab" data-tipo="stupefacenti">Stupefacenti</div>
         <div class="tipo-tab" data-tipo="veterinaria">Veterinaria</div>
@@ -503,7 +503,7 @@
 // ─── Versioning: bumpare ad ogni commit ───────────────────────────────
 // Counter incrementale + data di build, mostrato in footer per identificare
 // visivamente la versione caricata dopo un refresh / aggiornamento PWA.
-const APP_BUILD = 141;
+const APP_BUILD = 142;
 const APP_BUILD_DATE = '28/11/2026';
 
 let tipoSelezionato = 'bianca';
@@ -975,8 +975,8 @@ function getRequisiti() {
 4. Data di compilazione
 5. Farmaco con nome, dosaggio, forma farmaceutica e n. confezioni
 6. Posologia o indicazione terapeutica
-7. Timbro medico leggibile con codice regionale
-8. Firma autografa del medico
+7. Timbro medico leggibile con codice regionale (solo ricetta cartacea: sul promemoria dematerializzato il medico e' identificato da nome, codice fiscale e codice di autenticazione)
+8. Firma autografa del medico (solo ricetta cartacea: il promemoria dematerializzato non la prevede)
 9. Codice esenzione (se applicabile)
 10. Ricetta integra: non alterata, non cancellata, leggibile
 
@@ -1018,14 +1018,15 @@ Su ricetta privata (bianca) NON serve PT/specialista — basta qualsiasi medico 
 2. Generalità del paziente (nome/cognome o CF)
 3. Farmaco: nome, dosaggio, forma farmaceutica, quantità
 4. Posologia chiara e dettagliata
-5. Firma autografa del medico
+5. Firma autografa del medico (solo ricetta cartacea: il promemoria dematerializzato non la prevede, il medico e' identificato da nome, codice fiscale e codice di autenticazione)
 6. Dati identificativi medico (nome, specializzazione, indirizzo, n. Ordine)
 7. Indicazione "non ripetibile" se previsto
 8. Ricetta integra, leggibile, non alterata
+9. Se dematerializzata: NRBE (Numero di Ricetta Bianca Elettronico) sul promemoria (vedi FORMATO DELLA RICETTA)
 
 NOTA IMPORTANTE (ricetta bianca privata vs SSN):
 - Su ricetta bianca privata NON si applicano le note AIFA (N01, 13, 75, 79, 87, 96, ecc.): sono uno strumento di rimborsabilita' SSN, non un requisito normativo per la dispensazione. Es: un Caverject prescritto su ricetta bianca privata e' valido senza nota 75 e senza piano terapeutico. Il paziente paga il farmaco a prezzo pieno e non passa dal SSN.
-- Su ricetta bianca privata NON servono: NRE, codice ASL, codice regionale, codice esenzione, fustella. Sono requisiti SSN.
+- Su ricetta bianca privata NON servono: codice ASL, codice regionale, codice esenzione, fustella. Sono requisiti SSN. L'NRE e' solo della ricetta SSN; la bianca dematerializzata ha invece l'NRBE (la bianca cartacea non ha nessuno dei due).
 - Su ricetta bianca privata il prescrittore puo' essere QUALSIASI medico abilitato (MMG, specialista privato, libero professionista), NON serve specialista per farmaci che su SSN richiedono PT (es. Caverject, biologici, DOAC, ecc.).
 - Resta valido invece il regime giuridico del farmaco (RR standard / RR benzo orali Sez. E / RNR / RNR benzo iniettabili Sez. D / RNR Tab.A allegato III-bis / RMR Tab. I-III) e le relative regole di posologia, validita', trattenuta, documento, ecc.
 
@@ -1348,10 +1349,16 @@ REGOLE TIPO RICETTA (importanti, valide in entrambe le modalita'):
 - (Solo in modalita' PRE) Se la scadenza inserita dal farmacista non corrisponde alla classe rilevata, aggiungi un controllo "Validita' ricetta" stato "attenzione" con la scadenza corretta calcolata (data + 30 gg o data + 180 gg). Se il farmacista non ha inserito scadenza, calcolala tu nel campo note. In modalita' POST questa regola NON SI APPLICA (vedi assunto 5).
 - Se hai un'immagine, verifica che il tipo visivo della ricetta corrisponda al TIPO dichiarato. Indizi visivi:
   * SSN/dematerializzata: foglio rosso prestampato con header SSN/Ministero, campi prestampati (codice fiscale, codice esenzione, codice regione), o stampa digitale promemoria dematerializzato con NRE.
-  * Bianca privata: foglio bianco con sola intestazione/timbro medico, nessun campo prestampato SSN.
+  * Bianca privata: foglio bianco con sola intestazione/timbro medico, nessun campo prestampato SSN; OPPURE promemoria dematerializzato con NRBE (Numero di Ricetta Bianca Elettronico, a carico del cittadino). Un promemoria NON e' di per se' una ricetta SSN: con NRBE e' una bianca, con NRE e' una SSN. Se il tipo dichiarato e' bianca e il promemoria ha l'NRBE NON segnalare discordanza.
   * Stupefacenti: ricettario ministeriale beige/giallo a ricalco con 3 copie e numero progressivo prestampato.
   * Veterinaria: intestazione veterinaria con dati animale/proprietario.
 - Se il tipo VISIVO differisce dal tipo DICHIARATO: aggiungi un controllo con campo "Discordanza tipo ricetta" stato "attenzione" che evidenzia la discordanza, ma continua ad applicare i requisiti del tipo DICHIARATO (il farmacista sa cosa sta verificando). Sommario menziona la discordanza.
+
+FORMATO DELLA RICETTA: CARTACEA O DEMATERIALIZZATA (vale per bianca e SSN; la dematerializzata sta diventando il formato prevalente):
+- RICONOSCIMENTO: la ricetta DEMATERIALIZZATA si presenta come PROMEMORIA stampato o PDF ("ricetta elettronica - promemoria per l'assistito") con codici a barre e un numero di ricetta: NRE per la SSN (DM 2/11/2011), NRBE (Numero di Ricetta Bianca Elettronico) per la bianca a carico del cittadino (DM 30/12/2020; in Liguria dal 30/05/2022). La CARTACEA e' il modulo compilato e firmato dal medico (foglio rosso SSN, foglio bianco, ricettario a ricalco). Il medico puo' usare l'una o l'altra: entrambe valide e da spedire.
+- REQUISITI SUL PROMEMORIA: NON ci sono firma autografa ne' timbro del medico: il medico e' identificato da nome, codice fiscale e codice di autenticazione. NON segnalare come mancanti firma o timbro su un promemoria. Restano da verificare: data, paziente, farmaco/dosaggio/quantita', NRE o NRBE, e per la SSN codice fiscale, esenzione e note.
+- CONSERVAZIONE E ANNOTAZIONI: per la dematerializzata (SSN e bianca, ripetibile o non ripetibile) l'obbligo di conservazione della ricetta e' assolto dal Sistema TS (SAC), e le annotazioni previste dalla legge si fanno sul Sistema TS tramite il gestionale della farmacia. REGOLA GENERALE: dove le regole di dettaglio dicono "trattenere la ricetta", "conservare la ricetta" o "annotare sulla ricetta" (documento del ritirante, utilizzo parziale o frazionato), per la dematerializzata si intende la registrazione sul Sistema TS tramite gestionale: NON segnalare come errore la mancanza di annotazioni sul promemoria e, se serve un'azione, scrivi "registrare sul Sistema TS tramite gestionale". Il regime del farmaco (RR/RNR, validita', posologia, registro entrata/uscita per le sezioni A, B e C) NON cambia con il formato.
+- STUPEFACENTI su ricetta BIANCA dematerializzata: ammessi dal 23/11/2026 per i medicinali delle sezioni B, C, D ed E della Tabella dei medicinali (circ. Federfarma 245 e 249/2026; un primo avvio del 1/7/2026 era stato sospeso da SOGEI il 3/7/2026). Restano ESCLUSI dalla dematerializzazione: la sezione A (solo ricettario ministeriale a ricalco: un promemoria dematerializzato con un farmaco di sezione A, es. metilfenidato Ritalin/Medikinet/Concerta o morfina/fentanil fiale, e' anomalo -> "errore"), le preparazioni magistrali e i farmaci OSP (non vendibili al pubblico). Per la sezione D in allegato III-bis transitata dopo il 15/6/2009 (tramadolo, tapentadolo, buprenorfina transdermica...) generalita' e documento di chi ritira si registrano sul Sistema TS tramite gestionale, NON sul promemoria. Un promemoria bianco di stupefacenti con data di redazione anteriore al 23/11/2026 e' anomalo -> "attenzione". Le ricette cartacee per gli stessi farmaci restano valide e vanno spedite se conformi.
 
 CASISTICHE PARTICOLARI DI EROGAZIONE (valide per tutti i tipi, verifica giugno 2026):
 - FUORI REGIONE: la ricetta SSN dematerializzata (promemoria/NRE) e' erogabile in QUALSIASI regione (ricetta elettronica nazionale a pieno regime). Ticket ed esenzioni sono quelli della regione di iscrizione sanitaria dell'assistito, NON di quella di erogazione. NON segnalare come errore una ricetta DEM prescritta in altra regione: e' valida e spedibile. I farmaci in DPC prescritti fuori regione si erogano comunque in regime DPC.
@@ -1579,7 +1586,7 @@ function mostraRisultati(r) {
   const farmacoVal = (document.getElementById('f-farmaco').value || '').trim();
   const dataPrescr = document.getElementById('f-data').value;
   const dataPrescrStr = dataPrescr ? new Date(dataPrescr + 'T00:00:00').toLocaleDateString('it-IT') : '';
-  const tipoLabel = { ssn:'SSN / Dematerializzata', bianca:'Bianca privata', stupefacenti:'Stupefacenti', veterinaria:'Veterinaria' }[tipoSelezionato] || tipoSelezionato;
+  const tipoLabel = { ssn:'SSN', bianca:'Bianca privata', stupefacenti:'Stupefacenti', veterinaria:'Veterinaria' }[tipoSelezionato] || tipoSelezionato;
   const ctxRows = [];
   if (medicoVal)     ctxRows.push(`<div><span class="lbl">Medico prescrittore:</span> ${escHtml(medicoVal)}</div>`);
   if (farmacoVal)    ctxRows.push(`<div><span class="lbl">Farmaco:</span> ${escHtml(farmacoVal)}</div>`);
@@ -1870,7 +1877,7 @@ function generaTestoSegnalazione() {
   const dataOra = now.toLocaleDateString('it-IT') + ' ore ' + now.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
   const medico  = (document.getElementById('f-medico').value  || '').trim();
   const farmaco = (document.getElementById('f-farmaco').value || '').trim();
-  const tipoLabel = { ssn:'SSN / Dematerializzata', bianca:'Bianca privata', stupefacenti:'Stupefacenti' }[tipoSelezionato] || tipoSelezionato;
+  const tipoLabel = { ssn:'SSN', bianca:'Bianca privata', stupefacenti:'Stupefacenti' }[tipoSelezionato] || tipoSelezionato;
   const sommario = ultimoRisultato ? (ultimoRisultato.sommario || '') : '';
   return [
     'SEGNALAZIONE RICETTA SOSPETTA',
