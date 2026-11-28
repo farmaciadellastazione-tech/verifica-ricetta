@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import {
   circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, regoleToPrompt, regoleToDbFile,
-  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa,
+  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa, circolareDaValutare, trattamentoCircolare,
 } from '../regole-core.js';
 
 // Circolari reali Federfarma La Spezia (solo oggetto e testo normativo).
@@ -368,5 +368,46 @@ describe('logistica DPC — eccezione per entrate/uscite di medicinali', () => {
       'DPC: esclusione di PROLIA dalla distribuzione per conto',
       'Proroga accordo DPC e uscita di EPREX dal canale',
     ]) expect(circolarePertinente(s), s).toBe(true);
+  });
+});
+
+// Circolari sugli stupefacenti (28/11/2026): cambiano le regole di base del
+// prompt, non una regola per farmaco → nella PR come "da valutare a mano".
+describe('circolareDaValutare — stupefacenti da leggere a mano', () => {
+  it('oggetti con sigla STUP o stupefacenti', () => {
+    for (const s of [
+      '245 -STUP- DEMATERIALIZZAZIONE DELLE RICETTE A CAARICO DEL CITTADINO (CD RICETTE BIANCHE) PER I MEDICINALI STUPEFACENTI DELLE SEZIONI B,C,D ED E',
+      '249 -STUP-DEMATERIALIZZAZIONE RICETTE BIANCHE STUPEFACENTI SEZIONI B, C, D ED E. PRECISAZIONI',
+      'circ FF Lig. n. 0070 del 06-07-26 Erogazione ricette dema farmaci stupefacenti. Chiarimenti Federfarma momentanea sospensione',
+    ]) expect(circolareDaValutare(s), s).toBe(true);
+  });
+  it('le altre circolari no; le segnalazioni FOFI di furti/falsi nemmeno', () => {
+    for (const s of [
+      '241 -AIFA-DETERMINAZIONI 20 OTTOBRE 2026. AGGIORNAMENTO NOTA AIFA 31.',
+      'circ FF.Lig 0053 del 08-06-26 DPC. Aggiornamento elenco A dal 08-06-2026',
+      'IMPORTANTE : Segnalazione possibile ricetta falsificata stupefacenti',
+      'furto ricettario stupefacenti',
+      '', null,
+    ]) expect(circolareDaValutare(s), String(s)).toBe(false);
+  });
+});
+
+// Code review 28/11/2026: una circolare STUP che e' anche AIFA/DPC/erogazione va
+// comunque a Gemini; e le esclusioni (corsi, ritiri lotto, logistica) valgono anche qui.
+describe('trattamentoCircolare — Gemini e/o avviso da valutare a mano', () => {
+  it('STUP pertinente: Gemini + avviso', () => {
+    expect(trattamentoCircolare('250 -STUP- AIFA nota 3 aggiornamento')).toEqual({ gemini: true, avviso: true });
+    expect(trattamentoCircolare('circ FF Lig. n. 0070 del 06-07-26 Erogazione ricette dema farmaci stupefacenti')).toEqual({ gemini: true, avviso: true });
+  });
+  it('STUP non pertinente: solo avviso', () => {
+    expect(trattamentoCircolare('249 -STUP-DEMATERIALIZZAZIONE RICETTE BIANCHE STUPEFACENTI SEZIONI B, C, D ED E. PRECISAZIONI')).toEqual({ gemini: false, avviso: true });
+  });
+  it('pertinente non STUP: solo Gemini; ne\' l\'una ne\' l\'altra: niente', () => {
+    expect(trattamentoCircolare('241 -AIFA-DETERMINAZIONI. AGGIORNAMENTO NOTA AIFA 31.')).toEqual({ gemini: true, avviso: false });
+    expect(trattamentoCircolare('Nuovo punto prelievi nel DSS18')).toEqual({ gemini: false, avviso: false });
+  });
+  it('esclusioni valide anche per gli stupefacenti', () => {
+    for (const s of ['STUP - Corso ECM gestione stupefacenti', 'Ritiro lotti medicinale stupefacente', 'Carenza medicinale stupefacente'])
+      expect(circolareDaValutare(s), s).toBe(false);
   });
 });

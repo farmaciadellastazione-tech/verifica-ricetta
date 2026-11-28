@@ -35,6 +35,24 @@ function circolarePertinente(oggetto) {
   return _PERTINENTE.test(s);
 }
 
+// Circolari sugli stupefacenti: cambiano le regole di base del prompt (tipo di
+// ricetta, documento, conservazione), non una regola per farmaco. Non vanno a
+// Gemini: finiscono nella PR come "da valutare a mano" (28/11/2026). Furti e
+// falsificazioni di ricettari restano alla pipeline FOFI.
+function circolareDaValutare(oggetto) {
+  const s = String(oggetto || '');
+  // stesse esclusioni delle altre circolari (furti/falsi, corsi, ritiri lotto, logistica, carenze)
+  if (!s.trim() || _ESCLUSA.test(s) || _LOGISTICA.test(s)) return false;
+  return /(^|[^a-z])STUP([^a-z]|$)|stupefacent/i.test(s);
+}
+
+// Cosa fare di una circolare: estrarre regole con Gemini e/o segnalarla al
+// revisore. Una circolare STUP che e' anche AIFA/DPC/erogazione fa entrambe le
+// cose (review 28/11: prima l'avviso "da valutare" bloccava l'estrazione).
+function trattamentoCircolare(oggetto) {
+  return { gemini: circolarePertinente(oggetto), avviso: circolareDaValutare(oggetto) };
+}
+
 // Testo normalizzato per i confronti: minuscolo, senza accenti, sillabazione
 // di fine riga ricomposta, punteggiatura e a capo ridotti a spazi.
 function _norm(s) {
@@ -319,6 +337,6 @@ function prRegoleInAttesa(pulls) {
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _regoleExports = { TIPI_REGOLA, circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa };
+const _regoleExports = { TIPI_REGOLA, circolarePertinente, circolareDaValutare, trattamentoCircolare, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa };
 Object.assign(globalThis, _regoleExports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _regoleExports;

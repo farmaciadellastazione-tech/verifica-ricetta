@@ -63,6 +63,7 @@ The regulatory logic for ricetta bianca privata vs SSN is **substantially differ
 - Note AIFA (N01, 13, 75, ecc.) apply only su SSN, mai su bianca privata. (La "Nota 64" non esiste: non citarla — test in `tests/prompt-note-aifa.test.js`.)
 - RMR (ricalco) vs RNR (bianca/SSN non a ricalco) determina la necessità del documento ritirante per stupefacenti allegato III-bis (vedi DPR 309/90 art. 45 c. 6-bis).
 - Alcuni farmaci sono OSP1 (uso ospedaliero esclusivo, art. 92 DL 219/06) — segnala "errore di prescrivibilità", non "manca documento".
+- **Formato cartacea vs dematerializzata** (sezione "FORMATO DELLA RICETTA" nella parte fissa del prompt, 28/11/2026): il tipo (bianca/SSN) è indipendente dal formato. Promemoria SSN = NRE, promemoria bianca = **NRBE**; sul promemoria niente firma autografa né timbro (CF + codice di autenticazione); conservazione e annotazioni (documento ritirante, frazionamento) sul Sistema TS. Una regola generale "traduce" le righe di dettaglio scritte per la carta ("trattenere/annotare sulla ricetta"). Stupefacenti su bianca dematerializzata: sez. B-E dal 23/11/2026, sez. A solo ricalco (circ. Federfarma 245/249/2026). Test: `tests/prompt-formato.test.js`. Le circolari "STUP" la pipeline regole non le estrae: le mette nella PR come "da valutare a mano" (`circolareDaValutare`).
 
 If you change the regulatory text in the prompt, double-check against the most recent version of D.Lgs. 219/2006 and DPR 309/90; these are the regulatory anchors the prompt is built around.
 
