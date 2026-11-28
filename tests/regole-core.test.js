@@ -329,3 +329,44 @@ describe('index.html — avviso PR regole', () => {
     expect(html).toContain('api.github.com/repos/farmaciadellastazione-tech/verifica-ricetta/pulls');
   });
 });
+
+// Lettura di 365 giorni (PR #28, 28/11/2026): 20 regole su 49 erano logistica
+// DPC o carenze, non regole per controllare una ricetta.
+describe('logistica DPC e carenze — non sono regole di prescrizione', () => {
+  it('oggetti di sola logistica/carenza: mail scartate', () => {
+    for (const s of [
+      '!!! DPC ministock. Entro DOMANI, 10-12-2025 RESO SELEPARINA 3800 UI',
+      'circ FF.Lig 0176 del 18-12-25 DPC inventario al 31-12-2025 (2 parte) - Operativita della farmacia',
+      'circ FF.Lig 0041 del 24-04-26 DPC: dal 01-05-2026 modifica PEC per richiesta addebito invendibili/smarriti e segnalazione difetti',
+      'DPC disponibilità farmaci. Nota ATSL per i medici. Aggiornamento disponibilità BINOCRIT',
+      'circ FF Liguria n. 0071 del 06-07-2026 DPC elenco contingentati aggiornamento 06-07-2026',
+      'circ FF.Lig 0052 del 03-06-26 ACCORDO DPC: PROROGA al 31-05-2027',
+      'circ FF.Lig 0019 del 10-02-26 Carenza Depakin granulato r.m. Nota Regione Liguria 10-02-2026. Comunicato Sanofi/AIFA',
+    ]) expect(circolarePertinente(s), s).toBe(false);
+  });
+  it('gli aggiornamenti dell\'elenco A DPC restano', () => {
+    for (const s of [
+      'circ FF.Lig 0036 del 03-04-26 DPC. Aggiornamento elenco A dal 07-04-2026.',
+      'circ FF.Lig 0053 del 08-06-26 DPC. Aggiornamento elenco A dal 08-06-2026',
+      'circ FF.Lig 0010 del 27-01-26 DPC Aggiornamento elenco A dal 28-01-2026. Nuove formulazione RYBELSUS',
+    ]) expect(circolarePertinente(s), s).toBe(true);
+  });
+  it('il prompt di estrazione esclude esplicitamente la logistica DPC', () => {
+    const p = promptEstrazione('x', 'y').toLowerCase();
+    for (const w of ['ministock', 'inventari', 'contingentament', 'allocazion', 'pec', 'esaurimento scorte', 'carenz'])
+      expect(p, w).toContain(w);
+  });
+});
+
+// Review 28/11: "accordo"/"disponibilità" sono generiche: se l'oggetto annuncia
+// medicinali che entrano o escono dalla DPC la circolare va letta comunque.
+describe('logistica DPC — eccezione per entrate/uscite di medicinali', () => {
+  it('ingressi/uscite DPC con parole generiche nell\'oggetto: lette', () => {
+    for (const s of [
+      'Nuovo accordo DPC: inserimento di MOUNJARO',
+      'Disponibilità in DPC di OBODENCE: inserimento in elenco',
+      'DPC: esclusione di PROLIA dalla distribuzione per conto',
+      'Proroga accordo DPC e uscita di EPREX dal canale',
+    ]) expect(circolarePertinente(s), s).toBe(true);
+  });
+});

@@ -20,9 +20,18 @@ const TIPI_REGOLA = {
 const _PERTINENTE = /\bAIFA\b|\bnot[ae]\s+(aifa\s+)?\d|riclassific|\bclasse\s+[ACH]\b|\bfascia\s+[ACH]\b|\bDPC\b|\bPHT\b|modalit[aà]\s+di\s+(prescrizione|erogazione)|\berogazione\b|regime\s+di\s+fornitura|piano\s+terapeutico/i;
 const _ESCLUSA = /vaccin|valori\s+di\s+rimborso|\bECM\b|\bcorso\b|prelievi|riepilogo|segnalazion|falsificat|furto|smarriment|ritiro\s+lott|revoc|decadenz/i;
 
+// Logistica DPC e carenze (lettura 365 gg, PR #28: 20 regole inutili su 49):
+// non cambiano i controlli sulla ricetta. Valgono anche se l'oggetto dice "DPC";
+// passano solo gli aggiornamenti dell'elenco A, le riclassificazioni e le note AIFA.
+const _LOGISTICA = /ministock|inventari|\bPEC\b|disponibilit[aà]|contingent|\baccordo\b|proroga|carenz|\breso\b|esaurimento|allocazion/i;
+
 function circolarePertinente(oggetto) {
   const s = String(oggetto || '');
-  if (!s.trim() || _ESCLUSA.test(s) && !/riclassific|nota\s+aifa|\bDPC\b/i.test(s)) return false;
+  if (!s.trim()) return false;
+  if (_ESCLUSA.test(s) && !/riclassific|nota\s+aifa|\bDPC\b/i.test(s)) return false;
+  // eccezione: medicinali che entrano/escono dalla DPC (o vanno in diretta), anche
+  // se l'oggetto usa parole generiche come "accordo" o "disponibilità" (review 28/11)
+  if (_LOGISTICA.test(s) && !/elenco\s+a\b|riclassific|nota\s+aifa|inseriment|inserit|inclus|esclus|uscit|distribuzione\s+diretta/i.test(s)) return false;
   return _PERTINENTE.test(s);
 }
 
@@ -130,6 +139,8 @@ function promptEstrazione(oggetto, testo) {
 - "riclassificazione": cambio di classe di rimborsabilita' (A, C, H) o di regime di fornitura (RR, RNR, RRL, RNRL, OSP, SOP, OTC) di un medicinale;
 - "dpc": inserimento o uscita di un medicinale dalla Distribuzione Per Conto regionale, o cambio del canale di erogazione (DPC / convenzionata).
 NON estrarre: carenze e disponibilita' di magazzino, prezzi, valori di rimborso, ritiri di lotti, revoche AIC, vaccini, corsi, aspetti amministrativi o contabili.
+NON estrarre nemmeno la LOGISTICA DPC, che non cambia il controllo della ricetta: ministock, inventari, ordini e resi ai depositi, contingentamenti (n. confezioni per ricetta), allocazioni ed evasioni, prodotti ad esaurimento scorte, indirizzi PEC e procedure di addebito, segnalazione difetti, proroghe di accordi, farmaci alternativi acquistati per una carenza, istruzioni sul gestionale (GOpen/GopenDPC). Per la DPC estrai SOLO quali medicinali ENTRANO o ESCONO dall'elenco DPC (o passano a distribuzione diretta), con la data.
+NON ripetere regole transitorie gia' concluse (es. periodo di tolleranza di 30 giorni dopo un'abrogazione).
 
 Per ogni regola restituisci:
 - "tipo": "nota_aifa" | "riclassificazione" | "dpc"
