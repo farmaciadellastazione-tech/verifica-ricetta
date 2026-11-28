@@ -61,8 +61,9 @@ direttamente la pagina del workflow su GitHub (serve essere loggati).
   (sul branch `dev`). Se non ci sono circolari nuove, il job termina senza fare
   nulla; altrimenti compare una PR verso `dev`.
 
-> Lo **scheduler automatico** (lun-sab alle 07, 11, 15, 18 ora solare; un'ora
-> dopo con l'ora legale; GitHub può ritardare di 10-30 minuti) parte solo quando il workflow è
+> Lo **scheduler automatico** (lun-sab alle 07:13, 11:13, 15:13, 18:13 ora solare; un'ora
+> dopo con l'ora legale; GitHub può ritardare anche di ore o saltare un giro,
+> soprattutto agli orari tondi: per questo il minuto è 13) parte solo quando il workflow è
 > presente sul **branch di default** del repo (`main`): finché resta solo su
 > `dev`, usalo a mano con *Run workflow*. Dopo il merge su `main` (con la tua
 > conferma) gira da solo.
@@ -122,7 +123,7 @@ direttamente la pagina del workflow su GitHub (serve essere loggati).
 
 # Automazione regole di prescrizione (note AIFA, riclassificazioni, DPC)
 
-Workflow `.github/workflows/regole-update.yml`, lun-sab alle 06:30 UTC.
+Workflow `.github/workflows/regole-update.yml`, lun-sab alle 07:17 e 13:47 (ora solare).
 
 1. `tools/update-regole.mjs` legge le mail di `federfarmalaspezia.it` e
    `fofiruf.it` degli ultimi 30 giorni. Tiene solo quelle con oggetto
