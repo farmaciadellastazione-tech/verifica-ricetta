@@ -357,3 +357,16 @@ describe('logistica DPC e carenze — non sono regole di prescrizione', () => {
       expect(p, w).toContain(w);
   });
 });
+
+// Review 28/11: "accordo"/"disponibilità" sono generiche: se l'oggetto annuncia
+// medicinali che entrano o escono dalla DPC la circolare va letta comunque.
+describe('logistica DPC — eccezione per entrate/uscite di medicinali', () => {
+  it('ingressi/uscite DPC con parole generiche nell\'oggetto: lette', () => {
+    for (const s of [
+      'Nuovo accordo DPC: inserimento di MOUNJARO',
+      'Disponibilità in DPC di OBODENCE: inserimento in elenco',
+      'DPC: esclusione di PROLIA dalla distribuzione per conto',
+      'Proroga accordo DPC e uscita di EPREX dal canale',
+    ]) expect(circolarePertinente(s), s).toBe(true);
+  });
+});

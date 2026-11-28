@@ -29,7 +29,9 @@ function circolarePertinente(oggetto) {
   const s = String(oggetto || '');
   if (!s.trim()) return false;
   if (_ESCLUSA.test(s) && !/riclassific|nota\s+aifa|\bDPC\b/i.test(s)) return false;
-  if (_LOGISTICA.test(s) && !/elenco\s+a\b|riclassific|nota\s+aifa/i.test(s)) return false;
+  // eccezione: medicinali che entrano/escono dalla DPC (o vanno in diretta), anche
+  // se l'oggetto usa parole generiche come "accordo" o "disponibilità" (review 28/11)
+  if (_LOGISTICA.test(s) && !/elenco\s+a\b|riclassific|nota\s+aifa|inseriment|inserit|inclus|esclus|uscit|distribuzione\s+diretta/i.test(s)) return false;
   return _PERTINENTE.test(s);
 }
 
