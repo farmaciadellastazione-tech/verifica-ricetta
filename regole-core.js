@@ -41,8 +41,16 @@ function circolarePertinente(oggetto) {
 // falsificazioni di ricettari restano alla pipeline FOFI.
 function circolareDaValutare(oggetto) {
   const s = String(oggetto || '');
-  if (!s.trim() || /segnalazion|falsificat|furto|smarriment/i.test(s)) return false;
+  // stesse esclusioni delle altre circolari (furti/falsi, corsi, ritiri lotto, logistica, carenze)
+  if (!s.trim() || _ESCLUSA.test(s) || _LOGISTICA.test(s)) return false;
   return /(^|[^a-z])STUP([^a-z]|$)|stupefacent/i.test(s);
+}
+
+// Cosa fare di una circolare: estrarre regole con Gemini e/o segnalarla al
+// revisore. Una circolare STUP che e' anche AIFA/DPC/erogazione fa entrambe le
+// cose (review 28/11: prima l'avviso "da valutare" bloccava l'estrazione).
+function trattamentoCircolare(oggetto) {
+  return { gemini: circolarePertinente(oggetto), avviso: circolareDaValutare(oggetto) };
 }
 
 // Testo normalizzato per i confronti: minuscolo, senza accenti, sillabazione
@@ -329,6 +337,6 @@ function prRegoleInAttesa(pulls) {
 
 // ── Export per browser + Node ────────────────────────────────────────────
 
-const _regoleExports = { TIPI_REGOLA, circolarePertinente, circolareDaValutare, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa };
+const _regoleExports = { TIPI_REGOLA, circolarePertinente, circolareDaValutare, trattamentoCircolare, estrattoPresente, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, regoleToPrompt, regoleToDbFile, regolaDuplicata, regoleNuove, reportPR, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa };
 Object.assign(globalThis, _regoleExports);
 if (typeof module !== 'undefined' && module.exports) module.exports = _regoleExports;

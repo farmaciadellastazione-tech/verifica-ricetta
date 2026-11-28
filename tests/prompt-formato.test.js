@@ -71,3 +71,34 @@ describe('interfaccia — la dematerializzata non e\' solo SSN', () => {
     expect(html).not.toContain('SSN / Dematerializzata');
   });
 });
+
+// Code review 28/11/2026
+describe('review — coerenza del prompt su documento ritirante e scheda stupefacenti', () => {
+  it('buprenorfina transdermica NON e\' tra i farmaci transitati dopo il 15/6/2009 (in III-bis dal 2001)', () => {
+    // le righe che ELENCANO i farmaci post-2009 (la riga NON_VALIDA cita Transtec tra i PRE, giustamente)
+    const righe = html.split('\n').filter(l =>
+      l.startsWith('  * RNR Tab. A allegato III-bis - tramadolo') ||
+      l.startsWith('- STUPEFACENTI su ricetta BIANCA dematerializzata'));
+    expect(righe).toHaveLength(2);
+    for (const riga of righe)
+      expect(riga, riga.slice(0, 120)).not.toMatch(/buprenorfina transdermica|Transtec|Triquisic/i);
+  });
+
+  it('regole POST sul documento ritirante: eccezione per il promemoria dematerializzato', () => {
+    const r1288 = html.split('\n').find(l => l.startsWith('* Bianca/SSN non a ricalco RNR sez. D allegato III-bis POST-15/6/2009')) || '';
+    expect(r1288).toMatch(/dematerializzat[^.]*Sistema TS/i);
+    const nonValida = html.split('\n').find(l => l.startsWith('- "NON_VALIDA"') && l.includes('INADEMPIENZE')) || '';
+    expect(nonValida).toMatch(/promemoria dematerializzat/i);
+  });
+
+  it('scheda Stupefacenti: ambito ricalco, una bianca RNR o un promemoria NRBE va verificato con la scheda Bianca', () => {
+    const stup = sezione('stupefacenti: `Requisiti ricetta stupefacenti', 'VALIDITA\':');
+    expect(stup).toMatch(/AMBITO/);
+    expect(stup).toMatch(/NRBE/);
+    expect(stup).toMatch(/Bianca privata/);
+  });
+
+  it('etichetta Veterinaria anche nel testo della segnalazione', () => {
+    expect((html.match(/veterinaria:'Veterinaria'/g) || []).length).toBeGreaterThanOrEqual(2);
+  });
+});

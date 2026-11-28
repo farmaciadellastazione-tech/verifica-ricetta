@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import {
   circolarePertinente, estrattoPresente, validaRegola, avvisiRegola, regoleToPrompt, regoleToDbFile,
-  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa, circolareDaValutare,
+  promptEstrazione, parseRispostaEstrazione, regoleNuove, reportPR, regolaDuplicata, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa, prRegoleInAttesa, circolareDaValutare, trattamentoCircolare,
 } from '../regole-core.js';
 
 // Circolari reali Federfarma La Spezia (solo oggetto e testo normativo).
@@ -389,5 +389,25 @@ describe('circolareDaValutare — stupefacenti da leggere a mano', () => {
       'furto ricettario stupefacenti',
       '', null,
     ]) expect(circolareDaValutare(s), String(s)).toBe(false);
+  });
+});
+
+// Code review 28/11/2026: una circolare STUP che e' anche AIFA/DPC/erogazione va
+// comunque a Gemini; e le esclusioni (corsi, ritiri lotto, logistica) valgono anche qui.
+describe('trattamentoCircolare — Gemini e/o avviso da valutare a mano', () => {
+  it('STUP pertinente: Gemini + avviso', () => {
+    expect(trattamentoCircolare('250 -STUP- AIFA nota 3 aggiornamento')).toEqual({ gemini: true, avviso: true });
+    expect(trattamentoCircolare('circ FF Lig. n. 0070 del 06-07-26 Erogazione ricette dema farmaci stupefacenti')).toEqual({ gemini: true, avviso: true });
+  });
+  it('STUP non pertinente: solo avviso', () => {
+    expect(trattamentoCircolare('249 -STUP-DEMATERIALIZZAZIONE RICETTE BIANCHE STUPEFACENTI SEZIONI B, C, D ED E. PRECISAZIONI')).toEqual({ gemini: false, avviso: true });
+  });
+  it('pertinente non STUP: solo Gemini; ne\' l\'una ne\' l\'altra: niente', () => {
+    expect(trattamentoCircolare('241 -AIFA-DETERMINAZIONI. AGGIORNAMENTO NOTA AIFA 31.')).toEqual({ gemini: true, avviso: false });
+    expect(trattamentoCircolare('Nuovo punto prelievi nel DSS18')).toEqual({ gemini: false, avviso: false });
+  });
+  it('esclusioni valide anche per gli stupefacenti', () => {
+    for (const s of ['STUP - Corso ECM gestione stupefacenti', 'Ritiro lotti medicinale stupefacente', 'Carenza medicinale stupefacente'])
+      expect(circolareDaValutare(s), s).toBe(false);
   });
 });

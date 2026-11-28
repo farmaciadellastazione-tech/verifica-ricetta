@@ -30,7 +30,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FILE_REGOLE = resolve(ROOT, 'regole-prescrizione.js');
 const FILE_REPORT = resolve(ROOT, '.regole-report.json');
 const {
-  circolarePertinente, circolareDaValutare, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa,
+  trattamentoCircolare, validaRegola, avvisiRegola, promptEstrazione, parseRispostaEstrazione, rispostaLeggibile, diagnosiChiave, erroreGemini, esitoCorsa,
   regoleToDbFile, regolaDuplicata, regoleNuove, reportPR,
 } = require(resolve(ROOT, 'regole-core.js'));
 const { dataDMY } = require(resolve(ROOT, 'fofi-match.js'));
@@ -188,15 +188,13 @@ async function aggiorna(giorni) {
         const env = await client.fetchOne(String(uid), { envelope: true }, { uid: true });
         const subject = (env?.envelope?.subject || '').trim();
         const msgId = env?.envelope?.messageId || '';
-        const daValutare = circolareDaValutare(subject);
-        if (!msgId || esaminate.has(msgId) || !(daValutare || circolarePertinente(subject))) continue;
-        if (daValutare) {
-          // stupefacenti: niente Gemini, la circolare la legge il revisore
-          avvisi.push({ fonte: subject, problemi: ['circolare sugli stupefacenti: DA VALUTARE A MANO (cambia le regole di base del prompt, non estratta in automatico)'] });
+        const tratt = trattamentoCircolare(subject);
+        if (!msgId || esaminate.has(msgId) || !(tratt.gemini || tratt.avviso)) continue;
+        if (tratt.avviso) {
+          // stupefacenti: la circolare la legge il revisore (cambia le regole di base del prompt)
+          avvisi.push({ fonte: subject, problemi: ['circolare sugli stupefacenti: DA VALUTARE A MANO (puo\' cambiare le regole di base del prompt)'] });
           console.log(`Da valutare a mano: ${subject}`);
-          esaminate.add(msgId);
-          lette++;
-          continue;
+          if (!tratt.gemini) { esaminate.add(msgId); lette++; continue; }
         }
 
         const parsed = await scaricaMail(client, uid);
